@@ -1,0 +1,16 @@
+{
+  "name": "elegancehouse-ads",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "cd apps/dashboard && npm run dev",
+    "build": "cd apps/dashboard && npm run build",
+    "db:migrate": "npx supabase db push"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "@higgsfield/client": "latest",
+    "@supabase/supabase-js": "latest",
+    "cheerio": "^1.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "buildCommand": "cd apps/dashboard && npm run build",
+  "outputDirectory": "apps/dashboard/dist",
+  "installCommand": "npm install --legacy-peer-deps && cd apps/dashboard && npm install",
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/(.*)", "destination": "/apps/dashboard/dist/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/detect-events",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

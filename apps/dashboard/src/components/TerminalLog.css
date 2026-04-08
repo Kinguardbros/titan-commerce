@@ -1,0 +1,37 @@
+.term-box {
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  overflow: hidden;
+  opacity: 0;
+  animation: riseUp .6s cubic-bezier(.22,1,.36,1) forwards;
+  animation-delay: .35s;
+}
+.term-head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 12px 16px; border-bottom: 1px solid var(--edge);
+  background: linear-gradient(180deg, var(--surface), var(--deep));
+}
+.term-dot { width: 7px; height: 7px; border-radius: 50%; }
+.term-dot.r { background: var(--coral); }
+.term-dot.y { background: var(--amber); }
+.term-dot.g { background: var(--emerald); }
+.term-label {
+  font-family: var(--mono); font-size: 8px; color: var(--text4);
+  margin-left: 6px; letter-spacing: 2px; text-transform: uppercase;
+}
+
+.term-body {
+  padding: 12px 16px; height: 210px; overflow-y: auto;
+  font-family: var(--mono); font-size: 8.5px; line-height: 2;
+}
+.tl { opacity: 0; animation: slideIn .4s ease forwards; }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.tl-time { color: var(--text4); }
+.tl-agent { font-weight: 500; }
+.tl-msg { color: var(--text3); }
+.tl-msg--error { color: var(--coral); }
+.tl-msg--warn { color: var(--gold); }

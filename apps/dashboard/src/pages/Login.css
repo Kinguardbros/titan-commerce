@@ -1,0 +1,52 @@
+.login-page {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-app);
+}
+.login-card {
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+  padding: 48px 40px; max-width: 360px; width: 100%;
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: var(--card-radius); box-shadow: var(--shadow-card);
+}
+.login-logo { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 12px; }
+.login-logo-mark {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: var(--accent-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-size: 24px; color: #fff;
+  margin-bottom: 8px;
+}
+.login-logo-brand {
+  font-family: var(--font-display); font-size: 14px;
+  background: var(--gradient-heading);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.login-logo-sub { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); letter-spacing: 3px; text-transform: uppercase; }
+
+.login-input {
+  width: 100%; padding: 12px 16px; border-radius: 10px;
+  background: var(--bg-input); border: 1px solid var(--border-default);
+  color: var(--text-primary); font-family: var(--font-body); font-size: 13px;
+  outline: none; transition: border-color 200ms; text-align: center;
+}
+.login-input:focus { border-color: var(--accent-primary); }
+.login-input::placeholder { color: var(--text-muted); }
+
+.login-remember {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font-family: var(--font-body); font-size: 11px; color: var(--text-muted); cursor: pointer;
+}
+.login-remember input { cursor: pointer; accent-color: var(--accent-primary); }
+
+.login-btn {
+  width: 100%; padding: 12px; border-radius: 12px;
+  background: var(--accent-primary); border: none; color: #fff;
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 200ms;
+}
+.login-btn:hover { background: var(--accent-primary-hover); }
+.login-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.login-error { font-family: var(--font-body); font-size: 11px; color: var(--accent-danger); }
+.login-hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }

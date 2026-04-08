@@ -1,0 +1,43 @@
+.pc {
+  background: var(--bg-surface); border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 6px;
+  border-left: 3px solid var(--text-muted);
+  display: flex; align-items: flex-start; gap: 12px;
+  transition: all 200ms;
+}
+.pc:hover { border-color: var(--border-hover); }
+.pc--critical { border-left-color: var(--accent-danger); }
+.pc--high { border-left-color: var(--accent-secondary); }
+.pc--medium { border-left-color: var(--accent-tertiary); }
+.pc--low { border-left-color: var(--accent-success); }
+
+.pc-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+
+.pc-body { flex: 1; min-width: 0; }
+.pc-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.pc-desc { font-size: 11px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 6px; }
+
+.pc-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+.pc-tag {
+  font-family: var(--font-mono); font-size: 9px; color: var(--accent-primary);
+  background: var(--accent-primary-soft); padding: 2px 8px; border-radius: 20px;
+}
+.pc-tag--count { color: var(--text-secondary); background: var(--bg-card); }
+
+.pc-product-link {
+  background: none; border: none; font-family: var(--font-mono); font-size: 10px;
+  color: var(--text-muted); cursor: pointer; padding: 0; text-decoration: underline;
+  transition: color 150ms;
+}
+.pc-product-link:hover { color: var(--accent-primary); }
+
+.pc-actions { display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
+.pc-btn {
+  padding: 6px 14px; border-radius: 8px; font-family: var(--font-body);
+  font-size: 11px; font-weight: 500; cursor: pointer; transition: all 200ms;
+  border: 1px solid var(--border-subtle);
+}
+.pc-btn--approve { background: var(--accent-success-soft); color: var(--accent-success); border-color: rgba(34,197,94,.2); }
+.pc-btn--approve:hover { background: rgba(34,197,94,.2); }
+.pc-btn--dismiss { background: transparent; color: var(--text-muted); }
+.pc-btn--dismiss:hover { color: var(--accent-danger); border-color: rgba(239,68,68,.2); background: var(--accent-danger-soft); }

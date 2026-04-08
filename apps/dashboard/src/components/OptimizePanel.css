@@ -1,0 +1,124 @@
+.op-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(8,8,11,.85); backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  animation: ceIn .2s ease;
+}
+.op-modal {
+  background: var(--deep); border: 1px solid var(--edge); border-radius: 16px;
+  width: 900px; max-width: 95vw; max-height: 90vh; overflow-y: auto;
+  padding: 28px; position: relative;
+  animation: ceSlide .3s cubic-bezier(.22,1,.36,1);
+}
+.op-close {
+  position: absolute; top: 14px; right: 14px;
+  background: var(--surface); border: 1px solid var(--edge);
+  color: var(--text3); width: 30px; height: 30px; border-radius: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; transition: all .25s;
+}
+.op-close:hover { border-color: var(--gold); color: var(--gold); }
+
+.op-title { font-family: var(--display); font-size: 18px; font-weight: 500; color: var(--text); }
+.op-product { font-family: var(--mono); font-size: 10px; color: var(--gold); margin-top: 2px; margin-bottom: 16px; }
+.op-section { font-family: var(--mono); font-size: 8px; color: var(--text4); letter-spacing: 2px; text-transform: uppercase; margin: 12px 0 6px; }
+
+.op-textarea {
+  width: 100%; background: var(--surface); border: 1px solid var(--edge);
+  border-radius: 8px; color: var(--text); font-family: var(--sans); font-size: 11px;
+  padding: 10px 12px; outline: none; resize: none; margin-bottom: 12px;
+}
+.op-textarea:focus { border-color: var(--gold); }
+.op-textarea::placeholder { color: var(--text4); }
+
+.op-generate-btn {
+  width: 100%; padding: 12px; border-radius: 8px;
+  background: var(--gold); border: none; color: var(--void);
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .25s; letter-spacing: .5px;
+}
+.op-generate-btn:hover { background: var(--gold2); }
+
+.op-loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 40px;
+  font-family: var(--mono); font-size: 10px; color: var(--gold);
+}
+.op-spinner {
+  width: 24px; height: 24px; border: 2px solid var(--edge); border-top-color: var(--gold);
+  border-radius: 50%; animation: ceSpin 1s linear infinite;
+}
+.op-error {
+  background: var(--coral-glow); border: 1px solid rgba(212,96,92,.2);
+  color: var(--coral); border-radius: 8px; padding: 10px 14px;
+  font-family: var(--mono); font-size: 9px; margin: 12px 0;
+}
+
+/* Compare columns */
+.op-compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 12px 0; }
+.op-col { background: var(--surface); border-radius: 10px; padding: 14px; border: 1px solid var(--edge); }
+.op-col--original { opacity: .7; }
+.op-col-label { font-family: var(--mono); font-size: 8px; color: var(--text4); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+
+.op-field-label { font-family: var(--mono); font-size: 7px; color: var(--text4); letter-spacing: 1px; text-transform: uppercase; margin-top: 10px; }
+.op-field-value { font-size: 11px; color: var(--text); line-height: 1.6; margin-top: 2px; padding: 4px 0; }
+.op-field--dim { color: var(--text3); }
+.op-field--desc { max-height: 100px; overflow-y: auto; }
+.op-field--editable { cursor: pointer; padding: 4px 6px; border-radius: 4px; transition: background .15s; position: relative; }
+.op-field--editable:hover { background: rgba(201,168,76,.08); }
+.op-field--html { font-size: 10px; }
+.op-field--html h3 { font-size: 12px; margin: 8px 0 4px; color: var(--text); }
+.op-field--html p { margin: 4px 0; }
+.op-field--html ul { padding-left: 16px; margin: 4px 0; }
+.op-field--html li { margin: 2px 0; }
+.op-edit-icon { color: var(--gold); font-size: 10px; margin-left: 4px; opacity: 0; transition: opacity .15s; }
+.op-field--editable:hover .op-edit-icon { opacity: 1; }
+
+.op-edit-input {
+  width: 100%; background: var(--deep); border: 1px solid var(--gold);
+  border-radius: 4px; color: var(--text); font-family: var(--sans); font-size: 11px;
+  padding: 6px 8px; outline: none;
+}
+.op-edit-textarea {
+  width: 100%; background: var(--deep); border: 1px solid var(--gold);
+  border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 6px 8px; outline: none; resize: vertical;
+}
+
+/* Actions */
+.op-actions { display: flex; gap: 8px; margin-top: 16px; }
+.op-btn {
+  flex: 1; padding: 10px; border-radius: 8px;
+  font-family: var(--mono); font-size: 10px; font-weight: 500;
+  cursor: pointer; transition: all .25s; letter-spacing: .5px; border: 1px solid var(--edge);
+}
+.op-btn--regen { background: var(--surface); color: var(--text3); }
+.op-btn--regen:hover { border-color: var(--edge2); color: var(--text); }
+.op-btn--save { background: var(--gold-glow); color: var(--gold); border-color: rgba(201,168,76,.2); }
+.op-btn--save:hover { background: rgba(201,168,76,.2); }
+.op-btn--apply { background: var(--emerald-glow); color: var(--emerald); border-color: rgba(78,173,122,.2); }
+.op-btn--apply:hover { background: rgba(78,173,122,.25); }
+.op-btn--reject { background: transparent; color: var(--text4); }
+.op-btn--reject:hover { color: var(--coral); border-color: rgba(212,96,92,.3); background: var(--coral-glow); }
+.op-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Reject */
+.op-reject-box { margin-top: 12px; }
+.op-reject-input {
+  width: 100%; background: var(--surface); border: 1px solid var(--coral);
+  border-radius: 8px; color: var(--text); font-family: var(--sans); font-size: 11px;
+  padding: 8px 10px; outline: none; resize: none; margin-bottom: 8px;
+}
+
+/* Variants */
+.op-variants-table { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.op-variant-row {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 9px; padding: 3px 0;
+}
+.op-variant-original { color: var(--text4); min-width: 100px; }
+.op-variant-arrow { color: var(--gold); }
+.op-variant-new { color: var(--emerald); font-weight: 500; }
+.op-variant-labels { font-family: var(--mono); font-size: 8px; color: var(--text4); margin-top: 6px; }
+
+@media (max-width: 800px) { .op-compare { grid-template-columns: 1fr; } }
