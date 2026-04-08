@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, syncProducts } from '../lib/api';
+import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './Products.css';
 
@@ -19,30 +20,47 @@ const SORT_OPTIONS = [
   { key: 'creatives_desc', label: 'Most creatives' },
 ];
 
+const PAGE_SIZE = 50;
+
 export default function Products({ onSelectProduct, onNavigateToStudio, storeId }) {
   const toast = useToast();
   const [allProducts, setAllProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [creativesFilter, setCreativesFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name_asc');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('products_view') || 'list');
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (page = 1, append = false) => {
     try {
-      const data = await getProducts(storeId);
-      if (data) setAllProducts(data);
+      const result = await getProducts(storeId, { page, limit: PAGE_SIZE });
+      if (result) {
+        setAllProducts((prev) => append ? [...prev, ...result.products] : result.products);
+        setTotalProducts(result.total);
+        setCurrentPage(result.page);
+        setHasMore(result.page < result.pages);
+      }
     } catch (err) {
       console.error('Failed to fetch products:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [storeId]);
 
-  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+  useEffect(() => { setAllProducts([]); setCurrentPage(1); setLoading(true); fetchProducts(1); }, [fetchProducts]);
+
+  const handleLoadMore = () => {
+    setLoadingMore(true);
+    fetchProducts(currentPage + 1, true);
+  };
 
   // Extract unique collections from product tags
   const collections = useMemo(() => {
@@ -120,18 +138,19 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       <div className="products-header">
         <div>
           <div className="products-title">Products</div>
-          <div className="products-subtitle">{filtered.length} of {allProducts.length} products</div>
+          <div className="products-subtitle">{filtered.length} of {totalProducts} products{hasMore ? ` (${allProducts.length} loaded)` : ''}</div>
         </div>
         <div className="products-actions">
           <div className="products-view-toggle">
             {['grid', 'list', 'cards'].map((v) => (
               <button key={v} className={`products-view-btn${viewMode === v ? ' products-view-btn--active' : ''}`}
+                aria-label={`Switch to ${v} view`} aria-pressed={viewMode === v}
                 onClick={() => { setViewMode(v); localStorage.setItem('products_view', v); }}>
                 {v === 'grid' ? '▤' : v === 'list' ? '≡' : '▦'}
               </button>
             ))}
           </div>
-          <input className="products-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="products-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search products by name" />
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}
           </button>
@@ -199,10 +218,15 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       </div>
 
       {loading ? (
-        <div className="products-loading">Loading products...</div>
+        <SkeletonGrid count={8} />
       ) : filtered.length === 0 ? (
         <div className="products-empty">
-          <div className="products-empty-text">No products match filters</div>
+          <div className="products-empty-icon">📦</div>
+          <div className="products-empty-title">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' ? 'No products match filters' : 'No products yet'}</div>
+          <div className="products-empty-desc">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' ? 'Try adjusting your filters or search query.' : 'Sync your Shopify products to get started.'}</div>
+          {!(search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all') && (
+            <button className="products-empty-cta" onClick={handleSync} disabled={syncing}>{syncing ? 'Syncing...' : 'Sync Shopify →'}</button>
+          )}
         </div>
       ) : (
         <>
@@ -210,8 +234,8 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
             <div className="products-grid">
               {filtered.map((p) => (
                 <div key={p.id} className="product-card" onClick={() => onSelectProduct(p)}>
-                  <div className="product-card-img" style={p.image_url ? { backgroundImage: `url(${p.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: 'var(--bg-surface)' }}>
-                    {!p.image_url && <span className="product-card-no-img">No image</span>}
+                  <div className="product-card-img">
+                    {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : <span className="product-card-no-img">No image</span>}
                     {p.creative_count > 0 && <span className="product-card-badge">{p.creative_count} creatives</span>}
                   </div>
                   <div className="product-card-body">
@@ -230,12 +254,12 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                 <tbody>
                   {filtered.map((p) => (
                     <tr key={p.id} onClick={() => onSelectProduct(p)}>
-                      <td><div className="products-table-img" style={p.image_url ? { backgroundImage: `url(${p.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} /></td>
+                      <td><div className="products-table-img">{p.image_url && <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" />}</div></td>
                       <td className="products-table-name">{p.title}</td>
                       <td>${p.price || '—'}</td>
                       <td>{p.creative_count > 0 ? <span style={{ color: 'var(--accent-success)' }}>{p.creative_count}</span> : <span style={{ color: 'var(--accent-danger)' }}>0 ⚠</span>}</td>
                       <td>{p.cogs ? `$${p.cogs}` : '—'}</td>
-                      <td><button className="products-studio-link" onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button></td>
+                      <td><button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -246,8 +270,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           {viewMode === 'cards' && (
             <div className="products-cards">
               {filtered.map((p) => (
-                <div key={p.id} className="products-card-row" onClick={() => onSelectProduct(p)}>
-                  <div className="products-card-img" style={p.image_url ? { backgroundImage: `url(${p.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}} />
+                <div key={p.id} className="products-card-row" role="button" tabIndex={0} aria-label={`Open ${p.title}`} onClick={() => onSelectProduct(p)} onKeyDown={(e) => { if (e.key === 'Enter') onSelectProduct(p); }}>
+                  <div className="products-card-img">
+                    {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : null}
+                  </div>
                   <div className="products-card-info">
                     <div className="products-card-name">{p.title}</div>
                     <div className="products-card-meta">{p.product_type} {p.price ? `· $${p.price}` : ''} {p.cogs ? `· COGS: $${p.cogs}` : ''}</div>
@@ -256,10 +282,18 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                     <span>{p.creative_count || 0} 🎨</span>
                   </div>
                   <div className="products-card-actions">
-                    <button className="products-studio-link" onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button>
+                    <button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {hasMore && (
+            <div className="products-load-more">
+              <button className="products-load-more-btn" onClick={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading...' : `Load more (${allProducts.length} of ${totalProducts})`}
+              </button>
             </div>
           )}
         </>

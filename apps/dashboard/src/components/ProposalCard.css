@@ -41,3 +41,9 @@
 .pc-btn--approve:hover { background: rgba(34,197,94,.2); }
 .pc-btn--dismiss { background: transparent; color: var(--text-muted); }
 .pc-btn--dismiss:hover { color: var(--accent-danger); border-color: rgba(239,68,68,.2); background: var(--accent-danger-soft); }
+
+@media (max-width: 600px) {
+  .pc { flex-direction: column; align-items: stretch; gap: 10px; }
+  .pc-actions { align-self: stretch; display: flex; }
+  .pc-btn { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+}

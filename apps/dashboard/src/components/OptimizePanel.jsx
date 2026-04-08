@@ -83,9 +83,9 @@ export default function OptimizePanel({ product, existingOptimization, onClose, 
   }
 
   return (
-    <div className="op-overlay" onClick={onClose}>
-      <div className="op-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="op-close" onClick={onClose}>✕</button>
+    <div className="op-overlay" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      <div className="op-modal" role="dialog" aria-modal="true" aria-label={`Optimize product: ${product.title}`} onClick={(e) => e.stopPropagation()}>
+        <button className="op-close" aria-label="Close modal" onClick={onClose}>✕</button>
         <div className="op-title">Product Optimizer</div>
         <div className="op-product">{product.title}</div>
 

@@ -9,7 +9,7 @@
   margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;
 }
 .ov-period {
-  font-size: 8px; color: var(--text4); letter-spacing: .5px; text-transform: none;
+  font-size: 10px; color: var(--text4); letter-spacing: .5px; text-transform: none;
 }
 .ov-panel-loading {
   display: flex; align-items: center; justify-content: center;
@@ -23,7 +23,7 @@
   border: 1px solid var(--edge);
 }
 .ov-kpi-label {
-  font-family: var(--mono); font-size: 7px; color: var(--text4);
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
   letter-spacing: 1.5px; text-transform: uppercase;
 }
 .ov-kpi-value {
@@ -37,7 +37,7 @@
 
 /* Section labels */
 .ov-section-label {
-  font-family: var(--mono); font-size: 7px; color: var(--text4);
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
   letter-spacing: 1.5px; text-transform: uppercase; margin: 12px 0 6px;
 }
 
@@ -53,13 +53,13 @@
 .ov-list-rank {
   width: 16px; height: 16px; border-radius: 4px;
   background: var(--surface); display: flex; align-items: center; justify-content: center;
-  font-size: 8px; color: var(--text4); flex-shrink: 0;
+  font-size: 10px; color: var(--text4); flex-shrink: 0;
 }
 .ov-list-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ov-list-meta { color: var(--text4); font-size: 8px; }
+.ov-list-meta { color: var(--text4); font-size: 10px; }
 .ov-list-value { color: var(--text); font-weight: 500; flex-shrink: 0; }
 .ov-list-status {
-  font-size: 7px; padding: 1px 6px; border-radius: 8px; letter-spacing: .3px;
+  font-size: 10px; padding: 1px 6px; border-radius: 8px; letter-spacing: .3px;
   flex-shrink: 0; text-transform: uppercase;
 }
 .ov-list-status--active, .ov-list-status--fulfilled { color: var(--emerald); background: var(--emerald-glow); }
@@ -72,4 +72,4 @@
   padding: 40px; gap: 4px;
 }
 .ov-placeholder-text { font-family: var(--mono); font-size: 10px; color: var(--text3); }
-.ov-placeholder-hint { font-family: var(--mono); font-size: 8px; color: var(--text4); }
+.ov-placeholder-hint { font-family: var(--mono); font-size: 10px; color: var(--text4); }

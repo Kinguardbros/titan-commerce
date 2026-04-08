@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useShopifyOverview } from '../hooks/useShopifyOverview';
+import { SkeletonKPI, SkeletonChart, SkeletonRow } from './Skeleton';
 import './ShopifyDashboard.css';
 
 const PERIODS = [
@@ -12,8 +13,20 @@ export default function ShopifyDashboard({ storeId, onNavigateToProduct }) {
   const [days, setDays] = useState(7);
   const { data, loading } = useShopifyOverview(days, storeId);
 
-  if (loading) return <div className="sdb-loading">Loading dashboard...</div>;
-  if (!data?.connected) return <div className="sdb-empty">Admin API not connected</div>;
+  if (loading) return (
+    <div className="sdb">
+      <div className="sdb-kpis">{Array.from({ length: 4 }).map((_, i) => <SkeletonKPI key={i} />)}</div>
+      <SkeletonChart />
+      <div style={{ marginTop: 16 }}><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
+    </div>
+  );
+  if (!data?.connected) return (
+    <div className="sdb-empty">
+      <div className="sdb-empty-icon">🔌</div>
+      <div className="sdb-empty-title">Shopify Admin not connected</div>
+      <div className="sdb-empty-desc">Connect your Shopify Admin API to see orders, revenue, and analytics.</div>
+    </div>
+  );
 
   const maxRev = Math.max(...(data.daily_revenue || []).map((d) => d.revenue), 1);
   const ps = data.payment_status;

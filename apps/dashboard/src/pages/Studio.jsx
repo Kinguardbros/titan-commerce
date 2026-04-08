@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getProducts, getStudioCreatives, generateBranded, generateCreatives } from '../lib/api';
+import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives } from '../lib/api';
 import GeneratePanel from '../components/GeneratePanel';
 import CreativeEditor from '../components/CreativeEditor';
 import { approveAd, rejectAd } from '../lib/api';
 import supabase from '../lib/supabase';
+import Breadcrumbs from '../components/Breadcrumbs';
 import { useToast } from '../hooks/useToast.jsx';
 import './Studio.css';
 
@@ -52,7 +53,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   useEffect(() => { fetchCreatives(); }, [fetchCreatives]);
 
   useEffect(() => {
-    if (storeId) getProducts(storeId).then(setProducts).catch(() => {});
+    if (storeId) getAllProducts(storeId).then(setProducts).catch(() => {});
   }, [storeId]);
 
   // Pre-select product from navigation
@@ -200,8 +201,11 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
 
       {mode === 'product' && selectedProduct && (
         <div className="studio-product-selected">
+          <Breadcrumbs items={[
+            { label: 'Studio', onClick: () => setSelectedProduct(null) },
+            { label: selectedProduct.title },
+          ]} />
           <div className="studio-selected-header">
-            <button className="studio-back" onClick={() => setSelectedProduct(null)}>← Back</button>
             <span className="studio-selected-name">{selectedProduct.title}</span>
             <button className="studio-generate-btn studio-generate-btn--sm" onClick={() => setShowGeneratePanel(true)}>+ Generate</button>
           </div>

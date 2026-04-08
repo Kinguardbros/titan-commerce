@@ -1,5 +1,13 @@
 .sdb {}
-.sdb-loading, .sdb-empty { padding: 40px; text-align: center; font-family: var(--font-body); font-size: 12px; color: var(--text-muted); }
+.sdb-loading { padding: 40px; text-align: center; font-family: var(--font-body); font-size: 12px; color: var(--text-muted); }
+.sdb-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px; gap: 8px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--card-radius);
+}
+.sdb-empty-icon { font-size: 32px; margin-bottom: 4px; }
+.sdb-empty-title { font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.sdb-empty-desc { font-family: var(--font-body); font-size: 12px; color: var(--text-muted); text-align: center; max-width: 320px; }
 
 .sdb-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .sdb-kpi { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--card-radius); padding: 16px; display: flex; align-items: center; gap: 12px; }
@@ -19,7 +27,7 @@
 .sdb-chart { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
 .sdb-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
 .sdb-bar { width: 100%; max-width: 30px; background: var(--accent-primary); border-radius: 3px 3px 0 0; min-height: 2px; transition: height .5s; }
-.sdb-bar-label { font-family: var(--font-mono); font-size: 7px; color: var(--text-muted); margin-top: 4px; }
+.sdb-bar-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 4px; }
 
 .sdb-bottom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .sdb-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--card-radius); padding: 16px; }
@@ -42,3 +50,9 @@
 .sdb-list-empty { font-size: 11px; color: var(--text-muted); padding: 8px 0; }
 
 @media (max-width: 1200px) { .sdb-kpis { grid-template-columns: repeat(2, 1fr); } .sdb-bottom { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .sdb-kpis { grid-template-columns: 1fr; }
+  .sdb-bottom { grid-template-columns: 1fr; }
+  .sdb-periods { flex-wrap: wrap; }
+  .sdb-period { min-height: 44px; display: flex; align-items: center; }
+}

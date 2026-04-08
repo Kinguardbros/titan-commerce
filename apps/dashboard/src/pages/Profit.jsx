@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProfit } from '../hooks/useProfit';
-import { getProducts, updateCogs, addManualAdspend, cleanupStaleCreatives } from '../lib/api';
+import { getAllProducts, updateCogs, addManualAdspend, cleanupStaleCreatives } from '../lib/api';
+import Tooltip from '../components/Tooltip';
+import { SkeletonKPI, SkeletonRow } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './Profit.css';
 
@@ -26,7 +28,7 @@ export default function Profit({ storeId, store }) {
   const [cleanResult, setCleanResult] = useState(null);
 
   useEffect(() => {
-    getProducts(storeId).then(setProducts).catch(() => {});
+    getAllProducts(storeId).then(setProducts).catch(() => {});
   }, []);
 
   const handleSaveCogs = async () => {
@@ -82,7 +84,10 @@ export default function Profit({ storeId, store }) {
       </div>
 
       {loading ? (
-        <div className="profit-loading">Loading P&L data...</div>
+        <div className="profit-loading-skel">
+          <div className="profit-kpis">{Array.from({ length: 5 }).map((_, i) => <SkeletonKPI key={i} />)}</div>
+          <div style={{ marginTop: 16 }}><SkeletonRow /><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
+        </div>
       ) : (
         <>
           {/* KPI cards */}
@@ -92,7 +97,7 @@ export default function Profit({ storeId, store }) {
               <div className="profit-kpi-value">${t.revenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div className="profit-kpi">
-              <div className="profit-kpi-label">COGS</div>
+              <div className="profit-kpi-label"><Tooltip text="Cost of Goods Sold — your purchase price per unit">COGS</Tooltip></div>
               <div className="profit-kpi-value">${t.cogs?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="profit-kpi-sub">{t.revenue > 0 ? ((t.cogs / t.revenue) * 100).toFixed(1) : 0}%</div>
             </div>
@@ -109,7 +114,7 @@ export default function Profit({ storeId, store }) {
               <div className="profit-kpi-sub">{t.profit_pct?.toFixed(1)}%</div>
             </div>
             <div className="profit-kpi">
-              <div className="profit-kpi-label">ROAS</div>
+              <div className="profit-kpi-label"><Tooltip text="Return on Ad Spend — revenue divided by ad spend">ROAS</Tooltip></div>
               <div className="profit-kpi-value">{t.roas?.toFixed(2) || '—'}×</div>
             </div>
           </div>

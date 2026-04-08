@@ -5,6 +5,8 @@ import GeneratePanel from '../components/GeneratePanel';
 import CreativeEditor from '../components/CreativeEditor';
 import OptimizePanel from '../components/OptimizePanel';
 import { approveAd, rejectAd, updateCreative } from '../lib/api';
+import Breadcrumbs from '../components/Breadcrumbs';
+import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './ProductWorkspace.css';
 
@@ -103,7 +105,10 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
   return (
     <div className="pw">
-      <button className="pw-back" onClick={onBack}>← Back to Products</button>
+      <Breadcrumbs items={[
+        { label: 'Products', onClick: onBack },
+        { label: product.title },
+      ]} />
 
       <div className="pw-header">
         <div className="pw-hero" style={
@@ -155,7 +160,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
       </div>
 
       {loading ? (
-        <div className="pw-empty">Loading...</div>
+        <SkeletonGrid count={4} />
       ) : (
         <>
           {/* Generating — waiting for Higgsfield */}

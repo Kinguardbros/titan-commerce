@@ -115,8 +115,10 @@ export default function Overview({ onNavigateToProduct, onNavigateToStudio, onNa
         </div>
       ) : (
         <div className="ov-empty">
-          <div className="ov-empty-text">No pending proposals</div>
-          <div className="ov-empty-hint">Click "Scan Now" to detect events, or wait for the automated scan.</div>
+          <div className="ov-empty-icon">✅</div>
+          <div className="ov-empty-text">All caught up!</div>
+          <div className="ov-empty-hint">No pending proposals. Agent will scan for events automatically.</div>
+          <button className="ov-empty-cta" onClick={handleScan} disabled={scanning}>{scanning ? 'Scanning...' : 'Scan Now'}</button>
         </div>
       )}
 

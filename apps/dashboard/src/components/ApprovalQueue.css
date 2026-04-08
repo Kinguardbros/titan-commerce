@@ -35,11 +35,11 @@
   font-style: italic; margin-bottom: 2px;
 }
 .aq-headline {
-  font-family: var(--mono); font-size: 8px; color: var(--text3); margin-bottom: 8px;
+  font-family: var(--mono); font-size: 10px; color: var(--text3); margin-bottom: 8px;
 }
 .aq-meta {
   display: flex; justify-content: space-between;
-  font-family: var(--mono); font-size: 7px; color: var(--text4);
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
   margin-bottom: 10px; letter-spacing: .3px;
 }
 

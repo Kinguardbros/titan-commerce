@@ -1,4 +1,5 @@
 import { useShopifyOverview } from '../hooks/useShopifyOverview';
+import Tooltip from './Tooltip';
 import './OverviewPanels.css';
 
 export default function ShopifyPanel() {
@@ -43,7 +44,7 @@ export default function ShopifyPanel() {
           <div className="ov-kpi-value">{data.orders}</div>
         </div>
         <div className="ov-kpi">
-          <div className="ov-kpi-label">AOV</div>
+          <div className="ov-kpi-label"><Tooltip text="Average Order Value — revenue divided by number of orders">AOV</Tooltip></div>
           <div className="ov-kpi-value">${data.aov?.toFixed(2)}</div>
         </div>
       </div>

@@ -22,7 +22,7 @@
 .profit-kpi {
   background: var(--deep); border: 1px solid var(--edge); border-radius: 10px; padding: 14px 16px;
 }
-.profit-kpi-label { font-family: var(--mono); font-size: 7px; color: var(--text4); letter-spacing: 1.5px; text-transform: uppercase; }
+.profit-kpi-label { font-family: var(--mono); font-size: 10px; color: var(--text4); letter-spacing: 1.5px; text-transform: uppercase; }
 .profit-kpi-value { font-size: 20px; font-weight: 700; color: var(--text); margin-top: 4px; font-variant-numeric: tabular-nums; }
 .profit-kpi-sub { font-family: var(--mono); font-size: 9px; color: var(--text4); margin-top: 2px; }
 .profit-kpi--green { color: var(--emerald); }
@@ -37,7 +37,7 @@
 }
 .profit-warning-btn {
   background: var(--gold); color: var(--void); border: none; border-radius: 4px;
-  padding: 3px 10px; font-family: var(--mono); font-size: 8px; font-weight: 600;
+  padding: 3px 10px; font-family: var(--mono); font-size: 10px; font-weight: 600;
   cursor: pointer; margin-left: auto;
 }
 
@@ -52,7 +52,7 @@
 }
 .profit-table th {
   text-align: left; padding: 10px 12px;
-  font-size: 7px; color: var(--text4); letter-spacing: 1.5px; text-transform: uppercase;
+  font-size: 10px; color: var(--text4); letter-spacing: 1.5px; text-transform: uppercase;
   border-bottom: 1px solid var(--edge);
 }
 .profit-table td { padding: 8px 12px; border-bottom: 1px solid var(--edge); }
@@ -74,7 +74,7 @@
   transition: background .15s;
 }
 .profit-panel-header:hover { background: var(--surface); }
-.profit-badge-warn { font-size: 8px; color: var(--gold); background: var(--gold-glow); padding: 1px 6px; border-radius: 8px; letter-spacing: 0; text-transform: none; }
+.profit-badge-warn { font-size: 10px; color: var(--gold); background: var(--gold-glow); padding: 1px 6px; border-radius: 8px; letter-spacing: 0; text-transform: none; }
 .profit-panel-body {
   padding: 8px 14px 14px; max-height: 300px; overflow-y: auto;
 }
@@ -88,7 +88,7 @@
 .profit-cogs-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profit-cogs-btn {
   background: var(--surface); border: 1px solid var(--edge); border-radius: 4px;
-  padding: 2px 10px; font-family: var(--mono); font-size: 8px; color: var(--text4);
+  padding: 2px 10px; font-family: var(--mono); font-size: 10px; color: var(--text4);
   cursor: pointer; flex-shrink: 0;
 }
 .profit-cogs-btn:hover { border-color: var(--gold); color: var(--gold); }
@@ -100,7 +100,7 @@
 }
 .profit-cogs-save {
   background: var(--emerald-glow); border: 1px solid rgba(78,173,122,.2);
-  color: var(--emerald); font-family: var(--mono); font-size: 8px;
+  color: var(--emerald); font-family: var(--mono); font-size: 10px;
   padding: 2px 8px; border-radius: 4px; cursor: pointer;
 }
 .profit-cogs-cancel {
@@ -139,8 +139,8 @@
 }
 .profit-cleanup-btn:hover { border-color: var(--coral); color: var(--coral); }
 .profit-cleanup-btn:disabled { opacity: .5; cursor: not-allowed; }
-.profit-cleanup-hint { font-family: var(--mono); font-size: 8px; color: var(--text4); }
-.profit-cleanup-result { font-family: var(--mono); font-size: 8px; color: var(--emerald); }
+.profit-cleanup-hint { font-family: var(--mono); font-size: 10px; color: var(--text4); }
+.profit-cleanup-result { font-family: var(--mono); font-size: 10px; color: var(--emerald); }
 
 .profit-loading {
   display: flex; align-items: center; justify-content: center;
@@ -149,3 +149,15 @@
 
 @media (max-width: 1200px) { .profit-kpis { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .profit-kpis { grid-template-columns: repeat(2, 1fr); } .profit-bottom { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .profit-kpis { grid-template-columns: 1fr; }
+  .profit-header { flex-direction: column; align-items: stretch; }
+  .profit-controls { flex-wrap: wrap; }
+  .profit-periods { flex-wrap: wrap; }
+  .profit-period { min-height: 44px; display: flex; align-items: center; }
+  .profit-export { min-height: 44px; display: flex; align-items: center; }
+  .profit-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .profit-table { min-width: 500px; }
+  .profit-adspend-form { flex-direction: column; align-items: stretch; }
+  .profit-adspend-input { width: 100%; }
+}

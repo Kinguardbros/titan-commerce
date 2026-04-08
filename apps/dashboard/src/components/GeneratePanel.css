@@ -27,12 +27,12 @@
   font-family: var(--mono); font-size: 10px; color: var(--gold); margin-top: 2px; margin-bottom: 16px;
 }
 .gp-section {
-  font-family: var(--mono); font-size: 8px; color: var(--text4);
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
   letter-spacing: 2px; text-transform: uppercase; margin: 14px 0 8px;
 }
 
 .gp-group-label {
-  font-family: var(--mono); font-size: 7px; color: var(--text4);
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
   letter-spacing: 1.5px; text-transform: uppercase; margin: 10px 0 4px;
 }
 .gp-styles { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
@@ -43,7 +43,7 @@
 .gp-style:hover { border-color: var(--edge2); }
 .gp-style--active { border-color: var(--gold); background: var(--gold-glow); }
 .gp-style-label { font-size: 11px; font-weight: 600; color: var(--text); }
-.gp-style-desc { font-family: var(--mono); font-size: 8px; color: var(--text3); margin-top: 2px; }
+.gp-style-desc { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
 
 .gp-textarea {
   width: 100%; background: var(--surface); border: 1px solid var(--edge);
@@ -118,4 +118,16 @@
   width: 18px; height: 18px;
   border: 2px solid var(--edge); border-top-color: var(--azure);
   border-radius: 50%; animation: ceSpin 1s linear infinite;
+}
+
+@media (max-width: 768px) {
+  .gp-modal {
+    width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh;
+    border-radius: 0; margin: 0;
+  }
+  .gp-overlay { align-items: stretch; justify-content: stretch; }
+  .gp-close { width: 44px; height: 44px; font-size: 18px; top: 8px; right: 8px; }
+  .gp-generate-btn { min-height: 44px; }
+  .gp-style { padding: 12px 14px; }
+  .gp-source-grid { grid-template-columns: repeat(3, 1fr); }
 }

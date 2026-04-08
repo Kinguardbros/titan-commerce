@@ -1,722 +1,386 @@
-# Developer Brief: Sprint 7 — Event Detection + Proposal Queue
+# Developer Brief: Sprint 8 — Performance Optimization
 
 ## Project: Titan Commerce Limited
-**Stack:** React + Vite, Vercel Functions, Supabase, Higgsfield, Claude API
 **Design:** `skills/nextbyte-design/SKILL.md`
 
 ---
 
 ## PROC TENTO SPRINT
 
-Toto je PRELOMOVY sprint — system se meni z nastroje (tool) na agenta (AI agent). Misto "uzivatel klika na kazde tlacitko" system ted:
-1. **DETEKUJE** udalosti automaticky (kazdych 6h)
-2. **NAVRHNE** konkretni akci
-3. **CEKA** na schvaleni od uzivatele
-4. **PROVEDE** schvalenou akci
-
-**Princip: AI navrhuje, clovek schvaluje. ZADNA akce bez souhlasu.**
-
----
-
-## Task 1: Database — Events + Proposals
-
-### 1a. `sql/add-events-proposals.sql`
-
-```sql
--- Events: co se stalo (detekovane udalosti)
-CREATE TABLE events (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    store_id        UUID REFERENCES stores(id) NOT NULL,
-    type            TEXT NOT NULL CHECK (type IN (
-        'new_product',           -- novy produkt importovan
-        'product_no_creatives',  -- produkt se prodava ale nema kreativy
-        'revenue_declining',     -- revenue produktu klesa > 10%
-        'winner_detected',       -- produkt ma revenue growth > 15%
-        'optimization_pending',  -- produkt neni optimalizovany
-        'ad_underperforming',    -- Meta ad ROAS < 1.5 (budouci)
-        'ad_winner',             -- Meta ad ROAS > 4.0 (budouci)
-        'low_stock'              -- produkt dochazi (budouci)
-    )),
-    product_id      UUID REFERENCES products(id),
-    severity        TEXT DEFAULT 'medium' CHECK (severity IN ('low', 'medium', 'high', 'critical')),
-    title           TEXT NOT NULL,       -- "Summer Dress has no creatives"
-    description     TEXT,                -- "Product sold 6 units last week but has 0 creatives"
-    metadata        JSONB DEFAULT '{}',  -- { revenue: 380, units: 6, trend: "-18%" }
-    status          TEXT DEFAULT 'new' CHECK (status IN ('new', 'proposal_created', 'resolved', 'dismissed')),
-    resolved_at     TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-
--- Proposals: co AI navrhuje udelat
-CREATE TABLE proposals (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    store_id        UUID REFERENCES stores(id) NOT NULL,
-    event_id        UUID REFERENCES events(id),
-    type            TEXT NOT NULL CHECK (type IN (
-        'generate_creatives',    -- navrh: vygenerovat kreativy
-        'optimize_listing',      -- navrh: optimalizovat listing
-        'try_different_style',   -- navrh: zkusit jiny styl kreativ
-        'generate_variations',   -- navrh: vygenerovat varianty z winnera
-        'pause_ad',              -- navrh: pausnout ad (budouci)
-        'scale_ad',              -- navrh: zvysit budget (budouci)
-        'restock_alert'          -- navrh: doplnit zasoby (budouci)
-    )),
-    product_id      UUID REFERENCES products(id),
-    title           TEXT NOT NULL,       -- "Generate 4 creatives for Summer Dress"
-    description     TEXT,                -- "Recommended styles: lifestyle, ad_creative (based on winner data)"
-    suggested_action JSONB NOT NULL,     -- { action: "generate", count: 4, styles: ["lifestyle", "ad_creative"] }
-    status          TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'executed', 'expired')),
-    approved_by     TEXT,
-    approved_at     TIMESTAMPTZ,
-    rejected_reason TEXT,
-    executed_at     TIMESTAMPTZ,
-    expires_at      TIMESTAMPTZ,         -- navrh expiruje po 7 dnech
-    created_at      TIMESTAMPTZ DEFAULT now()
-);
-
--- Indexes
-CREATE INDEX idx_events_store_status ON events(store_id, status);
-CREATE INDEX idx_events_type ON events(type);
-CREATE INDEX idx_proposals_store_status ON proposals(store_id, status);
-CREATE INDEX idx_proposals_pending ON proposals(status) WHERE status = 'pending';
-```
+Dashboard se nacita 3-5 sekund. Hlavni priciny:
+1. N+1 DB queries v Shopify overview (60 queries na 10 produktu)
+2. Serialni Shopify API cally (misto paralelních)
+3. Zadna pagination (500+ produktu najednou)
+4. Zadne cachovani (kazdy tab switch = novy fetch)
+5. Dead dependency (recharts 200KB)
+6. api/system.js = 666 radku v jednom souboru
 
 ---
 
-## Task 2: Event Detection Engine
+## Task 1: Fix N+1 queries — NEJVETSI DOPAD
 
-### 2a. `api/cron/detect-events.js` — Cron endpoint (kazdych 6h)
-
-Tento endpoint bezi automaticky pres Vercel cron. Prochazi VSECHNY aktivni story a detekuje udalosti.
-
+### Problem
+`lib/shopify-admin.js` → `getTopProductsWithCreatives()` dela 3 DB queries PER PRODUKT v loop:
 ```js
-// GET /api/cron/detect-events
-// Vola se automaticky kazdych 6 hodin (vercel.json)
-
-// Pro kazdy aktivni store:
-// 1. Nacist top products s creative counts (reuse getTopProductsWithCreatives)
-// 2. Detekovat eventy
-// 3. Ulozit nove eventy do DB (skip pokud stejny event uz existuje a neni resolved)
-// 4. Pro kazdy novy event vytvorit proposal
-// 5. Logovat do pipeline_log
+// SPATNE — 30 queries pro 10 produktu:
+for (const p of products) {
+  const dbP = await supabase.from('products').select('id').ilike('title', ...).single();
+  const { count: total } = await supabase.from('creatives').select(count).eq('product_id', dbP.id);
+  const { count: approved } = await supabase.from('creatives').select(count).eq('product_id', dbP.id).eq('status', 'approved');
+}
 ```
 
-### Event detekce pravidla:
-
-| Event Type | Podminka | Severity | Proposal |
-|------------|----------|----------|----------|
-| `product_no_creatives` | units > 0 AND creative_count = 0 | high | generate_creatives (4ks, best styles) |
-| `revenue_declining` | trend < -10% AND creative_count > 0 | medium | try_different_style |
-| `winner_detected` | trend > +15% AND revenue > prumer | low | generate_variations (z winnera) |
-| `optimization_pending` | product nema approved optimization | medium | optimize_listing |
-| `new_product` | synced_at < 24h AND creative_count = 0 | high | generate_creatives + optimize_listing |
-
-### Deduplikace:
-Pred vlozenim eventu zkontrolovat:
-```sql
--- Existuje uz stejny neresolveny event pro tento produkt?
-SELECT id FROM events 
-WHERE store_id = ? AND product_id = ? AND type = ? AND status IN ('new', 'proposal_created')
-LIMIT 1;
--- Pokud existuje → skip (netvori duplikat)
-```
-
-### 2b. Proposal generation logic
-
-Pro kazdy novy event vytvorit 1 proposal:
-
+### Fix — 1 query misto 30
 ```js
-// Event: product_no_creatives
-{
-  type: 'generate_creatives',
-  title: `Generate 4 creatives for "${product.title}"`,
-  description: `Product sold ${event.metadata.units} units last week but has 0 creatives. Recommended styles based on store performance data.`,
-  suggested_action: {
-    action: 'generate',
-    product_id: product.id,
-    count: 4,
-    styles: ['ad_creative', 'lifestyle'], // top 2 styly z historickych dat
-    format: 'image'
-  },
-  expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 dni
-}
+// SPRAVNE — 1 bulk query:
+const titles = products.map(p => p.title.split('|')[0].trim());
 
-// Event: revenue_declining
-{
-  type: 'try_different_style',
-  title: `Try new style for "${product.title}" (revenue ↓${trend}%)`,
-  description: `Current creatives use "${dominantStyle}". Suggest trying "${alternativeStyle}" based on winner data.`,
-  suggested_action: {
-    action: 'generate',
-    product_id: product.id,
-    count: 2,
-    styles: [alternativeStyle],
-    format: 'image'
-  }
-}
+// Nacist vsechny matching products najednou
+const { data: dbProducts } = await supabase
+  .from('products')
+  .select('id, title')
+  .in('title', titles);  // nebo .or() s ilike
 
-// Event: winner_detected
-{
-  type: 'generate_variations',
-  title: `Scale winner: "${product.title}" (revenue ↑${trend}%)`,
-  description: `Top performer. Generate more creatives in same style to maximize reach.`,
-  suggested_action: {
-    action: 'generate',
-    product_id: product.id,
-    count: 4,
-    styles: [product.best_style || 'ad_creative'],
-    format: 'both' // image + video
+// Nacist creative counts pro vsechny products najednou
+const productIds = dbProducts.map(p => p.id);
+const { data: creativeCounts } = await supabase
+  .rpc('get_creative_counts', { product_ids: productIds });
+  // Nebo: raw SQL pres supabase.rpc()
+
+// Alternativa bez RPC — 2 queries misto 30:
+const { data: allCreatives } = await supabase
+  .from('creatives')
+  .select('product_id, status')
+  .in('product_id', productIds);
+
+// Agregovat client-side:
+for (const p of products) {
+  const match = dbProducts.find(db => db.title.includes(p.title.split('|')[0].trim()));
+  if (match) {
+    p.creative_count = allCreatives.filter(c => c.product_id === match.id).length;
+    p.approved_count = allCreatives.filter(c => c.product_id === match.id && c.status === 'approved').length;
+    p.product_id = match.id;
   }
 }
 ```
 
-### 2c. Upravit `vercel.json` — pridat cron
+**Vysledek:** 2-3 queries misto 30. Usetri 400-800ms.
 
-```json
-{
-  "crons": [
-    {
-      "path": "/api/cron/detect-events",
-      "schedule": "0 */6 * * *"
+---
+
+## Task 2: Paralelizovat Shopify API cally
+
+### Problem
+`getRevenueDelta()` vola `getRevenueSummary()` dvakrat seriove — kazdy vola `fetchOrders()`:
+```js
+// SPATNE — serialni:
+const current = await this.getRevenueSummary(days);     // 200-400ms
+const total2x = await this.getRevenueSummary(days * 2);  // 200-400ms
+```
+
+### Fix
+```js
+// SPRAVNE — paralelni:
+const [current, total2x] = await Promise.all([
+  this.getRevenueSummary(days),
+  this.getRevenueSummary(days * 2),
+]);
+```
+
+Stejne pro `getTopProductsWithCreatives()` kde vola `fetchOrders(days)` a `fetchOrders(days*2)` seriove.
+
+**Vysledek:** 200-400ms uspora.
+
+---
+
+## Task 3: Odstranit recharts dependency
+
+### Problem
+`recharts` je v `apps/dashboard/package.json` ale CLAUDE.md rika "zadne chart knihovny — pouzivat CSS bary". Dead dependency = +200KB v bundlu.
+
+### Fix
+```bash
+cd apps/dashboard && npm uninstall recharts --legacy-peer-deps
+```
+
+A overit ze nikde neni import:
+```bash
+grep -r "recharts" apps/dashboard/src/
+```
+Pokud nekde je — nahradit CSS bary.
+
+**Vysledek:** -200KB bundle size.
+
+---
+
+## Task 4: Pagination produktu
+
+### Problem
+`Products.jsx` nacita VSECHNY produkty najednou (500+). Vsechny obrazky se renderuji.
+
+### Fix — pagination
+```js
+// api/products/list.js — pridat pagination:
+const page = parseInt(req.query.page) || 1;
+const limit = parseInt(req.query.limit) || 50;
+const offset = (page - 1) * limit;
+
+const { data, count } = await supabase
+  .from('products')
+  .select('*', { count: 'exact' })
+  .eq('store_id', storeId)
+  .order('title')
+  .range(offset, offset + limit - 1);
+
+return res.json({ products: data, total: count, page, pages: Math.ceil(count / limit) });
+```
+
+Frontend:
+```jsx
+// Products.jsx — pridat pagination controls:
+const [page, setPage] = useState(1);
+// fetch s ?page=X&limit=50
+// "Load more" button nebo page numbers dole
+```
+
+### Lazy loading obrazku
+```jsx
+// Vsude kde je product image:
+<img src={product.image_url} loading="lazy" alt={product.title} />
+```
+
+**Vysledek:** 10x rychlejsi initial load (50 misto 500 produktu).
+
+---
+
+## Task 5: API response caching
+
+### Problem
+Kazdy tab switch = novy fetch ze Shopify API (2-3s). Data se nemeni kazdou minutu.
+
+### Fix — client-side cache v hookach
+
+```js
+// hooks/useShopifyOverview.js — pridat cache:
+const CACHE = {};
+const CACHE_TTL = 60000; // 60 sekund
+
+export function useShopifyOverview(days, storeId) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  const cacheKey = `shopify-${storeId}-${days}`;
+
+  const refresh = useCallback(async (force = false) => {
+    // Check cache
+    if (!force && CACHE[cacheKey] && Date.now() - CACHE[cacheKey].timestamp < CACHE_TTL) {
+      setData(CACHE[cacheKey].data);
+      setLoading(false);
+      return;
     }
-  ]
+    
+    setLoading(true);
+    const result = await getShopifyOverview(days, storeId);
+    CACHE[cacheKey] = { data: result, timestamp: Date.now() };
+    setData(result);
+    setLoading(false);
+  }, [days, storeId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+  return { data, loading, refresh: () => refresh(true) }; // force refresh on manual click
 }
 ```
-Bezi kazdych 6 hodin: 0:00, 6:00, 12:00, 18:00 UTC.
 
-**POZOR:** Cron endpoint NESMI pouzivat `withAuth()` — Vercel cron nema auth token. Misto toho overit cron secret:
+Stejny vzor pro `useProposals`, `useInsights`, `useProfit`.
+
+**Vysledek:** Tab switch = instant (z cache). Manual refresh = fresh data.
+
+---
+
+## Task 6: Deduplikovat API cally
+
+### Problem
+`Shopify.jsx` vola `getProducts(storeId)` DVAKRAT na mount (radky 23 a 25).
+
+### Fix
+Odstranit duplikat. Overit vsechny stranky ze nevolaji stejny endpoint vicekrat.
+
+```bash
+grep -n "getProducts\|getShopifyOverview\|getProposals" apps/dashboard/src/pages/*.jsx
+```
+
+---
+
+## Task 7: Rozdelit api/system.js
+
+### Problem
+666 radku, 13+ akci v jednom souboru. Pomalý Vercel cold start, tezke debugovani.
+
+### Fix — rozdelit na moduly
+```
+api/system.js (666 lines) → rozdelit na:
+├── api/system/stores.js      — stores_list
+├── api/system/pipeline.js    — pipeline_log
+├── api/system/kpi.js         — kpi, profit_summary
+├── api/system/proposals.js   — proposals_list, approve, reject, approve_all, scan_events
+├── api/system/optimizer.js   — optimize_product, approve/reject optimization
+├── api/system/creatives.js   — update_creative, generate_branded, cleanup_stale
+├── api/system/pricing.js     — bulk_price, update_cogs, manual_adspend
+```
+
+Kazdy soubor ~80-100 radku. Sdileny helper: `lib/system-helpers.js` pro spolecny kod.
+
+**POZOR:** Frontend `lib/api.js` vola `/api/system?action=X` — bud zachovat tento pattern (jeden router v system.js co deleguje) nebo updatovat frontend na nove URL.
+
+**Doporuceni:** Zachovat `/api/system` jako router ale presunout logiku do separatnich souboru:
 ```js
-// Na zacatku handleru:
-const cronSecret = req.headers['authorization'];
-if (cronSecret !== `Bearer ${process.env.CRON_SECRET}`) {
-  return res.status(401).json({ error: 'Invalid cron secret' });
+// api/system.js — tenky router:
+import { handleStores } from './system/stores.js';
+import { handleProposals } from './system/proposals.js';
+// ...
+
+export default withAuth(async (req, res) => {
+  const action = req.query.action || req.body?.action;
+  switch (action) {
+    case 'stores_list': return handleStores(req, res);
+    case 'proposals_list':
+    case 'approve_proposal': 
+    case 'reject_proposal': return handleProposals(req, res);
+    // ...
+  }
+});
+```
+
+---
+
+## Task 8: Vite code splitting
+
+### Problem
+Cely dashboard v jednom JS bundlu. Vsechny taby se nacitaji i kdyz uzivatel otevre jen Overview.
+
+### Fix — lazy loading tabu
+```jsx
+// App.jsx:
+import { lazy, Suspense } from 'react';
+
+const Overview = lazy(() => import('./pages/Overview'));
+const Shopify = lazy(() => import('./pages/Shopify'));
+const Studio = lazy(() => import('./pages/Studio'));
+const Products = lazy(() => import('./pages/Products'));
+const Profit = lazy(() => import('./pages/Profit'));
+
+// V rendereru:
+<Suspense fallback={<div className="page-loading">Loading...</div>}>
+  {activeTab === 'Overview' && <Overview ... />}
+  {activeTab === 'Shopify' && <Shopify ... />}
+  // ...
+</Suspense>
+```
+
+A v `vite.config.js`:
+```js
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+        }
+      }
+    }
+  }
+});
+```
+
+**Vysledek:** Initial load nacte jen vendor + aktivni tab. Ostatni taby on-demand.
+
+---
+
+## Task 9: Skeleton loadery
+
+### Problem
+"Loading..." text misto vizualniho feedbacku. Layout shift kdyz data prijdou.
+
+### Fix — skeleton komponenta
+```jsx
+// components/Skeleton.jsx
+export function SkeletonCard() {
+  return (
+    <div className="skeleton-card">
+      <div className="skeleton-img skeleton-pulse" />
+      <div className="skeleton-text skeleton-pulse" style={{ width: '80%' }} />
+      <div className="skeleton-text skeleton-pulse" style={{ width: '40%' }} />
+    </div>
+  );
+}
+
+export function SkeletonKPI() {
+  return (
+    <div className="skeleton-kpi">
+      <div className="skeleton-text skeleton-pulse" style={{ width: '60%', height: 12 }} />
+      <div className="skeleton-text skeleton-pulse" style={{ width: '40%', height: 28 }} />
+    </div>
+  );
 }
 ```
-Pridat `CRON_SECRET` do `.env.local` a Vercel env vars.
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `sql/add-events-proposals.sql` | **NOVY** — DB tabulky |
-| `api/cron/detect-events.js` | **NOVY** — cron event detection |
-| `vercel.json` | Edit — zmenit cron na detect-events, schedule */6 |
-| `.env.local` | Edit — pridat CRON_SECRET |
-
----
-
-## Task 3: Proposal API Endpoints
-
-### 3a. `api/proposals/list.js` — GET
-
-```
-GET /api/proposals/list?store_id=uuid&status=pending
-```
-Vrati vsechny pending proposals pro dany store. Serazeno od nejnovejsi.
-
-### 3b. `api/proposals/approve.js` — POST
-
-```json
-POST { "proposal_id": "uuid" }
-```
-1. Nacist proposal → overit `status === 'pending'`
-2. Podle `suggested_action.action`:
-   - `'generate'` → zavolat `api/creatives/generate` pro kazdy styl
-   - `'optimize'` → zavolat `api/system?action=optimize_product`
-3. Updatnout proposal: `status: 'executed', executed_at: now()`
-4. Updatnout event: `status: 'resolved', resolved_at: now()`
-5. Pipeline log: `agent: 'AGENT', message: 'Executed proposal: {title}'`
-6. Toast-friendly response: `{ success: true, message: 'Generated 4 creatives for Summer Dress' }`
-
-### 3c. `api/proposals/reject.js` — POST
-
-```json
-POST { "proposal_id": "uuid", "reason": "Not relevant now" }
-```
-Updatnout proposal: `status: 'rejected', rejected_reason`
-Updatnout event: `status: 'dismissed'`
-
-### 3d. `api/proposals/approve-all.js` — POST (BULK)
-
-```json
-POST { "proposal_ids": ["uuid1", "uuid2", "uuid3"] }
-```
-Schvaleni vice navrhu najednou — pro morning report "Approve All Recommended".
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `api/proposals/list.js` | **NOVY** |
-| `api/proposals/approve.js` | **NOVY** |
-| `api/proposals/reject.js` | **NOVY** |
-| `api/proposals/approve-all.js` | **NOVY** |
-| `lib/api.js` | Edit — pridat proposal API funkce |
-
----
-
-## Task 4: Frontend — Proposal Queue v Overview
-
-### 4a. Redesign Overview.jsx
-
-Overview se meni z action cards na **proposal-driven dashboard**:
-
-```
-OVERVIEW — Titan Commerce Agent
-
-┌─ AGENT PROPOSALS ────────────────────────────────────────┐
-│ 5 proposals awaiting your approval          [Approve All]│
-│                                                          │
-│ ┌─ 🔴 HIGH ─────────────────────────────────────────┐   │
-│ │ Generate 4 creatives for "Summer Dress"            │   │
-│ │ Sold 6 units, 0 creatives. Styles: lifestyle, ad   │   │
-│ │                         [Approve] [Edit] [Dismiss]  │   │
-│ ├────────────────────────────────────────────────────┤   │
-│ │ Optimize listing for "Linen Top"                    │   │
-│ │ New product imported 12h ago, not optimized yet     │   │
-│ │                         [Approve] [Edit] [Dismiss]  │   │
-│ └────────────────────────────────────────────────────┘   │
-│                                                          │
-│ ┌─ 🟡 MEDIUM ───────────────────────────────────────┐   │
-│ │ Try different style for "Elara Bikini"              │   │
-│ │ Revenue ↓18%. Current: ad_creative → Try: lifestyle │   │
-│ │                         [Approve] [Edit] [Dismiss]  │   │
-│ └────────────────────────────────────────────────────┘   │
-│                                                          │
-│ ┌─ 🟢 LOW ──────────────────────────────────────────┐   │
-│ │ Scale winner: "Mathilda Pants" (revenue ↑23%)       │   │
-│ │ Generate 4 more in lifestyle style + video           │   │
-│ │                         [Approve] [Edit] [Dismiss]  │   │
-│ └────────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────┘
-
-┌─ RECENT ACTIVITY ────────────────────────────────────────┐
-│ ✅ 2h ago: Generated 4 creatives for Karen Top           │
-│ ✅ 6h ago: Optimized listing for Silk Blouse             │
-│ ❌ 6h ago: Dismissed "Scale winner" for Reina Bikini     │
-│ 🔄 12h ago: 3 new events detected                        │
-└──────────────────────────────────────────────────────────┘
-
-┌─ PIPELINE ───────────────────────────────────────────────┐
-│ ApprovalQueue + TerminalLog + MetaPanel                   │
-└──────────────────────────────────────────────────────────┘
-```
-
-### 4b. Proposal Card interakce
-
-**[Approve]** → POST `/api/proposals/approve` → AI provede akci → success toast → karta zmizi
-**[Dismiss]** → POST `/api/proposals/reject` → karta zmizi s fade
-**[Edit]** → rozklikne detail kde lze upravit parametry (pocet kreativ, styly) pred schvalenim
-**[Approve All]** → POST `/api/proposals/approve-all` se vsemi pending IDs → bulk execute
-
-### 4c. Severity styling
 
 ```css
-.proposal-card--critical { border-left: 3px solid var(--accent-danger); }
-.proposal-card--high { border-left: 3px solid var(--accent-secondary); }  /* amber */
-.proposal-card--medium { border-left: 3px solid var(--accent-tertiary); } /* gold */
-.proposal-card--low { border-left: 3px solid var(--accent-success); }     /* green */
-```
-
-### 4d. Hook: `useProposals.js`
-
-```js
-export function useProposals(storeId) {
-  // fetch /api/proposals/list?store_id={storeId}&status=pending
-  // return { proposals, loading, refresh }
-  // Supabase realtime subscription na proposals tabulku (INSERT/UPDATE)
+.skeleton-pulse {
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-card-hover) 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
 }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 ```
 
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `pages/Overview.jsx` + CSS | PREPSAT — proposal queue layout |
-| `hooks/useProposals.js` | **NOVY** |
-| `components/ProposalCard.jsx` + CSS | **NOVY** — karta s approve/edit/dismiss |
-| `lib/api.js` | Edit — pridat getProposals, approveProposal, rejectProposal, approveAllProposals |
+Pouzit ve VSECH loading states misto "Loading..." textu.
 
 ---
 
-## Task 5: Manual Trigger
+## Poradi prace — DELEJ V TOMTO PORADI (od nejvyssiho dopadu)
 
-### Pro testovani a on-demand pouziti
+### Krok 1: Fix N+1 queries (Task 1) ← NEJVETSI DOPAD
+Prepsat getTopProductsWithCreatives na bulk query. Test: `/api/shopify/overview` odpovida pod 1s misto 3s.
 
-Pridat tlacitko v Overview headeru: **[🔍 Scan Now]**
-→ POST `/api/cron/detect-events?store_id=xxx` (s auth tokenem misto cron secret)
-→ Info toast: "Scanning for events..."
-→ Success toast: "Found 3 new events, 3 proposals created"
-→ Proposals se objevi v queue
+### Krok 2: Paralelizovat API cally (Task 2)
+Promise.all() v getRevenueDelta a getTopProductsWithCreatives. Test: Shopify tab load pod 2s.
 
----
+### Krok 3: Odstranit recharts (Task 3)
+npm uninstall. Test: bundle size zmenseny o ~200KB.
 
-## Task 6: Pipeline Log — Agent entries
+### Krok 4: Client-side cache (Task 5)
+Cache v hookach (60s TTL). Test: tab switch = instant, manual refresh = fresh data.
 
-Vsechny agent akce logovat s `agent: 'AGENT'`:
+### Krok 5: Pagination + lazy loading (Task 4)
+Products page: 50 per page + `loading="lazy"` na obrazky. Test: Products tab load pod 1s.
 
-```js
-// Event detekovan:
-{ agent: 'AGENT', message: 'Detected: Summer Dress has no creatives (6 units sold)', level: 'info' }
+### Krok 6: Deduplikace (Task 6)
+Odstranit duplicitni API cally. Grep + fix.
 
-// Proposal vytvoren:
-{ agent: 'AGENT', message: 'Proposed: Generate 4 creatives for Summer Dress', level: 'info' }
+### Krok 7: Code splitting (Task 8)
+Lazy import tabu + Vite chunks. Test: initial bundle < 300KB.
 
-// Proposal schvalen + proveden:
-{ agent: 'AGENT', message: 'Executed: Generated 4 creatives for Summer Dress', level: 'info' }
+### Krok 8: Skeleton loadery (Task 9)
+Nahradit "Loading..." skeleton komponentami.
 
-// Proposal zamitnut:
-{ agent: 'AGENT', message: 'Dismissed: Scale winner for Mathilda Pants — "Not relevant now"', level: 'warn' }
-```
-
-TerminalLog automaticky zobrazi tyto zaznamy (uz existuje).
-
----
-
-## Poradi prace — DELEJ V TOMTO PORADI
-
-### Krok 1: DB migrace (Task 1)
-Spustit `sql/add-events-proposals.sql`. Overit tabulky existuji.
-
-### Krok 2: Event detection cron (Task 2)
-Vytvorit `api/cron/detect-events.js`. Pridat CRON_SECRET do env. Otestovat rucne: `POST /api/cron/detect-events` → overit events + proposals v DB.
-
-### Krok 3: Proposal API (Task 3)
-Vytvorit list/approve/reject/approve-all endpointy. Otestovat: approve proposal → akce se provede.
-
-### Krok 4: Frontend proposal queue (Task 4)
-Prepsat Overview na proposal-driven. ProposalCard komponenta. useProposals hook. Otestovat: proposals se zobrazuji, approve funguje, dismiss funguje.
-
-### Krok 5: Manual trigger (Task 5)
-Pridat "Scan Now" tlacitko. Otestovat: klik → scan → proposals se objevi.
-
-### Krok 6: Vercel cron (Task 2c)
-Updatovat vercel.json. Deploy → overit ze cron bezi kazdych 6h.
-
----
-
-## BONUS Task: Bulk Pricing v Shopify tabu
-
-### Ucel
-Hromadna uprava cen produktu v kolekci. Vyber kolekci → vyber produkty (nebo vsechny) → nastav cenu → Apply → zapise do Shopify.
-
-### Kde v UI
-Shopify tab → novy sub-tab nebo sekce **"Pricing"**:
-
-```
-SHOPIFY
-[Analytics]  [Pricing]    ← novy sub-tab
-
-PRICING
-
-Collection: [All ▾] [Swimwear ▾] [Pants ▾] ...
-
-┌─ SELECT ─────────────────────────────────────────────────┐
-│ [☑ Select All]                     New price: [€___]     │
-│                                    [Apply to Selected]   │
-├──────┬──────────────────────────┬────────┬───────────────┤
-│  ☑   │ Mathilda Pants           │ €129   │ → €___        │
-│  ☑   │ Bella Comfort Pants      │ €119   │ → €___        │
-│  ☐   │ Silk Blouse              │ €89    │               │
-│  ☑   │ Linen Dress              │ €79    │ → €___        │
-└──────┴──────────────────────────┴────────┴───────────────┘
-```
-
-### Flow
-1. Uzivatel vybere kolekci (filtr z existujicich tags/collections)
-2. Zobrazi se produkty v kolekci jako tabulka s checkboxem
-3. Checkne ktere chce upravit (nebo Select All)
-4. Zada novou cenu do inputu
-5. Klik "Apply to Selected"
-6. System updatne cenu u VSECH VARIANT kazdeho vybraneho produktu pres Shopify Admin API
-7. Toast: "Updated prices for 12 products"
-
-### Backend: `api/shopify/bulk-price.js` — POST
-
-```json
-POST {
-  "store_id": "uuid",
-  "product_shopify_ids": [123, 456, 789],
-  "new_price": "49.95"
-}
-```
-
-Flow:
-1. Nacist store z DB → overit admin_token existuje
-2. Pro kazdy product_shopify_id:
-   - GET `/admin/api/2024-01/products/{id}.json` → nacist varianty
-   - Pro kazdy variant: PUT `/admin/api/2024-01/variants/{variant_id}.json` s `{ price: new_price }`
-3. Updatnout ceny v Supabase `products` tabulce (sync local)
-4. Pipeline log: `agent: 'PRICING', message: 'Bulk updated ${count} products to ${price}'`
-
-**POZOR:** Shopify API rate limit — max 2 requesty/sekundu. Pro 50 produktu × 3 varianty = 150 requestu = ~75 sekund. Vercel 60s limit nestaci!
-
-**Reseni:** Pouzit Shopify GraphQL bulk mutation:
-```graphql
-mutation {
-  productVariantsBulkUpdate(variants: [
-    { id: "gid://shopify/ProductVariant/123", price: "49.95" },
-    { id: "gid://shopify/ProductVariant/456", price: "49.95" },
-    ...
-  ]) {
-    productVariants { id price }
-    userErrors { field message }
-  }
-}
-```
-Jedna GraphQL mutace updatne az 250 variant najednou — vejde se do timeout.
-
-### Frontend: Rozsirit `pages/Shopify.jsx`
-
-- Pridat tab/sekci "Pricing" vedle "Analytics"
-- Filtr podle kolekce (reuse existujici collection tags z products)
-- Tabulka s checkboxy, current price, new price input
-- Select All / Deselect All
-- Apply button s loading state + toast
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `api/shopify/bulk-price.js` | **NOVY** — bulk price update endpoint |
-| `pages/Shopify.jsx` + CSS | Edit — pridat Pricing sekci |
-| `lib/shopify-admin.js` | Edit — pridat `bulkUpdateVariantPrices(storeUrl, token, variants)` |
-| `lib/api.js` | Edit — pridat `bulkUpdatePrices(storeId, productIds, price)` |
-
-### Omezeni
-- Funguje JEN pro story s admin_token (Elegance House). Isola bez Admin API → disabled.
-- Compare/compare_at_price (puvodni cena pro slevu) — zatim neresime, jen `price`.
-
----
-
----
-
-## BONUS Task 2: Shopify Tab Redesign (Alethe-style)
-
-### Ucel
-Kompletni redesign Shopify tabu. Inspirace: Alethe dashboard. Dva rezimy: Dashboard (analytics) a Services (akce). Nase pridana hodnota: services propojene s agent proposal systemem.
-
-### Nova sub-navigace v Shopify tabu
-
-```
-SHOPIFY
-[Dashboard]  [Services]  [Pricing]
-```
-
----
-
-### Sub-tab 1: DASHBOARD (analytics — jako Alethe screenshot 1)
-
-```
-┌─ KPIs ──────────────────────────────────────────────────────┐
-│ 🛍 194 PRODUCTS  📦 1,554 ORDERS  👥 3,331 CUSTOMERS  📂 28 COLLECTIONS │
-└─────────────────────────────────────────────────────────────┘
-
-┌─ Revenue ─────────────────────────── [1D] [7D] [30D] [90D] [1Y] ─┐
-│ €8,363                                                            │
-│ 📦 132 orders  💵 €63 avg  📈 €270/day                           │
-│                                                                    │
-│  ┌─ Chart ──────────────────────────────────────────────┐         │
-│  │  📈 (line/area chart — denni revenue)                 │         │
-│  └──────────────────────────────────────────────────────┘         │
-└───────────────────────────────────────────────────────────────────┘
-
-┌─ Payment ───────────┐ ┌─ Top Products ──────────────────┐ ┌─ Top Customers ─────────────┐
-│ ● PAID     131 (99%)│ │ 1. Mathilda Slimming   €2,897  │ │ 1. Andrea T.  2 ord  €127   │
-│ ● REFUNDED   1 (1%) │ │ 2. Mathilda Flattering €2,647  │ │ 2. Karolyn D. 1 ord  €90    │
-│                      │ │ 3. Elara              €2,477  │ │ 3. Manasa T.  1 ord  €90    │
-│ Fulfillment          │ │ 4. Mathilda Comfort     €949  │ │ 4. Thanh H.   1 ord  €90    │
-│ ● FULFILLED 129 (98%)│ └────────────────────────────────┘ └─────────────────────────────┘
-│ ● UNFULFILLED 3 (2%)│
-└──────────────────────┘
-```
-
-**Implementace:**
-- KPI row: `GET /api/shopify/overview` — products count, orders count, customers count, collections count
-- Revenue chart: `daily_revenue` data z overview endpointu + time range selector
-- Payment/Fulfillment: nove pole v overview response — `payment_status` a `fulfillment_status` agregace
-- Top Products: uz existuje v overview response
-- Top Customers: **NOVY** — `getTopCustomers(days, limit)` v `lib/shopify-admin.js`
-
-**Nove endpointy/funkce:**
-```js
-// lib/shopify-admin.js — pridat:
-async getCustomerCount() {
-  // GET /admin/api/2024-01/customers/count.json
-}
-
-async getTopCustomers(days, limit = 5) {
-  // Agregovat z orders: customer name, email, order count, total spent
-}
-
-async getPaymentFulfillmentStatus(days) {
-  // Agregovat z orders: paid/refunded counts, fulfilled/unfulfilled counts
-}
-
-async getCollectionCount() {
-  // GET /admin/api/2024-01/custom_collections/count.json + smart_collections/count.json
-}
-```
-
----
-
-### Sub-tab 2: SERVICES (akce — jako Alethe screenshot 2)
-
-6 kategorii jako karty. Kazda karta ma 3-4 akce. Klik na akci → bud spusti agent action, nebo otevre modal, nebo naviguje na jiny tab.
-
-```
-┌─ Store Management ──────┐ ┌─ Content & Copy ──────────┐ ┌─ Analytics & Reports ─────┐
-│ 🏪                       │ │ ✏️                         │ │ 📊                         │
-│ Overview, audits,        │ │ Product copy, SEO meta,    │ │ Sales analysis, forecasts, │
-│ and optimization         │ │ and blog posts             │ │ and segments               │
-│                          │ │                            │ │                            │
-│ 🔍 Store Overview        │ │ ✨ Optimize Product Titles │ │ 📈 Sales Performance       │
-│    Product count,        │ │    SEO-optimized titles    │ │    Revenue & top products  │
-│    orders & issues       │ │    for every product       │ │    (30 days)               │
-│                          │ │                            │ │                            │
-│ 🏥 Product Health Audit  │ │ 📝 Write Descriptions      │ │ 🏆 Top / Bottom Products   │
-│    Missing images,       │ │    Compelling, benefit-    │ │    Rank products by        │
-│    descriptions & pricing│ │    focused product copy    │ │    performance             │
-│                          │ │                            │ │                            │
-│ ⚡ Store Optimization    │ │ 🔎 Generate SEO Meta       │ │ 👥 Customer Segmentation   │
-│    Improvements across   │ │    Optimized titles &      │ │    VIPs, at-risk, and      │
-│    SEO, pricing & content│ │    meta descriptions       │ │    spending tiers           │
-│                          │ │                            │ │                            │
-│                          │ │ 📰 Write Blog Post         │ │ 📦 Inventory Forecast      │
-│                          │ │    Create and publish      │ │    Predict stock-outs      │
-│                          │ │    a blog post             │ │    in 30 days              │
-└──────────────────────────┘ └────────────────────────────┘ └────────────────────────────┘
-
-┌─ Trends & Research ─────┐ ┌─ Orders & Customers ──────┐ ┌─ Inventory & Pricing ─────┐
-│ 🔥                       │ │ 📦                         │ │ 💰                         │
-│ Market trends, niches,   │ │ Order status, refunds,     │ │ Stock levels, pricing,     │
-│ and competitor intel     │ │ and fulfillment            │ │ and discounts              │
-│                          │ │                            │ │                            │
-│ 📊 Trending Niches       │ │ 🔍 Check Order Status      │ │ ⚠️ Low Stock Audit         │
-│    Top trending product  │ │    Look up any order       │ │    Products below 10       │
-│    niches right now      │ │    by number or email      │ │    units + reorder         │
-│                          │ │                            │ │                            │
-│ 🕵️ Competitor Research   │ │ 💸 Process Refund          │ │ 💲 Bulk Update Pricing     │
-│    Pricing, range &      │ │    Calculate and process   │ │    Apply % increase/       │
-│    marketing strategies  │ │    a refund                │ │    decrease to collection  │
-│                          │ │                            │ │                            │
-│ 💡 Evaluate Opportunity  │ │ ✅ Fulfill Order           │ │ 🏷️ Create Discount         │
-│    Trends, volume &      │ │    Add tracking and mark   │ │    Discount codes or       │
-│    competition analysis  │ │    as fulfilled            │ │    automatic promotions    │
-└──────────────────────────┘ └────────────────────────────┘ └────────────────────────────┘
-```
-
-**DULEZITE: Ne vsechny services budou hned funkcni.** Implementace po fazich:
-
-### Faze 1 (tento sprint) — fungujici services:
-| Service | Akce pri kliku | Existujici infrastruktura |
-|---------|---------------|--------------------------|
-| Store Overview | Zobrazi KPIs + summary (reuse Dashboard sub-tab data) | ✅ uz existuje |
-| Product Health Audit | Scan products: missing images, empty descriptions, no price | ✅ products tabulka |
-| Optimize Product Titles | Naviguje na Products tab → bulk optimizer | ✅ Product Optimizer |
-| Write Descriptions | Naviguje na Products tab → optimizer (description mode) | ✅ Product Optimizer |
-| Generate SEO Meta | Naviguje na Products tab → optimizer (SEO mode) | ✅ Product Optimizer |
-| Sales Performance | Zobrazi Dashboard sub-tab | ✅ uz existuje |
-| Top / Bottom Products | Zobrazi top products tabulku | ✅ uz existuje |
-| Bulk Update Pricing | Otevre Pricing sub-tab | ✅ v tomto briefu |
-
-### Faze 2 (budouci sprinty) — zatim disabled/coming soon:
-| Service | Proc disabled | Co potrebuje |
-|---------|--------------|-------------|
-| Store Optimization | Komplexni AI audit | Claude API + custom logika |
-| Write Blog Post | Shopify blog API | write_content scope + blog endpoint |
-| Customer Segmentation | Customer analiza | Shopify customer API + segmentace logika |
-| Inventory Forecast | Predikce | Historicka data + ML model |
-| Trending Niches | Externi data | Market research API |
-| Competitor Research | Externi data | Scraping + analiza |
-| Evaluate Opportunity | Externi data | Market data |
-| Check Order Status | Order detail | Shopify orders API (uz mame zaklad) |
-| Process Refund | Shopify refund API | write_orders scope |
-| Fulfill Order | Shopify fulfillment API | write_fulfillments scope |
-| Low Stock Audit | Inventory API | read_inventory scope (mame) |
-| Create Discount | Shopify discount API | write_price_rules scope |
-
-**Disabled services zobrazuji:** badge "Coming Soon" + kratky popis co bude umet. Karta je seda/dimmed.
-
----
-
-### Sub-tab 3: PRICING (bulk price edit — uz specifikovany vyse)
-
-Beze zmeny — viz BONUS Task 1 vyse.
-
----
-
-### Implementace Shopify sub-navigation
-
-```jsx
-// Shopify.jsx
-const [subTab, setSubTab] = useState('dashboard');
-
-return (
-  <div>
-    <div className="sh-subnav">
-      <button className={subTab === 'dashboard' ? 'active' : ''} onClick={() => setSubTab('dashboard')}>
-        Dashboard
-      </button>
-      <button className={subTab === 'services' ? 'active' : ''} onClick={() => setSubTab('services')}>
-        Services
-      </button>
-      <button className={subTab === 'pricing' ? 'active' : ''} onClick={() => setSubTab('pricing')}>
-        Pricing
-      </button>
-    </div>
-    
-    {subTab === 'dashboard' && <ShopifyDashboard storeId={storeId} />}
-    {subTab === 'services' && <ShopifyServices storeId={storeId} onNavigate={onNavigate} />}
-    {subTab === 'pricing' && <ShopifyPricing storeId={storeId} />}
-  </div>
-);
-```
-
-### Nove soubory
-| Soubor | Akce |
-|--------|------|
-| `components/ShopifyDashboard.jsx` + CSS | **NOVY** — Alethe-style dashboard (KPIs, chart, payment, top products/customers) |
-| `components/ShopifyServices.jsx` + CSS | **NOVY** — 6-category services grid |
-| `components/ShopifyPricing.jsx` + CSS | **NOVY** — bulk price editor (presunout z Shopify.jsx) |
-| `components/ServiceCard.jsx` + CSS | **NOVY** — reusable service card s ikonou, title, description, actions |
-| `pages/Shopify.jsx` | PREPSAT — sub-navigation + 3 sub-taby |
-| `lib/shopify-admin.js` | Edit — pridat getTopCustomers, getPaymentFulfillmentStatus, getCollectionCount, getCustomerCount |
-| `api/shopify/overview.js` | Edit — pridat customer count, collection count, payment/fulfillment status do response |
-| `lib/api.js` | Edit — pridat bulk price API funkce |
-
----
-
-### Krok 7: E2E test
-1. Import novy produkt na Shopify → sync → cron (nebo Scan Now) → event detekovan → proposal vytvoren
-2. Overview: vidim proposal "Generate creatives for [produkt]"
-3. Klik Approve → kreativy se generuji → success toast
-4. Klik Dismiss → proposal zmizi
-5. Approve All → vsechny pending se provedou
-6. Pipeline log ukazuje AGENT entries
-7. Po 6h cron bezi znovu → nove eventy pokud jsou
+### Krok 9: Split system.js (Task 7)
+Router pattern + separatni moduly. Test: zadna zmena v chovani, mensi soubory.
 
 ---
 
 ## Verifikace
 
-### Event detection
-- Cron bezi kazdych 6h (overit v Vercel logs)
-- Scan Now funguje manualne
-- Eventy se neukladaji duplicitne (deduplikace)
-- Kazdy event ma spravny type, severity, metadata
+### Performance metriky (pred vs po)
+- Shopify tab load: 3-5s → pod 1.5s
+- Products tab load: 2-3s → pod 0.5s
+- Tab switch: 2-3s → instant (cache)
+- Initial bundle: ~600KB → pod 350KB
+- Products render: 500 najednou → 50 s pagination
 
-### Proposals
-- Kazdy event ma prave 1 proposal
-- Approve → akce se provede (kreativy generovane / listing optimalizovany)
-- Reject → proposal dismissed, event dismissed
-- Approve All → vsechny pending se provedou najednou
-- Expired proposals (> 7 dni) se nezobrazuji
-
-### Overview
-- Proposals serazeny podle severity (critical → high → medium → low)
-- Approve/Dismiss buttony funguji s toast feedback
-- Recent Activity ukazuje historii akci
-- Pipeline section (ApprovalQueue + TerminalLog) pod proposals
-- Store izolace — kazdy store vidi jen sve proposals
-
-### Multi-store
-- Elegance House proposals neviditelne v Isola a naopak
-- Cron prochazi oba story
-- Kazdy event/proposal ma store_id
+### Jak merit
+- Network tab: sledovat response time vsech API callu
+- Lighthouse: Performance score pred a po
+- Bundle size: `npm run build` → velikost dist/assets/*.js

@@ -24,11 +24,21 @@ async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // Fetch all products with creative count
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+    const offset = (page - 1) * limit;
+
+    // Count total products
+    let countQuery = supabase.from('products').select('id', { count: 'exact', head: true });
+    if (storeId) countQuery = countQuery.eq('store_id', storeId);
+    const { count: total } = await countQuery;
+
+    // Fetch paginated products
     let productsQuery = supabase
       .from('products')
       .select('id, shopify_id, handle, title, price, image_url, product_type, tags')
-      .order('title');
+      .order('title')
+      .range(offset, offset + limit - 1);
 
     if (storeId) {
       productsQuery = productsQuery.eq('store_id', storeId);
@@ -62,7 +72,12 @@ async function handler(req, res) {
       creative_count: countMap[p.id] || 0,
     }));
 
-    return res.status(200).json(enriched);
+    return res.status(200).json({
+      products: enriched,
+      total: total || 0,
+      page,
+      pages: Math.ceil((total || 0) / limit),
+    });
   } catch (err) {
     console.error('[api/products/list] Error:', err);
     return res.status(500).json({ error: 'Failed to fetch products' });

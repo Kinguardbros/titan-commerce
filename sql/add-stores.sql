@@ -16,13 +16,17 @@ CREATE TABLE IF NOT EXISTS stores (
     created_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- 2. Insert stores
-INSERT INTO stores (name, slug, shopify_url, shopify_handle, storefront_token, admin_token, currency) VALUES
-('Elegance House', 'elegance-house', 'shop-elegancehouse.com', 'shop-elegancehouse', 'STOREFRONT_TOKEN_HERE', 'ADMIN_TOKEN_HERE', 'EUR')
+-- 2. Insert stores (TOKENS ARE IN SUPABASE DB — DO NOT HARDCODE HERE)
+-- After running this migration, manually set tokens in Supabase SQL Editor:
+--   UPDATE stores SET storefront_token = 'your_token', admin_token = 'your_token' WHERE slug = 'elegance-house';
+--   UPDATE stores SET storefront_token = 'your_token' WHERE slug = 'isola';
+
+INSERT INTO stores (name, slug, shopify_url, shopify_handle, currency) VALUES
+('Elegance House', 'elegance-house', 'shop-elegancehouse.myshopify.com', 'shop-elegancehouse', 'EUR')
 ON CONFLICT (slug) DO NOTHING;
 
-INSERT INTO stores (name, slug, shopify_url, shopify_handle, storefront_token, admin_token, currency) VALUES
-('Isola', 'isola', 'isolaworld.com', 'swimwear-brand', 'STOREFRONT_TOKEN_HERE', NULL, 'USD')
+INSERT INTO stores (name, slug, shopify_url, shopify_handle, currency) VALUES
+('Isola', 'isola', 'swimwear-brand.myshopify.com', 'swimwear-brand', 'USD')
 ON CONFLICT (slug) DO NOTHING;
 
 -- 3. Add store_id to all relevant tables

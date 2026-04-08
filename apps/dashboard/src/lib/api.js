@@ -90,8 +90,22 @@ export function convertToVideo(creativeId) {
 }
 
 // Products
-export function getProducts(storeId) {
-  return fetchJSON(`/api/products/list${storeId ? `?store_id=${storeId}` : ''}`);
+export async function getProducts(storeId, { page, limit } = {}) {
+  const params = [];
+  if (storeId) params.push(`store_id=${storeId}`);
+  if (page) params.push(`page=${page}`);
+  if (limit) params.push(`limit=${limit}`);
+  const qs = params.length ? `?${params.join('&')}` : '';
+  const result = await fetchJSON(`/api/products/list${qs}`);
+  // Support both paginated { products, total, page, pages } and legacy array responses
+  if (Array.isArray(result)) return { products: result, total: result.length, page: 1, pages: 1 };
+  return result;
+}
+
+// Convenience: fetch all products (used by Shopify pricing which needs full list)
+export async function getAllProducts(storeId) {
+  const result = await getProducts(storeId, { limit: 200 });
+  return result.products || [];
 }
 
 export function syncProducts(storeId) {

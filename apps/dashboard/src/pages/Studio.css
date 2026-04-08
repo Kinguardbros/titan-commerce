@@ -129,3 +129,11 @@
 
 @media (max-width: 1200px) { .studio-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 900px) { .studio-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) {
+  .studio-grid { grid-template-columns: 1fr; }
+  .studio-mode { flex-wrap: wrap; }
+  .studio-mode-btn { min-height: 44px; flex: 1; }
+  .studio-generate-btn { min-height: 44px; }
+  .studio-row { flex-direction: column; gap: 12px; }
+  .studio-pill { min-height: 36px; display: flex; align-items: center; }
+}

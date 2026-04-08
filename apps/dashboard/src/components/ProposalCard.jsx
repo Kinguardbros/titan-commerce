@@ -25,8 +25,8 @@ export default function ProposalCard({ proposal, onApprove, onDismiss, onNavigat
     : proposal.suggested_action;
 
   return (
-    <div className={`pc pc--${severity}`}>
-      <div className="pc-icon">{icon}</div>
+    <div className={`pc pc--${severity}`} role="article" aria-label={`Proposal: ${proposal.title}`}>
+      <div className="pc-icon" aria-hidden="true">{icon}</div>
       <div className="pc-body">
         <div className="pc-title">{proposal.title}</div>
         {proposal.description && <div className="pc-desc">{proposal.description}</div>}
@@ -37,14 +37,14 @@ export default function ProposalCard({ proposal, onApprove, onDismiss, onNavigat
           </div>
         )}
         {proposal.product?.title && (
-          <button className="pc-product-link" onClick={() => onNavigate?.(proposal.product_id)}>
+          <button className="pc-product-link" aria-label={`Go to product: ${proposal.product.title}`} onClick={() => onNavigate?.(proposal.product_id)}>
             {proposal.product.title}
           </button>
         )}
       </div>
       <div className="pc-actions">
-        <button className="pc-btn pc-btn--approve" onClick={() => onApprove(proposal.id)}>Approve</button>
-        <button className="pc-btn pc-btn--dismiss" onClick={() => onDismiss(proposal.id)}>Dismiss</button>
+        <button className="pc-btn pc-btn--approve" aria-label={`Approve: ${proposal.title}`} onClick={() => onApprove(proposal.id)}>Approve</button>
+        <button className="pc-btn pc-btn--dismiss" aria-label={`Dismiss: ${proposal.title}`} onClick={() => onDismiss(proposal.id)}>Dismiss</button>
       </div>
     </div>
   );

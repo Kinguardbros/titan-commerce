@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import ShopifyDashboard from '../components/ShopifyDashboard';
-import { getProducts, bulkUpdatePrices, getShopifyOverview } from '../lib/api';
+import { getAllProducts, bulkUpdatePrices, getShopifyOverview } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './Shopify.css';
 
@@ -17,12 +17,11 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  // Load products + collections for pricing
+  // Load products + collections for pricing (single call)
   useEffect(() => {
     if (storeId && hasAdmin) {
-      getProducts(storeId).then(setProducts).catch(() => {});
-      // Fetch collections from overview (it has collection_count, but we need names from product tags)
-      getProducts(storeId).then((prods) => {
+      getAllProducts(storeId).then((prods) => {
+        setProducts(prods || []);
         const colSet = new Set();
         for (const p of prods || []) {
           const tags = typeof p.tags === 'string' ? JSON.parse(p.tags || '[]') : (p.tags || []);
@@ -54,7 +53,7 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
       const result = await bulkUpdatePrices(storeId, Array.from(selected), newPrice);
       toast.success(`Updated ${result.variants_updated} variants to $${newPrice}`);
       setSelected(new Set()); setNewPrice('');
-      getProducts(storeId).then(setProducts).catch(() => {});
+      getAllProducts(storeId).then(setProducts).catch(() => {});
     } catch (err) { toast.error(`Price update failed: ${err.message}`); }
     finally { setPriceLoading(false); }
   };

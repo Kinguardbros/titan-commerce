@@ -87,9 +87,9 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
   const showStyleOptions = !isVideo || videoSource === 'generate_new';
 
   return (
-    <div className="gp-overlay" onClick={onClose}>
-      <div className="gp-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="gp-close" onClick={onClose}>✕</button>
+    <div className="gp-overlay" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-label={`Generate ${isVideo ? 'video' : 'image'} for ${product.title}`} onClick={(e) => e.stopPropagation()}>
+        <button className="gp-close" aria-label="Close modal" onClick={onClose}>✕</button>
 
         <div className="gp-title">Generate {isVideo ? 'Video' : 'Image'}</div>
         <div className="gp-product">{product.title}</div>

@@ -98,9 +98,9 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
   const hasImage = imageUrl && !imageUrl.includes('undefined');
 
   return (
-    <div className="ce-overlay" onClick={handleClose}>
-      <div className="ce-modal" onClick={(e) => e.stopPropagation()}>
-        <button className="ce-close" onClick={handleClose}>✕</button>
+    <div className="ce-overlay" onClick={handleClose} onKeyDown={(e) => { if (e.key === 'Escape') handleClose(); }}>
+      <div className="ce-modal" role="dialog" aria-modal="true" aria-label={`Edit creative: ${productName}`} onClick={(e) => e.stopPropagation()}>
+        <button className="ce-close" aria-label="Close modal" onClick={handleClose}>✕</button>
 
         <div className="ce-layout">
           <div className="ce-preview">
