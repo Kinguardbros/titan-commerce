@@ -20,6 +20,14 @@
 .products-search:focus { border-color: var(--gold); }
 .products-search::placeholder { color: var(--text4); }
 
+.products-import-btn {
+  background: var(--surface); border: 1px solid var(--edge);
+  color: var(--text2); font-family: var(--mono); font-size: 9px; font-weight: 500;
+  padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all .25s;
+  letter-spacing: .5px;
+}
+.products-import-btn:hover { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
+
 .products-sync-btn {
   background: var(--gold-glow); border: 1px solid rgba(201,168,76,.2);
   color: var(--gold); font-family: var(--mono); font-size: 9px; font-weight: 500;

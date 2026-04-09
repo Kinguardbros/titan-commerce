@@ -259,3 +259,18 @@ export function bulkUpdatePrices(storeId, productShopifyIds, newPrice) {
 export function cleanupStaleCreatives() {
   return fetchJSON('/api/system?action=cleanup_stale', { method: 'POST' });
 }
+
+// Product Import
+export function scrapeProductUrl(url) {
+  return fetchJSON('/api/system?action=scrape_product', {
+    method: 'POST',
+    body: JSON.stringify({ url }),
+  });
+}
+
+export function confirmImport(data) {
+  return fetchJSON('/api/system?action=import_confirm', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}

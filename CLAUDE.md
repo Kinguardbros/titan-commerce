@@ -1,4 +1,4 @@
-# CLAUDE.md — elegancehouse-ads
+# CLAUDE.md — Titan Commerce Limited
 
 > **Rule:** After every major change (new file, new screen/component, dependency add/remove, architecture change, new pattern, app flow change) **update this CLAUDE.md** to reflect the current project state. Specifically check and update: Key Files table, Key Dependencies, Important Patterns, App Flow, and Known Tech Debt. Do this automatically at the end of implementation — don't wait for the user to ask.
 
@@ -6,20 +6,37 @@
 
 ## Project Overview
 
-SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives (image + video), optimizes product listings with AI, tracks Shopify analytics and profit, and integrates with Meta Ads. Built for **Elegance House** (women's fashion, EU store, EUR currency) with multi-store architecture planned for Sprint 4.
+**Titan Commerce Limited** — multi-store SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives (image + video), optimizes product listings with AI, tracks Shopify analytics and profit, manages branded content, and integrates with Meta Ads. Supports **3 stores** (Elegance House, Isola, Eleganz Haus) with full store isolation via `store_id` FK on all data tables.
 
 ---
 
 ## Architecture
 
 - **Framework:** React + Vite (frontend dashboard)
-- **Deployment:** Vercel Serverless Functions (API layer)
+- **Deployment:** Vercel Serverless Functions (API layer, Hobby plan — 12 route max, 1 cron)
 - **Database:** Supabase (Postgres + Auth + Storage + Realtime)
 - **AI — Images/Video:** Higgsfield (Nano Banana for images, DOP Turbo for video)
 - **AI — Text:** Anthropic Claude API (claude-sonnet-4-20250514) for product optimization
-- **E-commerce:** Shopify Admin API (REST, v2024-01)
+- **E-commerce:** Shopify Admin API (REST, v2024-01) — MUST use `{handle}.myshopify.com` URLs (not custom domains)
 - **Ads:** Meta Marketing API (v21.0) — read-only, awaiting credentials
-- **Payments:** RevenueCat (planned, not yet integrated)
+- **Auth:** Password-based session tokens (`APP_PASSWORD` env var), `withAuth()` middleware on all endpoints
+- **Design:** Nextbyte Dark Luxe — Michroma (gradient headings), Plus Jakarta Sans (body), Space Mono (data)
+
+---
+
+## Multi-Store Architecture
+
+3 stores in `stores` table, each with own Shopify credentials:
+- **Elegance House** (women's fashion, EU, EUR)
+- **Isola** (swimwear)
+- **Eleganz Haus** (fashion, DE)
+
+Key patterns:
+- `store_id` FK on: `products`, `creatives`, `events`, `proposals`, `pipeline_log`
+- `lib/store-context.js` — `getStore(id)`, `getAllStores()`, `hasAdminAccess(store)`
+- `useActiveStore` hook + `StoreProvider` context with localStorage persistence
+- Store switcher dropdown in App.jsx header
+- Shopify Admin features only available for stores with `admin_token`
 
 ---
 
@@ -37,21 +54,26 @@ SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives 
 ### General
 - Vercel serverless: `export default handler`, max 60s timeout (use 55s safe limit)
 - Supabase server-side: `createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)`
-- Frontend API: all calls through `lib/api.js` (`fetchJSON` wrapper)
+- Frontend API: all calls through `lib/api.js` (`fetchJSON` wrapper with auth token)
 - `npm install` always with `--legacy-peer-deps` (Higgsfield peer dep conflict)
 - Currency: **EUR** (not USD)
 
 ### Frontend
 - Functional components only, hooks order: `useState → useRef → useEffect → custom → callbacks → render`
-- CSS: dark theme, CSS variables (`--gold`, `--emerald`, `--coral`, `--azure`, `--violet`, `--surface`, `--deep`, `--edge`), fonts `--display` (serif), `--sans`, `--mono`
+- CSS: dark theme with CSS variables, Nextbyte Dark Luxe design system
 - No chart libraries — use pure CSS bars for charts
 - HTML in descriptions: sanitize with DOMPurify before rendering
+- Toast notifications via `useToast()` hook for all user-facing feedback
+- Skeleton loaders (`Skeleton.jsx`) for loading states — no "Loading..." text
+- Code splitting: lazy imports with `React.lazy` + `Suspense` for all page components
 
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
+- `catch (e) {}` is **FORBIDDEN** — always log or re-throw
 - Pipeline activity → `pipeline_log` table (agent, message, level, metadata)
 - Shopify writes: always log to pipeline_log before and after
-- Claude API responses must be parseable JSON — use system prompt with clear JSON instruction
+- Rate limiting via `lib/rate-limit.js`: generate 20/hr, video 10/hr, optimize 30/hr
+- Vercel 12-route limit: consolidated endpoints in `api/system.js` mega-handler with `?action=X` pattern
 
 ---
 
@@ -60,23 +82,25 @@ SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives 
 1. **Don't push to Shopify without approval** — Product Optimizer saves to DB as `pending`, only `approve_optimization` writes to Shopify
 2. **Don't install new dependencies** without asking first
 3. **Don't use chart libraries** — CSS bars for all charts
-4. **Don't hardcode store-specific data** — multi-store is coming in Sprint 4
+4. **Don't hardcode store-specific data** — all store data from `stores` table
 5. **Don't make files longer than ~300 lines** — extract hooks, utils, sub-components
 6. **Don't swallow errors** — `catch (e) {}` is forbidden
 7. **Don't use `npm install` without `--legacy-peer-deps`**
+8. **Don't use custom Shopify domains** — always `{handle}.myshopify.com` for Admin API
 
 ---
 
 ## App Structure
 
-### Tabs: Overview | Shopify | Products | Profit
+### Tabs: Overview | Shopify | Studio | Products | Profit
 
 | Tab | Page | Purpose |
 |-----|------|---------|
-| Overview | `Overview.jsx` | Action cards (Action Needed, Declining, Winners) + Pending Optimizations + Pipeline (ApprovalQueue + TerminalLog) + Meta panel |
-| Shopify | `Shopify.jsx` | Full analytics: KPIs (Revenue/Orders/AOV/Sessions/Conv%), revenue chart, top products with creative count, traffic sources, recent orders |
-| Products | `Products.jsx` → `ProductWorkspace.jsx` | Product grid → per-product creative management (generate image/video, optimize listing) |
-| Profit | `Profit.jsx` | P&L dashboard: daily revenue/COGS/adspend/fees/profit, COGS management, manual adspend, CSV export |
+| Overview | `Overview.jsx` | Proposal queue (events → proposals → approve/dismiss) + Pipeline (ApprovalQueue + TerminalLog) + Meta panel + ShopifyServices |
+| Shopify | `Shopify.jsx` | ShopifyDashboard (KPIs, revenue chart, top products, traffic, orders) + inline Pricing (bulk price editor) |
+| Studio | `Studio.jsx` | Branded content generation (type/prompt/style/model/count) + Product creatives (product picker → GeneratePanel) |
+| Products | `Products.jsx` → `ProductWorkspace.jsx` | Paginated product grid (50/page, load more) → per-product creative management (generate image/video, optimize listing) |
+| Profit | `Profit.jsx` | P&L dashboard: daily revenue/COGS/adspend/fees/profit, COGS management, manual adspend, CSV export, storage cleanup |
 
 ---
 
@@ -85,59 +109,66 @@ SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives 
 | File | Purpose |
 |------|---------|
 | **Pages** | |
-| `apps/dashboard/src/App.jsx` | Root — 4-tab navigation, cross-tab product navigation |
-| `apps/dashboard/src/pages/Overview.jsx` | Action cards (insights) + pending optimizations + pipeline |
-| `apps/dashboard/src/pages/Shopify.jsx` | Shopify analytics dashboard |
-| `apps/dashboard/src/pages/Products.jsx` | Product grid with filters and Shopify sync |
-| `apps/dashboard/src/pages/ProductWorkspace.jsx` | Per-product workspace: creatives, video, optimize |
-| `apps/dashboard/src/pages/Profit.jsx` | P&L dashboard with COGS and manual adspend |
+| `apps/dashboard/src/App.jsx` | Root — auth gate, StoreProvider, ToastProvider, 5-tab nav, store switcher, cross-tab navigation |
+| `apps/dashboard/src/pages/Overview.jsx` | Proposal queue + pipeline + meta panel + ShopifyServices |
+| `apps/dashboard/src/pages/Shopify.jsx` | Shopify analytics dashboard + bulk pricing |
+| `apps/dashboard/src/pages/Studio.jsx` | Branded + product creative generation |
+| `apps/dashboard/src/pages/Products.jsx` | Paginated product grid with filters, sort, search, sync, view modes (grid/list/cards) |
+| `apps/dashboard/src/pages/ProductWorkspace.jsx` | Per-product workspace: creatives by style, generate image/video, optimize |
+| `apps/dashboard/src/pages/Profit.jsx` | P&L dashboard with COGS, manual adspend, CSV export |
+| `apps/dashboard/src/pages/Login.jsx` | Password gate login screen |
 | **Components** | |
-| `apps/dashboard/src/components/OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject |
-| `apps/dashboard/src/components/GeneratePanel.jsx` | Creative generation (image + video modes) |
+| `apps/dashboard/src/components/OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
+| `apps/dashboard/src/components/GeneratePanel.jsx` | Creative generation (image + video modes, style/subject/text overlay/count) |
 | `apps/dashboard/src/components/CreativeEditor.jsx` | Creative review: preview, edit, approve, reject, convert to video |
 | `apps/dashboard/src/components/ApprovalQueue.jsx` | Pending creatives queue |
-| `apps/dashboard/src/components/ShopifyPanel.jsx` | Shopify KPIs + top products + orders (used in Overview) |
+| `apps/dashboard/src/components/ProposalCard.jsx` | Event proposal cards (approve/dismiss) grouped by severity |
+| `apps/dashboard/src/components/ShopifyDashboard.jsx` | Full Shopify analytics (KPIs, chart, products, traffic, orders) |
+| `apps/dashboard/src/components/ShopifyPanel.jsx` | Compact Shopify KPIs + top products + orders (used in Overview) |
+| `apps/dashboard/src/components/ShopifyServices.jsx` | Service status grid at bottom of Overview |
 | `apps/dashboard/src/components/MetaPanel.jsx` | Meta Ads KPIs + campaigns (shows "not connected" placeholder) |
 | `apps/dashboard/src/components/TerminalLog.jsx` | Pipeline activity log with smart date formatting |
+| `apps/dashboard/src/components/Breadcrumbs.jsx` | Navigation breadcrumbs |
+| `apps/dashboard/src/components/Skeleton.jsx` | Skeleton loaders (SkeletonGrid, SkeletonKPI, SkeletonRow, SkeletonChart) |
+| `apps/dashboard/src/components/Tooltip.jsx` | Info tooltip component |
 | **Hooks** | |
-| `apps/dashboard/src/hooks/useShopifyOverview.js` | Fetch Shopify analytics data |
+| `apps/dashboard/src/hooks/useActiveStore.jsx` | StoreContext + StoreProvider, localStorage persistence |
+| `apps/dashboard/src/hooks/useToast.jsx` | Toast provider with success/error/info types |
+| `apps/dashboard/src/hooks/useShopifyOverview.js` | Fetch Shopify analytics (60s client cache TTL) |
+| `apps/dashboard/src/hooks/useProposals.js` | Fetch proposals (cached + Supabase Realtime) |
+| `apps/dashboard/src/hooks/useInsights.js` | Fetch action cards data |
 | `apps/dashboard/src/hooks/useMetaOverview.js` | Fetch Meta Ads data |
-| `apps/dashboard/src/hooks/useInsights.js` | Fetch action cards data (action_needed, declining, winners) |
 | `apps/dashboard/src/hooks/useProfit.js` | Fetch P&L data |
 | **Libs (frontend)** | |
-| `apps/dashboard/src/lib/api.js` | All API fetch functions (20+) |
+| `apps/dashboard/src/lib/api.js` | All API fetch functions (25+), auth token handling, `getProducts()` (paginated), `getAllProducts()` (full list) |
 | `apps/dashboard/src/lib/supabase.js` | Supabase client for realtime subscriptions |
 | **Libs (backend)** | |
 | `lib/claude.js` | Claude API wrapper + brand system prompt + `optimizeProduct()` |
-| `lib/higgsfield.js` | Higgsfield image/video generation + styled prompts (7 styles) |
-| `lib/shopify-admin.js` | Shopify Admin REST API: read (orders, products, traffic) + write (updateProduct, updateVariant, updateProductOptions) |
+| `lib/higgsfield.js` | Higgsfield image/video generation + styled prompts (7 styles) + per-store brand context + feedback learning |
+| `lib/shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) |
 | `lib/meta-api.js` | Meta Marketing API: read-only (insights, campaigns, active ads) |
 | `lib/supabase.js` | Supabase server-side client (service role) |
 | `lib/scraper-utils.js` | Product scraping + hook/headline generation |
+| `lib/store-context.js` | `getStore(id)`, `getAllStores()`, `hasAdminAccess(store)` |
+| `lib/auth.js` | Password-based HMAC token verification, `withAuth(handler)` wrapper |
+| `lib/rate-limit.js` | In-memory rate limiter with configurable window |
 | **API Endpoints** | |
-| `api/system.js` | Consolidated endpoint: pipeline_log, kpi, profit_summary, update_cogs, manual_adspend, optimize_product, approve/reject/save/pending_optimizations |
+| `api/system.js` | Consolidated mega-handler (15+ actions): stores_list, pipeline_log, kpi, profit_summary, proposals, events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale |
+| `api/auth/login.js` | Password authentication → session token |
 | `api/creatives/generate.js` | Generate image creative via Higgsfield |
 | `api/creatives/regenerate.js` | Regenerate image or video creative |
 | `api/creatives/convert-to-video.js` | Convert image creative to video (DOP Turbo) |
-| `api/creatives/list.js` | List creatives (filter by status, product_id) |
+| `api/creatives/list.js` | List creatives (filter by status, product_id, store_id, type) |
 | `api/ads/action.js` | Approve/reject/pause creatives |
-| `api/shopify/overview.js` | Shopify analytics: KPIs, daily revenue, top products with creative count, traffic, orders |
-| `api/meta/overview.js` | Meta Ads overview (returns "not connected" if no credentials) |
-| `api/products/list.js` | Products with creative counts |
+| `api/shopify/overview.js` | Shopify analytics: KPIs, daily revenue, top products, traffic, orders |
+| `api/meta/overview.js` | Meta Ads overview |
+| `api/products/list.js` | Paginated products with creative counts (page, limit params) |
 | `api/products/sync.js` | Sync products from Shopify |
-| `api/insights/actions.js` | Cross-query: products × creatives × orders → action cards |
-| **Agent Specs** | |
-| `agents/scraper.md` | SCRAPER agent spec |
-| `agents/forge.md` | FORGE agent spec |
-| `agents/publisher.md` | PUBLISHER agent spec (not implemented) |
-| `agents/looper.md` | LOOPER agent spec (not implemented) |
+| `api/cron/detect-events.js` | Event detection cron (every 6h): scans for actionable events → creates proposals |
 | **Product Knowledge** | |
 | `.claude/skills/elara.md` | Elara bikini: personas, hooks, visual direction |
 | `.claude/skills/mathilda.md` | Mathilda pants: personas, hooks, visual direction |
-| **Docs** | |
-| `Docs/Products/Elara USA/` | Elara research docs (avatar sheets, winning hooks, deep research) |
-| `Docs/Products/MATHILDA/` | Mathilda research docs |
-| `skills/` | Dev/design skills for system development |
+| `.claude/skills/isola.md` | Isola swimwear brand knowledge |
 
 ---
 
@@ -147,31 +178,35 @@ SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives 
 
 | Table | Purpose |
 |-------|---------|
-| `products` | Shopify products (synced) + `cogs` column for cost tracking |
-| `creatives` | Generated ad creatives (image/video), status: pending/approved/rejected/published |
+| `stores` | Multi-store config: shopify_url, admin_token, storefront_token, brand_config JSONB |
+| `products` | Shopify products (synced) + `cogs` + `store_id` FK |
+| `creatives` | Generated ad creatives (image/video), status: generating/pending/approved/rejected, `store_id` FK |
+| `events` | Detected events (product_no_creatives, revenue_declining, winner_detected) |
+| `proposals` | Actionable proposals from events, status: pending/approved/dismissed |
+| `product_optimizations` | AI optimization proposals: pending/approved/rejected with original + optimized JSONB |
+| `pipeline_log` | All agent/system activity log with `store_id` |
+| `manual_adspend` | Manual ad spend entries (TikTok, Pinterest, other) |
 | `ads` | Meta ads with campaign_id, meta_ad_id, budget, targeting |
-| `performance` | Daily ad metrics from Meta (spend, revenue, ROAS, CTR, CPC) |
+| `performance` | Daily ad metrics from Meta |
 | `briefs` | SCRAPER output (product hooks, headlines, visual refs) |
 | `winner_refs` | LOOPER feedback (winning hooks/headlines for FORGE) |
-| `pipeline_log` | All agent/system activity log |
-| `manual_adspend` | Manual ad spend entries (TikTok, Pinterest, other) |
-| `product_optimizations` | AI optimization proposals: pending/approved/rejected with original + optimized JSONB |
-| `product_docs` | Per-product document uploads (future: drag & drop) |
+| `product_docs` | Per-product document uploads (future) |
 
 ---
 
 ## Env Vars
 
 ```
+APP_PASSWORD=***                 # Dashboard login password
 HF_CREDENTIALS=***              # Higgsfield API key
 SUPABASE_URL=***                # Supabase project URL
 SUPABASE_ANON_KEY=***           # Supabase anon key
 SUPABASE_SERVICE_ROLE_KEY=***   # Supabase service role
 VITE_SUPABASE_URL=***           # Frontend Supabase URL
 VITE_SUPABASE_ANON_KEY=***      # Frontend Supabase anon key
-SHOPIFY_STORE_URL=***           # shop-elegancehouse.com
-SHOPIFY_ACCESS_TOKEN=***        # Storefront token (products only)
-SHOPIFY_ADMIN_TOKEN=***         # Admin API (read_orders, read_products, read_customers, read_analytics, write_products)
+SHOPIFY_STORE_URL=***           # Default store (Elegance House)
+SHOPIFY_ACCESS_TOKEN=***        # Default storefront token
+SHOPIFY_ADMIN_TOKEN=***         # Default admin token
 ANTHROPIC_API_KEY=***           # Claude API for Product Optimizer
 SITE_URL=***
 
@@ -186,7 +221,7 @@ META_AD_ACCOUNT_ID=             # EMPTY
 ## Key Dependencies
 
 - `@anthropic-ai/sdk` — Claude API for product optimization
-- `@higgsfield/client` — Higgsfield image/video generation
+- `@higgsfield/client` — Higgsfield image/video generation (manual polling for Nano Banana)
 - `@supabase/supabase-js` — Database + auth + storage + realtime
 - `cheerio` — HTML scraping for product data extraction
 - `dompurify` — Safe HTML rendering in OptimizePanel
@@ -195,6 +230,15 @@ META_AD_ACCOUNT_ID=             # EMPTY
 
 ## Important Patterns
 
+### Multi-Store Data Isolation
+Every query filters by `store_id`. Frontend passes active store ID to all API calls. Store switcher in header changes context for entire dashboard.
+
+### Auth Flow
+Password gate → `api/auth/login.js` → HMAC session token → stored in localStorage → `withAuth()` middleware validates on every API call. No Supabase Auth for dashboard users.
+
+### Event → Proposal System
+Cron (every 6h) → `detect-events.js` scans for actionable events → creates proposals → Overview shows proposal queue with Approve/Dismiss/Approve All. Event types: `product_no_creatives`, `revenue_declining`, `winner_detected`.
+
 ### Product Optimizer Approval Workflow
 ```
 Optimize → saves to DB (status: pending) → appears in Overview
@@ -202,88 +246,92 @@ Optimize → saves to DB (status: pending) → appears in Overview
   → Approve & Push → writes to Shopify → status: approved
   → Reject → status: rejected → never touches Shopify
 ```
-**Nothing pushes to Shopify without explicit approval.**
+**Nothing pushes to Shopify without explicit approval** (except product import — direct create is allowed).
 
 ### Creative Generation (Image + Video)
-- Image: Higgsfield Nano Banana (text2image)
+- Image: Higgsfield Nano Banana (text2image) with manual polling (SDK's withPolling broken)
 - Video: DOP Turbo (image2video) — requires source image
-- Two-step due to Vercel 60s timeout: generate image → convert to video in separate request
 - 7 style variants: ad_creative, product_shot, lifestyle, review_ugc, static_clean, static_split, static_urgency
+- Per-store brand context from `stores.brand_config` JSONB
+- Feedback learning from approved/rejected creatives
 
 ### Shopify API
 - REST API v2024-01 (not GraphQL)
-- Read: orders, products, traffic sources via `lib/shopify-admin.js`
-- Write: updateProduct, updateVariant, updateProductOptions
-- `shopifyREST()` supports GET/PUT/POST
+- `createShopifyClient(url, token)` factory pattern — returns object with all methods
+- MUST use `{handle}.myshopify.com` URLs, not custom domains
+- Default client exported for backward compat
 
-### Overview Action Cards
-- 🔴 Action Needed: products selling but with 0 creatives
-- 📉 Declining: products with revenue drop > 10%
-- 🏆 Winners: products with revenue up > 15%
-- ✨ Pending Optimizations: product optimizations awaiting approval
-- Cross-query: Shopify orders × Supabase products × creatives
+### Pagination (Products)
+- API: `page` + `limit` query params, returns `{ products, total, page, pages }`
+- Frontend: Products.jsx loads 50/page with "Load more" button
+- Other pages (Studio, Profit, Shopify) use `getAllProducts()` which fetches up to 200
 
-### Variant Standardization
-- Sizes: S, M, L, XL, XXL, 2XL, 3XL
-- Colors: English, capitalized (Black, Navy, Beige, White...)
-- Option labels: "Size" and "Color" (standardized from any language)
+### Vercel Hobby Limits
+- Max 12 serverless functions → consolidated into `api/system.js` mega-handler
+- 1 cron/day schedule → running every 6h via `0 */6 * * *`
+- 60s timeout → fire-and-forget for long operations
 
 ---
 
 ## App Flow
 
 ```
-Dashboard → 4 tabs
-├── Overview
-│   ├── ✨ Pending Optimizations → [Review] → Products tab
-│   ├── 🔴 Action Needed → [Generate Creatives] → Products tab
-│   ├── 📉 Declining → [Try Different Style] → Products tab
-│   ├── 🏆 Winners → [Generate More] → Products tab
-│   ├── ApprovalQueue (pending creatives)
-│   ├── TerminalLog (pipeline activity)
-│   └── MetaPanel (not connected / campaigns)
-│
-├── Shopify
-│   ├── KPIs: Revenue, Orders, AOV, Sessions, Conv%
-│   ├── Revenue bar chart (daily, 7d/30d/90d)
-│   ├── Top Products (with creative count per product)
-│   ├── Traffic Sources
-│   └── Recent Orders
-│
-├── Products
-│   ├── Product grid (search, filter, sort, sync)
-│   └── → ProductWorkspace (per product)
-│       ├── [+ Image] → GeneratePanel → Higgsfield
-│       ├── [▶ Video] → GeneratePanel (video mode) → DOP Turbo
-│       ├── [✨ Optimize] → OptimizePanel → Claude AI
-│       │   ├── Review original vs optimized
-│       │   ├── Edit any field (title, description, SEO, tags, variants)
-│       │   ├── Save Draft / Re-generate / Reject
-│       │   └── Approve & Push → writes to Shopify
-│       └── Creative grid (pending/approved, image/video)
-│
-└── Profit
-    ├── KPIs: Revenue, COGS, Adspend, Profit, ROAS
-    ├── Daily P&L table
-    ├── COGS management (per product)
-    ├── Manual adspend (TikTok, Pinterest)
-    └── CSV export
+Dashboard → Password gate (Login.jsx)
+  → Authenticated → Store selector (3 stores)
+    → 5 tabs:
+    │
+    ├── Overview
+    │   ├── Proposal Queue (events → approve/dismiss/approve all)
+    │   ├── Scan Now button (manual event detection)
+    │   ├── ApprovalQueue (pending creatives)
+    │   ├── TerminalLog (pipeline activity)
+    │   ├── MetaPanel (not connected / campaigns)
+    │   └── ShopifyServices grid
+    │
+    ├── Shopify
+    │   ├── ShopifyDashboard: KPIs, revenue chart, top products, traffic, orders
+    │   └── Pricing: bulk price editor (collection filter, search, checkboxes, apply)
+    │
+    ├── Studio
+    │   ├── Branded Content: type/prompt/style/model/count → generate
+    │   └── Product Creatives: product picker → GeneratePanel → gallery (images/videos)
+    │
+    ├── Products
+    │   ├── Paginated grid (50/page, load more, 3 view modes, filters, sort, sync)
+    │   └── → ProductWorkspace (per product)
+    │       ├── [+ Image] → GeneratePanel → Higgsfield
+    │       ├── [▶ Video] → GeneratePanel (video mode) → DOP Turbo
+    │       ├── [✨ Optimize] → OptimizePanel → Claude AI
+    │       │   ├── Review original vs optimized
+    │       │   ├── Edit any field (title, description, SEO, tags, variants)
+    │       │   ├── Save Draft / Re-generate / Reject
+    │       │   └── Approve & Push → writes to Shopify
+    │       ├── [Studio →] → navigates to Studio with product pre-selected
+    │       └── Creative grid by style (generating/pending/approved)
+    │
+    └── Profit
+        ├── KPIs: Revenue, COGS, Adspend, Profit, ROAS
+        ├── Daily P&L table (7d/14d/30d)
+        ├── COGS management (per product)
+        ├── Manual adspend (TikTok, Pinterest)
+        ├── CSV export
+        └── Storage cleanup (stale creatives)
 ```
 
 ---
 
 ## Known Tech Debt & Planned Work
 
-| Priority | Item | Sprint |
-|----------|------|--------|
+| Priority | Item | Notes |
+|----------|------|-------|
 | 🟡 MED | Meta Ads integration — awaiting credentials | When ready |
-| 🟡 MED | Product docs drag & drop upload (Supabase Storage: `product-docs/{handle}/`) | Sprint 4 |
-| 🔴 HIGH | Multi-store architecture (stores table, store_id FK, store switcher) | Sprint 4 |
-| 🟡 MED | Kiwi Size Guide integration (size chart per product) | Sprint 4+ |
+| 🟡 MED | Product docs drag & drop upload (Supabase Storage) | Future |
 | 🟡 MED | Product Optimizer — auto-detect unoptimized imports | Future |
+| 🟡 MED | system.js is 666+ lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
 | 🟢 LOW | PUBLISHER agent (auto-publish to Meta) | Future |
 | 🟢 LOW | LOOPER agent (performance scoring feedback loop) | Future |
 | 🟢 LOW | TikTok/Pinterest API integration (replace manual adspend) | Future |
+| 🟢 LOW | Full mobile responsive design | Partial — basic responsive exists |
 
 ---
 
@@ -294,8 +342,11 @@ Dashboard → 4 tabs
 cd apps/dashboard && npm run dev     # http://localhost:5173
 
 # Backend (Vercel)
-vercel dev                           # or however backend is started
+vercel dev                           # API + frontend together
 
 # Install dependencies
 npm install --legacy-peer-deps       # always use --legacy-peer-deps
+
+# Build
+cd apps/dashboard && npm run build   # production build
 ```

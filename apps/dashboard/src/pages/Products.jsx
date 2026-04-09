@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { getProducts, syncProducts } from '../lib/api';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './Products.css';
+
+const ImportModal = lazy(() => import('../components/ImportModal'));
 
 const PRICE_RANGES = [
   { key: 'all', label: 'All prices' },
@@ -24,6 +26,7 @@ const PAGE_SIZE = 50;
 
 export default function Products({ onSelectProduct, onNavigateToStudio, storeId }) {
   const toast = useToast();
+  const [showImport, setShowImport] = useState(false);
   const [allProducts, setAllProducts] = useState([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -151,6 +154,9 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
             ))}
           </div>
           <input className="products-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search products by name" />
+          <button className="products-import-btn" onClick={() => setShowImport(true)}>
+            Import
+          </button>
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}
           </button>
@@ -297,6 +303,16 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
             </div>
           )}
         </>
+      )}
+
+      {showImport && (
+        <Suspense fallback={null}>
+          <ImportModal
+            storeId={storeId}
+            onClose={() => setShowImport(false)}
+            onImported={() => { setShowImport(false); fetchProducts(1); }}
+          />
+        </Suspense>
       )}
     </div>
   );
