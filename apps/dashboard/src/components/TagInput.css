@@ -1,0 +1,27 @@
+.ti-wrap { display: flex; flex-direction: column; gap: 6px; }
+.ti-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ti-tag {
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 10px;
+  padding: 2px 8px; font-family: var(--mono); font-size: 10px; color: var(--text3);
+}
+.ti-tag-x {
+  background: none; border: none; color: var(--text4); font-size: 10px;
+  cursor: pointer; padding: 0 2px; transition: color .2s;
+}
+.ti-tag-x:hover { color: var(--coral); }
+.ti-input-row { display: flex; gap: 4px; }
+.ti-input {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 6px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 4px 8px; outline: none; flex: 1; min-width: 80px; transition: border-color .2s;
+}
+.ti-input:focus { border-color: var(--gold); }
+.ti-input::placeholder { color: var(--text4); }
+.ti-add {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 6px;
+  color: var(--text3); width: 28px; cursor: pointer; transition: all .2s;
+  font-size: 12px;
+}
+.ti-add:hover { border-color: var(--gold); color: var(--gold); }
+.ti-add:disabled { opacity: .4; cursor: not-allowed; }

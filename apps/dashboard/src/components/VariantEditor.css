@@ -1,0 +1,33 @@
+.ve-wrap { }
+.ve-options { display: flex; gap: 8px; margin-bottom: 8px; }
+.ve-option-badge {
+  font-family: var(--mono); font-size: 9px; color: var(--azure);
+  background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.15);
+  padding: 2px 8px; border-radius: 10px; letter-spacing: .3px;
+}
+.ve-table-wrap {
+  background: var(--deep); border: 1px solid var(--edge); border-radius: 10px;
+  overflow-x: auto;
+}
+.ve-table {
+  width: 100%; border-collapse: collapse;
+  font-family: var(--mono); font-size: 10px; color: var(--text2);
+}
+.ve-table th {
+  text-align: left; padding: 8px 12px;
+  font-size: 9px; color: var(--text4); letter-spacing: .5px; text-transform: uppercase;
+  border-bottom: 1px solid var(--edge); background: var(--surface);
+}
+.ve-table td { padding: 6px 12px; border-bottom: 1px solid var(--edge); }
+.ve-table tbody tr:last-child td { border-bottom: none; }
+.ve-variant-name { font-weight: 500; color: var(--text); white-space: nowrap; }
+.ve-price { color: var(--gold); font-weight: 500; }
+.ve-sku { color: var(--text3); }
+.ve-inv { color: var(--emerald); }
+.ve-inv--low { color: var(--coral); }
+.ve-input {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 4px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 3px 6px; width: 80px; outline: none; transition: border-color .2s;
+}
+.ve-input:focus { border-color: var(--gold); }

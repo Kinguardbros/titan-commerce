@@ -99,7 +99,7 @@ Key patterns:
 | Overview | `Overview.jsx` | Proposal queue (events → proposals → approve/dismiss) + Pipeline (ApprovalQueue + TerminalLog) + Meta panel + ShopifyServices |
 | Shopify | `Shopify.jsx` | ShopifyDashboard (KPIs, revenue chart, top products, traffic, orders) + inline Pricing (bulk price editor) |
 | Studio | `Studio.jsx` | Branded content generation (type/prompt/style/model/count) + Product creatives (product picker → GeneratePanel) |
-| Products | `Products.jsx` → `ProductWorkspace.jsx` | Paginated product grid (50/page, load more) → per-product creative management (generate image/video, optimize listing) |
+| Products | `Products.jsx` → `ProductWorkspace.jsx` | Paginated product grid (50/page, load more, import) → per-product workspace (creatives, size chart, full product detail + editor) |
 | Profit | `Profit.jsx` | P&L dashboard: daily revenue/COGS/adspend/fees/profit, COGS management, manual adspend, CSV export, storage cleanup |
 
 ---
@@ -114,13 +114,20 @@ Key patterns:
 | `apps/dashboard/src/pages/Shopify.jsx` | Shopify analytics dashboard + bulk pricing |
 | `apps/dashboard/src/pages/Studio.jsx` | Branded + product creative generation |
 | `apps/dashboard/src/pages/Products.jsx` | Paginated product grid with filters, sort, search, sync, view modes (grid/list/cards) |
-| `apps/dashboard/src/pages/ProductWorkspace.jsx` | Per-product workspace: creatives by style, generate image/video, optimize |
+| `apps/dashboard/src/pages/ProductWorkspace.jsx` | Per-product workspace: creatives by style, generate image/video, optimize, size chart, product detail/editor |
 | `apps/dashboard/src/pages/Profit.jsx` | P&L dashboard with COGS, manual adspend, CSV export |
 | `apps/dashboard/src/pages/Login.jsx` | Password gate login screen |
 | **Components** | |
 | `apps/dashboard/src/components/OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
 | `apps/dashboard/src/components/GeneratePanel.jsx` | Creative generation (image + video modes, style/subject/text overlay/count) |
 | `apps/dashboard/src/components/CreativeEditor.jsx` | Creative review: preview, edit, approve, reject, convert to video |
+| `apps/dashboard/src/components/ImportModal.jsx` | 4-step product import wizard (scrape URL → preview → import → done) |
+| `apps/dashboard/src/components/SizeChartEditor.jsx` | Size chart: read/edit/import from image (Claude Vision) → Shopify metafield |
+| `apps/dashboard/src/components/ProductDetail.jsx` | Full product detail + inline editor (all Shopify fields) |
+| `apps/dashboard/src/components/TagInput.jsx` | Tag chips input (add/remove tags) |
+| `apps/dashboard/src/components/VariantEditor.jsx` | Variant table (read-only or editable: price, SKU, compare_at) |
+| `apps/dashboard/src/components/ImageManager.jsx` | Image gallery with reorder/delete |
+| `apps/dashboard/src/components/MetafieldEditor.jsx` | Key-value metafield editor |
 | `apps/dashboard/src/components/ApprovalQueue.jsx` | Pending creatives queue |
 | `apps/dashboard/src/components/ProposalCard.jsx` | Event proposal cards (approve/dismiss) grouped by severity |
 | `apps/dashboard/src/components/ShopifyDashboard.jsx` | Full Shopify analytics (KPIs, chart, products, traffic, orders) |
@@ -266,6 +273,15 @@ Optimize → saves to DB (status: pending) → appears in Overview
 - Frontend: Products.jsx loads 50/page with "Load more" button
 - Other pages (Studio, Profit, Shopify) use `getAllProducts()` which fetches up to 200
 
+### Product Import
+Paste competitor URL → scrape → preview/edit → create in Shopify (direct, no approval) → auto-optimize (pending approval) → auto-generate creatives. Collection URLs scrape multiple products for batch import.
+
+### Size Chart
+CSV-format metafield (`custom.size_chart_text`) in Shopify. Two input methods: manual table editor or image upload → Claude Vision extraction. Write via Shopify metafield API.
+
+### Product Editor (Direct Write)
+Product edit writes to Shopify immediately (no approval queue). Unlike Optimizer which goes through pending → approve flow. All changes logged to pipeline_log with before/after audit trail.
+
 ### Vercel Hobby Limits
 - Max 12 serverless functions → consolidated into `api/system.js` mega-handler
 - 1 cron/day schedule → running every 6h via `0 */6 * * *`
@@ -297,17 +313,16 @@ Dashboard → Password gate (Login.jsx)
     │   └── Product Creatives: product picker → GeneratePanel → gallery (images/videos)
     │
     ├── Products
-    │   ├── Paginated grid (50/page, load more, 3 view modes, filters, sort, sync)
+    │   ├── Paginated grid (50/page, load more, 3 view modes, filters, sort, sync, import)
+    │   ├── [Import] → ImportModal (scrape URL → preview/edit → create in Shopify → auto-optimize + auto-generate)
     │   └── → ProductWorkspace (per product)
     │       ├── [+ Image] → GeneratePanel → Higgsfield
     │       ├── [▶ Video] → GeneratePanel (video mode) → DOP Turbo
-    │       ├── [✨ Optimize] → OptimizePanel → Claude AI
-    │       │   ├── Review original vs optimized
-    │       │   ├── Edit any field (title, description, SEO, tags, variants)
-    │       │   ├── Save Draft / Re-generate / Reject
-    │       │   └── Approve & Push → writes to Shopify
+    │       ├── [✨ Optimize] → OptimizePanel → Claude AI → approval workflow
     │       ├── [Studio →] → navigates to Studio with product pre-selected
-    │       └── Creative grid by style (generating/pending/approved)
+    │       ├── Creative grid by style (generating/pending/approved)
+    │       ├── Size Chart (read/edit table + import from image via Claude Vision → Shopify metafield)
+    │       └── Product Detail + Editor (all Shopify fields, inline edit, direct save)
     │
     └── Profit
         ├── KPIs: Revenue, COGS, Adspend, Profit, ROAS

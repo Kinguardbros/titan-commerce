@@ -201,6 +201,44 @@ async function handler(req, res) {
         return res.status(200).json(data || []);
       }
 
+      // ─── READ SIZE CHART ───
+      if (action === 'read_size_chart') {
+        const storeId = req.query.store_id;
+        const productId = req.query.product_id;
+        if (!storeId || !productId) return res.status(400).json({ error: 'store_id and product_id required' });
+
+        const store = await getStore(storeId);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        const { data: product } = await supabase.from('products').select('shopify_id').eq('id', productId).single();
+        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found' });
+
+        const client = createShopifyClient(store.shopify_url, store.admin_token);
+        const metafield = await client.getMetafield(product.shopify_id, 'custom', 'size_chart_text');
+        return res.status(200).json({ size_chart_text: metafield?.value || null });
+      }
+
+      // ─── PRODUCT DETAIL (full Shopify data) ───
+      if (action === 'product_detail') {
+        const storeId = req.query.store_id;
+        const productId = req.query.product_id;
+        if (!storeId || !productId) return res.status(400).json({ error: 'store_id and product_id required' });
+
+        const store = await getStore(storeId);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        const { data: product } = await supabase.from('products').select('shopify_id').eq('id', productId).single();
+        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found' });
+
+        const client = createShopifyClient(store.shopify_url, store.admin_token);
+        const [fullProduct, metafields] = await Promise.all([
+          client.getFullProduct(product.shopify_id),
+          client.getProductMetafields(product.shopify_id),
+        ]);
+
+        return res.status(200).json({ product: fullProduct, metafields });
+      }
+
       return res.status(400).json({ error: 'Unknown GET action' });
     }
 
@@ -652,6 +690,139 @@ async function handler(req, res) {
         });
 
         return res.status(200).json({ deleted, total_checked: stale?.length || 0 });
+      }
+
+      // ─── SAVE SIZE CHART ───
+      if (action === 'save_size_chart') {
+        const { store_id, product_id, size_chart_text } = req.body;
+        if (!store_id || !product_id || !size_chart_text) return res.status(400).json({ error: 'store_id, product_id, and size_chart_text required' });
+
+        const store = await getStore(store_id);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        const { data: product } = await supabase.from('products').select('shopify_id, title').eq('id', product_id).single();
+        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found' });
+
+        const client = createShopifyClient(store.shopify_url, store.admin_token);
+        const result = await client.updateMetafield(product.shopify_id, 'custom', 'size_chart_text', size_chart_text);
+        if (!result) return res.status(500).json({ error: 'Failed to save metafield to Shopify' });
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'SIZE_CHART',
+          message: `Updated size chart for "${product.title}"`,
+          level: 'success',
+        });
+
+        return res.status(200).json({ ok: true });
+      }
+
+      // ─── PARSE SIZE CHART IMAGE (Claude Vision) ───
+      if (action === 'parse_size_chart_image') {
+        const { image_url } = req.body;
+        if (!image_url) return res.status(400).json({ error: 'image_url required' });
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image', source: { type: 'url', url: image_url } },
+              { type: 'text', text: 'Extract the size chart from this image. Return ONLY CSV format with no markdown or code fences: first line is headers separated by commas, each following line is one size row separated by commas. Example:\nSize, US, Bust (in), Waist (in)\nS, 4-6, 34-35, 27-28\nM, 8-10, 36-37, 29-30' },
+            ],
+          }],
+        });
+
+        const csvText = response.content?.[0]?.text?.trim() || '';
+        return res.status(200).json({ csv: csvText });
+      }
+
+      // ─── UPDATE PRODUCT FULL ───
+      if (action === 'update_product_full') {
+        const { store_id, product_id, updates } = req.body;
+        if (!store_id || !product_id || !updates) return res.status(400).json({ error: 'store_id, product_id, and updates required' });
+
+        const store = await getStore(store_id);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        const { data: product } = await supabase.from('products').select('shopify_id, title').eq('id', product_id).single();
+        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found' });
+
+        const client = createShopifyClient(store.shopify_url, store.admin_token);
+        const changes = [];
+
+        // Snapshot before-state for audit trail
+        const before = await client.getFullProduct(product.shopify_id);
+
+        // Update main product fields
+        const productFields = {};
+        for (const key of ['title', 'body_html', 'vendor', 'product_type', 'tags', 'status']) {
+          if (updates[key] !== undefined) {
+            productFields[key] = updates[key];
+            changes.push(key);
+          }
+        }
+        if (updates.seo_title !== undefined) { productFields.metafields_global_title_tag = updates.seo_title; changes.push('seo_title'); }
+        if (updates.seo_description !== undefined) { productFields.metafields_global_description_tag = updates.seo_description; changes.push('seo_description'); }
+
+        if (Object.keys(productFields).length > 0) {
+          const result = await client.updateProduct(product.shopify_id, productFields);
+          if (!result) return res.status(500).json({ error: 'Failed to update product in Shopify' });
+        }
+
+        // Update variants
+        if (updates.variants?.length > 0) {
+          for (const v of updates.variants) {
+            if (v.id) {
+              const variantUpdates = {};
+              if (v.price !== undefined) variantUpdates.price = v.price;
+              if (v.compare_at_price !== undefined) variantUpdates.compare_at_price = v.compare_at_price;
+              if (v.sku !== undefined) variantUpdates.sku = v.sku;
+              await client.updateVariant(v.id, variantUpdates);
+              changes.push(`variant_${v.id}`);
+            }
+          }
+        }
+
+        // Update metafields
+        if (updates.metafields?.length > 0) {
+          for (const mf of updates.metafields) {
+            await client.updateMetafield(product.shopify_id, mf.namespace, mf.key, mf.value, mf.type || 'multi_line_text_field');
+            changes.push(`metafield_${mf.namespace}.${mf.key}`);
+          }
+        }
+
+        // Update images
+        if (updates.images) {
+          await client.updateProductImages(product.shopify_id, updates.images);
+          changes.push('images');
+        }
+
+        // Sync title/price back to Supabase
+        const supabaseUpdates = {};
+        if (updates.title) supabaseUpdates.title = updates.title;
+        if (updates.product_type) supabaseUpdates.product_type = updates.product_type;
+        if (updates.tags) supabaseUpdates.tags = JSON.stringify(Array.isArray(updates.tags) ? updates.tags : updates.tags.split(',').map((t) => t.trim()));
+        if (Object.keys(supabaseUpdates).length > 0) {
+          await supabase.from('products').update(supabaseUpdates).eq('id', product_id);
+        }
+
+        // Pipeline log with before/after audit trail
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'EDITOR',
+          message: `Updated "${product.title}": ${changes.join(', ')}`,
+          level: 'info',
+          metadata: {
+            product_id, changes,
+            before: before ? { title: before.title, body_html: before.body_html, tags: before.tags, status: before.status } : null,
+            after: updates,
+          },
+        });
+
+        return res.status(200).json({ ok: true, changes });
       }
 
       // ─── SCRAPE PRODUCT URL ───

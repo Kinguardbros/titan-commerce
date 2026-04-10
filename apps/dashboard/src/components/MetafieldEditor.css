@@ -1,0 +1,39 @@
+.mfe-wrap { display: flex; flex-direction: column; gap: 6px; }
+.mfe-row { display: flex; gap: 10px; align-items: flex-start; }
+.mfe-key {
+  font-family: var(--mono); font-size: 9px; color: var(--azure);
+  min-width: 120px; flex-shrink: 0; padding-top: 2px;
+  word-break: break-all;
+}
+.mfe-value {
+  font-family: var(--mono); font-size: 10px; color: var(--text3);
+  word-break: break-all;
+}
+.mfe-value-edit {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 4px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 3px 6px; flex: 1; outline: none; resize: vertical; transition: border-color .2s;
+}
+.mfe-value-edit:focus { border-color: var(--gold); }
+.mfe-empty {
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
+}
+.mfe-add {
+  display: flex; gap: 4px; margin-top: 4px; align-items: center;
+}
+.mfe-add-input {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 4px;
+  color: var(--text); font-family: var(--mono); font-size: 10px;
+  padding: 3px 6px; width: 80px; outline: none; transition: border-color .2s;
+}
+.mfe-add-input:focus { border-color: var(--gold); }
+.mfe-add-ns { width: 60px; }
+.mfe-add-val { flex: 1; }
+.mfe-add-btn {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 4px;
+  color: var(--text3); width: 24px; height: 24px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; transition: all .2s;
+}
+.mfe-add-btn:hover { border-color: var(--gold); color: var(--gold); }
+.mfe-add-btn:disabled { opacity: .4; cursor: not-allowed; }

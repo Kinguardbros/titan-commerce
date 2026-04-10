@@ -274,3 +274,35 @@ export function confirmImport(data) {
     body: JSON.stringify(data),
   });
 }
+
+// Size Chart
+export function readSizeChart(storeId, productId) {
+  return fetchJSON(`/api/system?action=read_size_chart&store_id=${storeId}&product_id=${productId}`);
+}
+
+export function saveSizeChart(storeId, productId, sizeChartText) {
+  return fetchJSON('/api/system?action=save_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, size_chart_text: sizeChartText }),
+  });
+}
+
+export function parseSizeChartImage(imageUrl) {
+  return fetchJSON('/api/system?action=parse_size_chart_image', {
+    method: 'POST',
+    body: JSON.stringify({ image_url: imageUrl }),
+  });
+}
+
+// Product Detail
+export function getProductDetail(storeId, productId) {
+  return fetchJSON(`/api/system?action=product_detail&store_id=${storeId}&product_id=${productId}`);
+}
+
+// Product Editor
+export function updateProductFull(storeId, productId, updates) {
+  return fetchJSON('/api/system?action=update_product_full', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, updates }),
+  });
+}

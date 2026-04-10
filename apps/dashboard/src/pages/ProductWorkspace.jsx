@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { getProductCreatives } from '../lib/api';
 import supabase from '../lib/supabase';
 import GeneratePanel from '../components/GeneratePanel';
@@ -9,6 +9,8 @@ import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './ProductWorkspace.css';
+
+const ProductDetail = lazy(() => import('../components/ProductDetail'));
 
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creatives' },
@@ -43,216 +45,149 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
   useEffect(() => {
     fetchCreatives();
-
     const channel = supabase
       .channel(`product-${product.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'creatives' },
-        (payload) => {
-          if (payload.new.product_id === product.id) {
-            setCreatives((prev) => [payload.new, ...prev]);
-          }
-        }
-      )
+        (payload) => { if (payload.new.product_id === product.id) setCreatives((prev) => [payload.new, ...prev]); })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'creatives' },
-        (payload) => {
-          setCreatives((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c));
-        }
-      )
+        (payload) => { setCreatives((prev) => prev.map((c) => c.id === payload.new.id ? { ...c, ...payload.new } : c)); })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'creatives' },
-        (payload) => {
-          setCreatives((prev) => prev.filter((c) => c.id !== payload.old.id));
-        }
-      )
+        (payload) => { setCreatives((prev) => prev.filter((c) => c.id !== payload.old.id)); })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [product.id, fetchCreatives]);
 
-  // Split by status
-  const generating = useMemo(() =>
-    creatives.filter((c) => c.status === 'generating' && (c.style || 'ad_creative') === activeStyle),
-    [creatives, activeStyle]
-  );
-  const pending = useMemo(() =>
-    creatives.filter((c) => c.status === 'pending' && (c.style || 'ad_creative') === activeStyle),
-    [creatives, activeStyle]
-  );
-  const approved = useMemo(() =>
-    creatives.filter((c) => c.status === 'approved' && (c.style || 'ad_creative') === activeStyle),
-    [creatives, activeStyle]
-  );
+  const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
+  const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
+  const approved = useMemo(() => creatives.filter((c) => c.status === 'approved' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
 
   const handleApprove = async (id, comment) => {
     try { await approveAd(id, 'Team', comment); toast.success('Creative approved!'); } catch (e) { console.error(e); toast.error(`Approve failed: ${e.message}`); }
     setCreatives((prev) => prev.map((c) => c.id === id ? { ...c, status: 'approved' } : c));
     setEditingCreative(null);
   };
-
   const handleReject = async (id, reason) => {
     try { await rejectAd(id, 'Team', reason); toast.success('Creative rejected'); } catch (e) { console.error(e); toast.error(`Reject failed: ${e.message}`); }
     setCreatives((prev) => prev.filter((c) => c.id !== id));
     setEditingCreative(null);
   };
-
   const handleSave = async (id, updates) => {
     try { await updateCreative(id, updates); } catch (e) { console.error(e); toast.error(`Save failed: ${e.message}`); }
     setCreatives((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c));
   };
 
-  const images = JSON.parse(product.images || '[]');
   const totalPending = creatives.filter((c) => c.status === 'pending').length;
   const totalApproved = creatives.filter((c) => c.status === 'approved').length;
 
   return (
     <div className="pw">
-      <Breadcrumbs items={[
-        { label: 'Products', onClick: onBack },
-        { label: product.title },
-      ]} />
+      {/* Header bar */}
+      <div className="pw-topbar">
+        <Breadcrumbs items={[
+          { label: 'Products', onClick: onBack },
+          { label: product.title },
+        ]} />
+        <div className="pw-topbar-actions">
+          <button className="pw-action-btn" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
+          <button className="pw-action-btn pw-action-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+          <button className="pw-action-btn pw-action-btn--optimize" onClick={() => setShowOptimize(true)}>Optimize</button>
+          {onNavigateToStudio && (
+            <button className="pw-action-btn pw-action-btn--muted" onClick={() => onNavigateToStudio(product.id)}>Studio</button>
+          )}
+        </div>
+      </div>
 
-      <div className="pw-header">
-        <div className="pw-hero" style={
-          product.image_url
-            ? { backgroundImage: `url(${product.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-            : { background: 'var(--surface)' }
-        } />
-        <div className="pw-info">
-          <div className="pw-title">{product.title}</div>
-          {product.price && <div className="pw-price">${product.price}</div>}
-          <div className="pw-meta">
-            {product.handle && <span>{product.handle}</span>}
-            <span>{images.length} product images</span>
+      {/* ══ PRODUCT EDITOR (Shopify-style) ══ */}
+      <Suspense fallback={<div className="pw-detail-loading">Loading...</div>}>
+        <ProductDetail product={product} storeId={storeId} store={store} />
+      </Suspense>
+
+      {/* ══ CREATIVES SECTION ══ */}
+      <div className="pw-creatives-section">
+        <div className="pw-creatives-header">
+          <div className="pw-creatives-title">Ad Creatives</div>
+          <div className="pw-creatives-stats">
             <span>{totalPending} pending</span>
             <span>{totalApproved} approved</span>
           </div>
         </div>
-        <div className="pw-generate-group">
-          <button className="pw-generate-btn" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>
-            + Image
-          </button>
-          <button className="pw-generate-btn pw-generate-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>
-            ▶ Video
-          </button>
-          <button className="pw-generate-btn pw-generate-btn--optimize" onClick={() => setShowOptimize(true)}>
-            ✨ Optimize
-          </button>
-          {onNavigateToStudio && (
-            <button className="pw-generate-btn" onClick={() => onNavigateToStudio(product.id)} style={{ opacity: 0.6 }}>
-              Studio →
-            </button>
-          )}
+
+        <div className="pw-tabs">
+          {STYLES.map((s) => {
+            const count = creatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
+            return (
+              <button key={s.key} className={`pw-tab${activeStyle === s.key ? ' pw-tab--active' : ''}`}
+                onClick={() => setActiveStyle(s.key)}>
+                {s.label} {count > 0 && <span className="pw-tab-count">{count}</span>}
+              </button>
+            );
+          })}
         </div>
+
+        {loading ? (
+          <SkeletonGrid count={4} />
+        ) : (
+          <>
+            {generating.length > 0 && (
+              <div className="pw-section">
+                <div className="pw-section-title pw-section-title--generating">
+                  Generating...<span className="pw-section-count">{generating.length}</span>
+                </div>
+                <div className="pw-grid">
+                  {generating.map((c) => (
+                    <div key={c.id} className="pw-card pw-card--generating">
+                      <div className="pw-card-img" style={{ background: 'var(--surface)' }}>
+                        <div className="pw-generating-spinner" />
+                      </div>
+                      <div className="pw-card-body">
+                        <div className="pw-card-hook">Generating image...</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {pending.length > 0 && (
+              <div className="pw-section">
+                <div className="pw-section-title">Review & Approve<span className="pw-section-count">{pending.length}</span></div>
+                <div className="pw-grid">
+                  {pending.map((c) => <CreativeCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} />)}
+                </div>
+              </div>
+            )}
+
+            {approved.length > 0 && (
+              <div className="pw-section">
+                <div className="pw-section-title pw-section-title--approved">Approved<span className="pw-section-count pw-section-count--approved">{approved.length}</span></div>
+                <div className="pw-grid">
+                  {approved.map((c) => <CreativeCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} status="approved" />)}
+                </div>
+              </div>
+            )}
+
+            {generating.length === 0 && pending.length === 0 && approved.length === 0 && (
+              <div className="pw-empty">
+                <div>No {STYLES.find((s) => s.key === activeStyle)?.label.toLowerCase()} yet</div>
+                <div className="pw-empty-actions">
+                  <button className="pw-action-btn-sm" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
+                  <button className="pw-action-btn-sm pw-action-btn-sm--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
-      <div className="pw-tabs">
-        {STYLES.map((s) => {
-          const count = creatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
-          return (
-            <button
-              key={s.key}
-              className={`pw-tab${activeStyle === s.key ? ' pw-tab--active' : ''}`}
-              onClick={() => setActiveStyle(s.key)}
-            >
-              {s.label} {count > 0 && <span className="pw-tab-count">{count}</span>}
-            </button>
-          );
-        })}
-      </div>
-
-      {loading ? (
-        <SkeletonGrid count={4} />
-      ) : (
-        <>
-          {/* Generating — waiting for Higgsfield */}
-          {generating.length > 0 && (
-            <div className="pw-section">
-              <div className="pw-section-title pw-section-title--generating">
-                Generating...
-                <span className="pw-section-count">{generating.length}</span>
-              </div>
-              <div className="pw-grid">
-                {generating.map((c) => (
-                  <div key={c.id} className="pw-card pw-card--generating">
-                    <div className="pw-card-img" style={{ background: 'var(--surface)' }}>
-                      <div className="pw-generating-spinner" />
-                    </div>
-                    <div className="pw-card-body">
-                      <div className="pw-card-hook">Generating image...</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Pending — new creatives to review */}
-          {pending.length > 0 && (
-            <div className="pw-section">
-              <div className="pw-section-title">
-                New — Review & Approve
-                <span className="pw-section-count">{pending.length}</span>
-              </div>
-              <div className="pw-grid">
-                {pending.map((c) => (
-                  <CreativeCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Approved — passed the review */}
-          {approved.length > 0 && (
-            <div className="pw-section">
-              <div className="pw-section-title pw-section-title--approved">
-                Approved
-                <span className="pw-section-count pw-section-count--approved">{approved.length}</span>
-              </div>
-              <div className="pw-grid">
-                {approved.map((c) => (
-                  <CreativeCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} status="approved" />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {generating.length === 0 && pending.length === 0 && approved.length === 0 && (
-            <div className="pw-empty">
-              <div>No {STYLES.find((s) => s.key === activeStyle)?.label.toLowerCase()} yet</div>
-              <div className="pw-generate-group">
-                <button className="pw-generate-btn-sm" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
-                <button className="pw-generate-btn-sm pw-generate-btn-sm--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>▶ Video</button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
+      {/* Modals */}
       {showGenerate && (
-        <GeneratePanel
-          product={product}
-          mode={generateMode}
-          defaultStyle={activeStyle}
-          creatives={creatives}
-          onClose={() => setShowGenerate(false)}
-          onGenerated={() => { setShowGenerate(false); fetchCreatives(); }}
-        />
+        <GeneratePanel product={product} mode={generateMode} defaultStyle={activeStyle} creatives={creatives}
+          onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
       )}
-
-      <CreativeEditor
-        creative={editingCreative}
-        open={!!editingCreative}
-        onClose={() => setEditingCreative(null)}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onSave={handleSave}
-      />
-
+      <CreativeEditor creative={editingCreative} open={!!editingCreative}
+        onClose={() => setEditingCreative(null)} onApprove={handleApprove} onReject={handleReject} onSave={handleSave} />
       {showOptimize && (
-        <OptimizePanel
-          product={product}
-          onClose={() => setShowOptimize(false)}
-          onApplied={() => { setShowOptimize(false); }}
-        />
+        <OptimizePanel product={product} onClose={() => setShowOptimize(false)} onApplied={() => { setShowOptimize(false); }} />
       )}
     </div>
   );
@@ -266,13 +201,11 @@ function CreativeCard({ creative: c, onClick, status }) {
   return (
     <div className="pw-card" onClick={onClick}>
       <div className="pw-card-img" style={
-        thumbUrl
-          ? { backgroundImage: `url(${thumbUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-          : { background: 'var(--surface)' }
+        thumbUrl ? { backgroundImage: `url(${thumbUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: 'var(--surface)' }
       }>
-        {isVideo && <span className="pw-card-play">▶</span>}
-        {status === 'approved' && <span className="pw-card-check">✓</span>}
-        {!status && <span className={`pill pending`}>pending</span>}
+        {isVideo && <span className="pw-card-play">+</span>}
+        {status === 'approved' && <span className="pw-card-check">+</span>}
+        {!status && <span className="pill pending">pending</span>}
       </div>
       <div className="pw-card-body">
         <div className="pw-card-hook">{c.hook_used?.slice(0, 60) || c.headline?.slice(0, 60)}</div>
