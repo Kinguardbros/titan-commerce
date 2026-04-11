@@ -154,37 +154,53 @@ async function handler(req, res) {
     let requestId = null;
     const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
-    if (ai_model === 'fal_nano_banana') {
-      // fal.ai Nano Banana 2 Edit — image-to-image with reference
-      console.log('[generate] Using fal.ai Nano Banana 2 Edit, ref images:', Math.min(images.length, 3));
-      const falPrompt = images.length > 0
+    // Map ai_model key → fal.ai model path
+    const FAL_MODEL_MAP = {
+      fal_flux2_edit:       'fal-ai/flux-2/edit',
+      fal_flux2_pro_edit:   'fal-ai/flux-2-pro/edit',
+      fal_ideogram_bg:      'fal-ai/ideogram/v3/replace-background',
+      fal_ideogram_edit:    'fal-ai/ideogram/v3/edit',
+      fal_flux_kontext:     'fal-ai/flux-pro/kontext',
+      fal_nano_banana:      'fal-ai/nano-banana-2/edit',
+    };
+
+    const falModel = FAL_MODEL_MAP[ai_model];
+
+    if (falModel) {
+      // All fal.ai models
+      const maxRef = falModel.includes('ideogram') ? 1 : falModel.includes('flux-2') ? 5 : 3;
+      const refImages = images.slice(0, maxRef);
+      console.log(`[generate] Using fal.ai ${falModel}, ref images: ${refImages.length}`);
+
+      const falPrompt = refImages.length > 0
         ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
         : prompt;
+
       const result = await generateFal({
-        model: 'fal-ai/nano-banana-2/edit',
+        model: falModel,
         prompt: falPrompt,
-        imageUrl: images.slice(0, 3),
+        imageUrl: refImages,
       });
       imageUrl = result.url;
       requestId = result.requestId;
     } else if (ai_model === 'flux_kontext') {
-      // Higgsfield Flux Kontext Max — text-to-image
+      // Legacy: Higgsfield Flux Kontext Max
       const fluxPrompt = `PRODUCT: ${product.title}${product.price ? ` ($${product.price})` : ''}${productDesc ? `\nProduct details: ${productDesc}` : ''}\n\n${prompt}`;
-      console.log('[generate] Using Flux Kontext Max');
+      console.log('[generate] Using Higgsfield Flux Kontext Max');
       try {
         const result = await generateFluxKontext({ prompt: fluxPrompt, aspectRatio: '1:1' });
         imageUrl = result.url;
         requestId = result.jobId;
       } catch (fluxErr) {
         console.error('[generate] Flux failed, falling back to fal.ai:', fluxErr.message);
-        const result = await generateFal({ model: 'fal-ai/nano-banana-2/edit', prompt, imageUrl: images.slice(0, 3) });
+        const result = await generateFal({ model: 'fal-ai/flux-2/edit', prompt, imageUrl: images.slice(0, 5) });
         imageUrl = result.url;
         requestId = result.requestId;
       }
     } else {
-      // Higgsfield Soul / Soul Reference — image-to-image
+      // Legacy: Higgsfield Soul / Soul Reference
       const refImages = images.slice(0, ai_model === 'soul_ref' ? 5 : 3);
-      console.log(`[generate] Using ${ai_model === 'soul_ref' ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
+      console.log(`[generate] Using Higgsfield ${ai_model === 'soul_ref' ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
       try {
         requestId = await submitJob(prompt, refImages);
       } catch (submitErr) {

@@ -25,10 +25,22 @@ const STYLE_MAP = {
 
 // Map V2 model IDs → backend model keys
 const MODEL_MAP = {
+  "flux2-edit": "fal_flux2_edit",
+  "flux2-pro-edit": "fal_flux2_pro_edit",
+  "ideogram-bg": "fal_ideogram_bg",
+  "ideogram-edit": "fal_ideogram_edit",
+  "flux-kontext": "fal_flux_kontext",
   "nano-banana": "fal_nano_banana",
-  "flux-pro": "flux_kontext",
-  "sdxl-lightning": "soul",
-  "ideogram-3": "soul_ref",
+};
+
+// Per-model cost estimate ($/image)
+const MODEL_COST = {
+  "flux2-edit": 0.012,
+  "flux2-pro-edit": 0.03,
+  "ideogram-bg": 0.03,
+  "ideogram-edit": 0.03,
+  "flux-kontext": 0.04,
+  "nano-banana": 0.08,
 };
 
 const NEON = "#E2A832";
@@ -98,10 +110,12 @@ const STYLE_CATEGORIES = [
 ];
 
 const IMG_MODELS = [
-  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing" },
-  { id: "flux-pro", label: "FLUX 1.1 Pro", detail: "Photorealistic" },
-  { id: "sdxl-lightning", label: "SDXL Lightning", detail: "Fast drafts" },
-  { id: "ideogram-3", label: "Ideogram 3", detail: "Text in image" },
+  { id: "flux2-edit", label: "FLUX.2 Edit", detail: "Best value — $0.012" },
+  { id: "flux2-pro-edit", label: "FLUX.2 Pro Edit", detail: "Best quality — $0.03" },
+  { id: "ideogram-bg", label: "Ideogram BG Swap", detail: "Replace background — $0.03" },
+  { id: "ideogram-edit", label: "Ideogram Edit", detail: "Smart editing — $0.03" },
+  { id: "flux-kontext", label: "FLUX Kontext Pro", detail: "Identity preserve — $0.04" },
+  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.08" },
 ];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
@@ -402,7 +416,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [tab, setTab] = useState("image");
   // Image config
   const [imgStyle, setImgStyle] = useState("ad-creative");
-  const [imgModel, setImgModel] = useState("nano-banana");
+  const [imgModel, setImgModel] = useState("flux2-edit");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
   const [customText, setCustomText] = useState("");
@@ -460,9 +474,10 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const showSceneForAb = SCENE_STYLES.has(abStyle);
 
   const imgCost = useMemo(() => {
-    const base = imgCount * 0.14;
+    const perImage = MODEL_COST[imgModel] || 0.03;
+    const base = imgCount * perImage;
     return abMode ? (base * 2).toFixed(2) : base.toFixed(2);
-  }, [imgCount, abMode]);
+  }, [imgCount, abMode, imgModel]);
 
   const vidCost = useMemo(() => {
     const dur = parseInt(duration);
