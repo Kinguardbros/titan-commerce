@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { buildStyledPrompt } from '../../lib/higgsfield.js';
+import { buildStyledPrompt, generateFluxKontext } from '../../lib/higgsfield.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -110,19 +110,41 @@ async function handler(req, res) {
       storeId: store_id,
     });
 
-    // Generate ONE image per call — send up to 3 reference photos for better fidelity
-    const refImages = images.slice(0, 3);
-    console.log('[generate] Submitting job, prompt length:', prompt.length, 'ref images:', refImages.length);
-    let requestId;
-    try {
-      requestId = await submitJob(prompt, refImages);
-    } catch (submitErr) {
-      console.error('[generate] submitJob FAILED:', submitErr.message, submitErr.response?.status, JSON.stringify(submitErr.response?.data || {}).slice(0, 500));
-      throw new Error(`Higgsfield submit failed: ${submitErr.message}`);
-    }
-    if (!requestId) throw new Error('No request ID from Higgsfield');
+    // Route: Flux Kontext Max for quality styles, Soul for others
+    const FLUX_STYLES = ['product_photo_beach', 'ad_creative', 'lifestyle', 'product_shot', 'review_ugc'];
+    const useFlux = FLUX_STYLES.includes(style);
 
-    const imageUrl = await pollUntilDone(requestId);
+    let imageUrl;
+    if (useFlux) {
+      // Flux Kontext — text-to-image, no reference needed but enrich prompt with product details
+      const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
+      const fluxPrompt = `PRODUCT: ${product.title}${product.price ? ` ($${product.price})` : ''}${productDesc ? `\nProduct details: ${productDesc}` : ''}\n\n${prompt}`;
+      console.log('[generate] Using Flux Kontext Max, prompt length:', fluxPrompt.length);
+      try {
+        const result = await generateFluxKontext({ prompt: fluxPrompt, aspectRatio: '1:1' });
+        imageUrl = result.url;
+      } catch (fluxErr) {
+        console.error('[generate] Flux failed, falling back to Soul:', fluxErr.message);
+        // Fallback to Soul
+        const refImages = images.slice(0, 3);
+        const requestId = await submitJob(prompt, refImages);
+        imageUrl = await pollUntilDone(requestId);
+      }
+    } else {
+      // Soul — image-to-image with reference photos
+      const refImages = images.slice(0, 3);
+      console.log('[generate] Using Soul, ref images:', refImages.length);
+      let requestId;
+      try {
+        requestId = await submitJob(prompt, refImages);
+      } catch (submitErr) {
+        console.error('[generate] submitJob FAILED:', submitErr.message);
+        throw new Error(`Higgsfield submit failed: ${submitErr.message}`);
+      }
+      if (!requestId) throw new Error('No request ID from Higgsfield');
+      imageUrl = await pollUntilDone(requestId);
+    }
+
     if (!imageUrl) throw new Error('Generation timed out');
 
     // Upload to storage
