@@ -1,75 +1,169 @@
-import { useState } from 'react';
-import { generateSkill } from '../lib/api';
+import { useState, useEffect, useCallback } from 'react';
+import { getSkills, generateSkills, regenerateSkill } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './BrandKnowledge.css';
 
+const SKILL_ICONS = {
+  'ad-hooks': '\u{1F3AF}',
+  'creative-direction': '\u{1F3A8}',
+  'audience-personas': '\u{1F465}',
+  'product-knowledge': '\u{1F4E6}',
+  'brand-voice': '\u{1F4AC}',
+};
+
+const SKILL_DESCRIPTIONS = {
+  'ad-hooks': 'Winning hooks, ad copy patterns, CTA styles',
+  'creative-direction': 'Visual rules, testing framework, KPI benchmarks',
+  'audience-personas': 'Personas, pain points, triggers, customer language',
+  'product-knowledge': 'Unique mechanism, features, belief statements',
+  'brand-voice': 'Positioning, tone rules, messaging do/don\'t',
+};
+
 export default function BrandKnowledge({ storeId, storeName }) {
   const toast = useToast();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [skills, setSkills] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [regenerating, setRegenerating] = useState(null);
+  const [expandedSkill, setExpandedSkill] = useState(null);
 
-  const handleGenerate = async () => {
-    setLoading(true);
+  const fetchSkills = useCallback(async () => {
+    if (!storeId) return;
     try {
-      const result = await generateSkill(storeId);
-      setData(result);
-      if (!result.markdown) {
-        toast.info('No documents processed yet — upload docs to Inbox first');
-      }
+      const data = await getSkills(storeId);
+      setSkills(data.skills || []);
+      setCategories(data.available_categories || []);
     } catch (err) {
       console.error('[BrandKnowledge] Error:', err);
-      toast.error(`Failed: ${err.message}`);
     } finally {
       setLoading(false);
     }
+  }, [storeId]);
+
+  useEffect(() => { fetchSkills(); }, [fetchSkills]);
+
+  const handleGenerateAll = async () => {
+    setGenerating(true);
+    try {
+      const result = await generateSkills(storeId);
+      toast.success(`Generated ${result.generated} skills`);
+      fetchSkills();
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const handleExport = () => {
-    if (!data?.markdown) return;
-    const blob = new Blob([data.markdown], { type: 'text/markdown' });
+  const handleRegenerate = async (skillType) => {
+    setRegenerating(skillType);
+    try {
+      await regenerateSkill(storeId, skillType);
+      toast.success(`Regenerated ${skillType}`);
+      fetchSkills();
+    } catch (err) {
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
+  const handleExport = (skill) => {
+    const blob = new Blob([`# ${skill.title}\n\n${skill.content}`], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${storeName || 'store'}_brand_knowledge.md`;
+    a.download = `${storeName || 'store'}_${skill.skill_type}.md`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success('Exported as Markdown');
   };
+
+  if (loading) return null;
+
+  const totalSources = skills.reduce((s, sk) => s + (sk.source_count || 0), 0);
 
   return (
     <div className="bk-section">
       <div className="bk-header">
-        <div className="bk-title">Brand Knowledge</div>
-        <button className="bk-generate-btn" onClick={handleGenerate} disabled={loading}>
-          {loading ? 'Generating...' : data ? 'Regenerate' : 'Generate'}
-        </button>
+        <div>
+          <div className="bk-title">Brand Knowledge</div>
+          {skills.length > 0 && (
+            <div className="bk-subtitle">{skills.length} skills from {totalSources} documents</div>
+          )}
+        </div>
+        {categories.length > 0 && (
+          <button className="bk-generate-btn" onClick={handleGenerateAll} disabled={generating}>
+            {generating ? 'Generating...' : skills.length > 0 ? 'Regenerate All' : 'Generate Skills'}
+          </button>
+        )}
       </div>
 
-      {!data && !loading && (
+      {skills.length === 0 && categories.length === 0 && (
+        <div className="bk-empty">Upload documents to Inbox and process them to generate brand knowledge</div>
+      )}
+
+      {skills.length === 0 && categories.length > 0 && (
         <div className="bk-empty">
-          Click Generate to compile brand knowledge from processed documents
+          {categories.length} document categories available. Click Generate Skills to compile brand knowledge.
         </div>
       )}
 
-      {data?.markdown && (
-        <>
-          <div className="bk-stats">
-            <span>Generated from {data.doc_count} document{data.doc_count !== 1 ? 's' : ''}, {data.insight_count} insights</span>
-            <button className="bk-export-btn" onClick={handleExport}>Export MD</button>
-          </div>
+      {skills.length > 0 && (
+        <div className="bk-cards">
+          {skills.map((skill) => {
+            const isExpanded = expandedSkill === skill.skill_type;
+            const isRegen = regenerating === skill.skill_type;
+            const icon = SKILL_ICONS[skill.skill_type] || '\u{1F4CB}';
+            const desc = SKILL_DESCRIPTIONS[skill.skill_type] || '';
+            const age = getTimeAgo(skill.generated_at);
 
-          <div className={`bk-content${expanded ? '' : ' bk-content--collapsed'}`}>
-            <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(data.markdown) }} />
-          </div>
-
-          {!expanded && (
-            <button className="bk-expand-btn" onClick={() => setExpanded(true)}>View full document</button>
-          )}
-        </>
+            return (
+              <div key={skill.skill_type} className="bk-card">
+                <div className="bk-card-header">
+                  <div className="bk-card-left">
+                    <span className="bk-card-icon">{icon}</span>
+                    <div>
+                      <div className="bk-card-title">{skill.title}</div>
+                      <div className="bk-card-desc">{desc}</div>
+                    </div>
+                  </div>
+                  <div className="bk-card-actions">
+                    <button className="bk-card-btn" onClick={() => setExpandedSkill(isExpanded ? null : skill.skill_type)}>
+                      {isExpanded ? 'Close' : 'View'}
+                    </button>
+                    <button className="bk-card-btn" onClick={() => handleRegenerate(skill.skill_type)} disabled={isRegen}>
+                      {isRegen ? '...' : 'Regen'}
+                    </button>
+                    <button className="bk-card-btn" onClick={() => handleExport(skill)}>MD</button>
+                  </div>
+                </div>
+                <div className="bk-card-meta">
+                  <span>{skill.source_count} source{skill.source_count !== 1 ? 's' : ''}</span>
+                  <span>{age}</span>
+                </div>
+                {isExpanded && (
+                  <div className="bk-card-content">
+                    <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
+}
+
+function getTimeAgo(dateStr) {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 function markdownToHtml(md) {

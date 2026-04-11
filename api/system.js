@@ -286,68 +286,16 @@ async function handler(req, res) {
         return res.status(200).json({ url: data?.publicUrl });
       }
 
-      // ─── GENERATE SKILL (compiled brand knowledge) ───
-      if (action === 'generate_skill') {
+      // ─── GET SKILLS (list all for a store) ───
+      if (action === 'get_skills') {
         const storeId = req.query.store_id;
         if (!storeId) return res.status(400).json({ error: 'store_id required' });
-
-        const store = await getStore(storeId);
-        if (!store) return res.status(404).json({ error: 'Store not found' });
-
+        const { data: skills } = await supabase.from('store_skills').select('*')
+          .eq('store_id', storeId).order('skill_type');
         const { data: knowledge } = await supabase.from('store_knowledge')
-          .select('source_file, category, insights, processed_at')
-          .eq('store_id', storeId)
-          .order('processed_at', { ascending: false });
-
-        if (!knowledge?.length) {
-          return res.status(200).json({ markdown: null, doc_count: 0, insight_count: 0 });
-        }
-
-        // Group by category
-        const grouped = {};
-        for (const k of knowledge) {
-          if (!grouped[k.category]) grouped[k.category] = [];
-          grouped[k.category].push(k.insights);
-        }
-        const groupedText = Object.entries(grouped)
-          .map(([cat, insights]) => `## ${cat}\n${insights.join('\n')}`)
-          .join('\n\n');
-
-        const Anthropic = (await import('@anthropic-ai/sdk')).default;
-        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-        const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 3000,
-          messages: [{
-            role: 'user',
-            content: `You are compiling a brand knowledge document from extracted insights.
-Store: ${store.name}
-
-Insights by category:
-${groupedText}
-
-Generate a structured brand knowledge document with these sections:
-- Brand Positioning
-- Target Audience & Personas
-- Product Knowledge
-- Creative Direction
-- Winning Hooks & Copy
-- Visual Direction
-
-Use only the insights provided. Be specific, not generic. Use markdown formatting with ## headings and bullet points. Skip sections that have no relevant data.`,
-          }],
-        });
-
-        const markdown = response.content[0].text;
-        const insightCount = knowledge.reduce((s, k) => s + (k.insights.match(/^[-•*]/gm) || []).length, 0);
-
-        return res.status(200).json({
-          markdown,
-          doc_count: knowledge.length,
-          insight_count: insightCount,
-          sources: [...new Set(knowledge.map((k) => k.source_file))],
-        });
+          .select('category').eq('store_id', storeId);
+        const categories = [...new Set((knowledge || []).map((k) => k.category))];
+        return res.status(200).json({ skills: skills || [], available_categories: categories });
       }
 
       // ─── META OVERVIEW ───
@@ -811,6 +759,111 @@ Use only the insights provided. Be specific, not generic. Use markdown formattin
         });
 
         return res.status(200).json({ deleted, total_checked: stale?.length || 0 });
+      }
+
+      // ─── GENERATE ALL SKILLS ───
+      if (action === 'generate_skills') {
+        const { store_id } = req.body;
+        if (!store_id) return res.status(400).json({ error: 'store_id required' });
+
+        const store = await getStore(store_id);
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        const { data: knowledge } = await supabase.from('store_knowledge')
+          .select('category, insights').eq('store_id', store_id)
+          .order('processed_at', { ascending: false });
+
+        if (!knowledge?.length) return res.status(200).json({ generated: 0, skills: [] });
+
+        const SKILL_MAP = {
+          Ads: { type: 'ad-hooks', title: 'Ad Hooks & Copy', prompt: `From these ad transcripts and ad library analyses for "${store.name}", extract: winning hooks (exact quotes), failing hooks, hook patterns/structures, ad frameworks, CTA styles. Be maximally specific — include exact examples.` },
+          Creative: { type: 'creative-direction', title: 'Creative Direction', prompt: `From these creative playbooks for "${store.name}", extract: visual rules (colors, settings, model types, lighting), what works vs what doesn't, testing framework, KPI benchmarks, format guidelines.` },
+          Audience: { type: 'audience-personas', title: 'Audience Personas', prompt: `From these audience docs for "${store.name}", extract: detailed personas (name, age, core emotion, exact quotes), pain points, objections, trigger phrases, customer language patterns. Be maximally specific.` },
+          Products: { type: 'product-knowledge', title: 'Product Knowledge', prompt: `From these product docs for "${store.name}", extract: unique mechanism per product, key features with benefits, belief statements, objection counters, competitor failures. Organize per product.` },
+          Brand: { type: 'brand-voice', title: 'Brand Voice', prompt: `From these brand docs for "${store.name}", extract: brand positioning statement, voice & tone rules, messaging do's and don'ts, taglines, key messages, brand story elements.` },
+        };
+
+        const grouped = {};
+        for (const k of knowledge) {
+          if (!grouped[k.category]) grouped[k.category] = [];
+          grouped[k.category].push(k.insights);
+        }
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+        const results = [];
+
+        for (const [category, insightsList] of Object.entries(grouped)) {
+          const mapping = SKILL_MAP[category];
+          if (!mapping) continue;
+
+          const insightsText = insightsList.join('\n\n');
+          const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 3000,
+            messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights from the sources.` }],
+          });
+
+          const content = response.content[0].text;
+          await supabase.from('store_skills').upsert({
+            store_id, skill_type: mapping.type, title: mapping.title,
+            content, source_count: insightsList.length, generated_at: new Date().toISOString(),
+          }, { onConflict: 'store_id,skill_type' });
+
+          results.push({ skill_type: mapping.type, title: mapping.title, source_count: insightsList.length });
+        }
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'SKILL_GEN',
+          message: `Generated ${results.length} skills for ${store.name}`,
+          level: 'success', metadata: { skills: results.map((r) => r.skill_type) },
+        });
+
+        return res.status(200).json({ generated: results.length, skills: results });
+      }
+
+      // ─── REGENERATE SINGLE SKILL ───
+      if (action === 'regenerate_skill') {
+        const { store_id, skill_type } = req.body;
+        if (!store_id || !skill_type) return res.status(400).json({ error: 'store_id and skill_type required' });
+
+        const store = await getStore(store_id);
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        const SKILL_MAP = {
+          'ad-hooks': { category: 'Ads', title: 'Ad Hooks & Copy', prompt: `From these ad transcripts and ad library analyses for "${store.name}", extract: winning hooks (exact quotes), failing hooks, hook patterns/structures, ad frameworks, CTA styles. Be maximally specific.` },
+          'creative-direction': { category: 'Creative', title: 'Creative Direction', prompt: `From these creative playbooks for "${store.name}", extract: visual rules, what works vs doesn't, testing framework, KPI benchmarks.` },
+          'audience-personas': { category: 'Audience', title: 'Audience Personas', prompt: `From these audience docs for "${store.name}", extract: detailed personas, pain points, objections, trigger phrases, customer language.` },
+          'product-knowledge': { category: 'Products', title: 'Product Knowledge', prompt: `From these product docs for "${store.name}", extract: unique mechanism, features, belief statements, objection counters.` },
+          'brand-voice': { category: 'Brand', title: 'Brand Voice', prompt: `From these brand docs for "${store.name}", extract: positioning, voice & tone rules, messaging do/don't, taglines.` },
+        };
+
+        const mapping = SKILL_MAP[skill_type];
+        if (!mapping) return res.status(400).json({ error: `Unknown skill_type: ${skill_type}` });
+
+        const { data: knowledge } = await supabase.from('store_knowledge')
+          .select('insights').eq('store_id', store_id).eq('category', mapping.category)
+          .order('processed_at', { ascending: false });
+
+        if (!knowledge?.length) return res.status(200).json({ error: `No ${mapping.category} insights found` });
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const insightsText = knowledge.map((k) => k.insights).join('\n\n');
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 3000,
+          messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights.` }],
+        });
+
+        const content = response.content[0].text;
+        await supabase.from('store_skills').upsert({
+          store_id, skill_type, title: mapping.title,
+          content, source_count: knowledge.length, generated_at: new Date().toISOString(),
+        }, { onConflict: 'store_id,skill_type' });
+
+        return res.status(200).json({ skill_type, title: mapping.title, content, source_count: knowledge.length });
       }
 
       // ─── UPLOAD STORE DOC (with auto-processing) ───

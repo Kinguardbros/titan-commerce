@@ -312,8 +312,22 @@ export function getStoreDocs(storeName) {
   return fetchJSON(`/api/system?action=store_docs&store_name=${encodeURIComponent(storeName)}`);
 }
 
-export function generateSkill(storeId) {
-  return fetchJSON(`/api/system?action=generate_skill&store_id=${storeId}`);
+export function getSkills(storeId) {
+  return fetchJSON(`/api/system?action=get_skills&store_id=${storeId}`);
+}
+
+export function generateSkills(storeId) {
+  return fetchJSON('/api/system?action=generate_skills', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
+  });
+}
+
+export function regenerateSkill(storeId, skillType) {
+  return fetchJSON('/api/system?action=regenerate_skill', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, skill_type: skillType }),
+  });
 }
 
 export function processSingleFile(storeId, filename) {

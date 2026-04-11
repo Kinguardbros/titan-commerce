@@ -1,17 +1,20 @@
 .bk-section { margin-top: 24px; }
 .bk-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 12px; gap: 12px;
 }
 .bk-title {
   font-family: var(--display); font-size: 16px; font-weight: 500;
   background: linear-gradient(135deg, var(--gold), var(--gold-light, #e2c87a));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
+.bk-subtitle {
+  font-family: var(--mono); font-size: 9px; color: var(--text4); margin-top: 2px; letter-spacing: .3px;
+}
 .bk-generate-btn {
   background: var(--gold-glow); border: 1px solid rgba(201,168,76,.3); border-radius: 8px;
-  padding: 6px 16px; font-family: var(--mono); font-size: 10px; color: var(--gold);
-  cursor: pointer; transition: all .2s; letter-spacing: .3px;
+  padding: 8px 18px; font-family: var(--mono); font-size: 10px; color: var(--gold);
+  cursor: pointer; transition: all .2s; letter-spacing: .3px; white-space: nowrap;
 }
 .bk-generate-btn:hover { background: rgba(201,168,76,.2); }
 .bk-generate-btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -22,62 +25,68 @@
   background: var(--deep); border: 1px dashed var(--edge); border-radius: 10px;
 }
 
-.bk-stats {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 8px;
-  font-family: var(--mono); font-size: 9px; color: var(--text4); letter-spacing: .3px;
+/* Skill cards */
+.bk-cards { display: flex; flex-direction: column; gap: 8px; }
+
+.bk-card {
+  background: var(--deep); border: 1px solid var(--edge); border-radius: 10px;
+  padding: 14px 16px; transition: border-color .2s;
 }
-.bk-export-btn {
+.bk-card:hover { border-color: var(--edge2); }
+
+.bk-card-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+}
+.bk-card-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.bk-card-icon { font-size: 18px; flex-shrink: 0; }
+.bk-card-title {
+  font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text);
+}
+.bk-card-desc {
+  font-family: var(--mono); font-size: 9px; color: var(--text4); margin-top: 1px;
+  letter-spacing: .2px;
+}
+
+.bk-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.bk-card-btn {
   background: var(--surface); border: 1px solid var(--edge); border-radius: 6px;
   padding: 3px 10px; font-family: var(--mono); font-size: 9px; color: var(--text3);
   cursor: pointer; transition: all .2s;
 }
-.bk-export-btn:hover { border-color: var(--gold); color: var(--gold); }
+.bk-card-btn:hover { border-color: var(--gold); color: var(--gold); }
+.bk-card-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-.bk-content {
-  background: var(--deep); border: 1px solid var(--edge); border-radius: 12px;
-  padding: 20px 24px; overflow: hidden;
+.bk-card-meta {
+  display: flex; gap: 12px; margin-top: 6px;
+  font-family: var(--mono); font-size: 9px; color: var(--text4); letter-spacing: .2px;
 }
-.bk-content--collapsed { max-height: 320px; position: relative; }
-.bk-content--collapsed::after {
-  content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 80px;
-  background: linear-gradient(transparent, var(--deep));
-  pointer-events: none;
+
+/* Expanded content */
+.bk-card-content {
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--edge);
+  max-height: 400px; overflow-y: auto;
 }
 
 .bk-markdown {
-  font-family: var(--sans); font-size: 12px; color: var(--text3); line-height: 1.7;
+  font-family: var(--sans); font-size: 11px; color: var(--text3); line-height: 1.7;
 }
 .bk-markdown .bk-h2 {
-  font-family: var(--sans); font-size: 15px; font-weight: 600; color: var(--text);
-  margin: 16px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--edge);
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin: 14px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--edge);
 }
 .bk-markdown .bk-h3 {
-  font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--gold);
-  margin: 14px 0 6px;
+  font-size: 12px; font-weight: 600; color: var(--gold); margin: 12px 0 4px;
 }
 .bk-markdown .bk-h4 {
-  font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--text2);
-  margin: 10px 0 4px;
+  font-size: 11px; font-weight: 600; color: var(--text2); margin: 8px 0 4px;
 }
-.bk-markdown ul {
-  margin: 4px 0 8px; padding-left: 18px;
-}
-.bk-markdown li {
-  margin-bottom: 3px; color: var(--text3);
-}
+.bk-markdown ul { margin: 4px 0 8px; padding-left: 16px; }
+.bk-markdown li { margin-bottom: 3px; }
 .bk-markdown strong { color: var(--text2); }
 
-.bk-expand-btn {
-  display: block; width: 100%; margin-top: 8px;
-  background: var(--surface); border: 1px solid var(--edge); border-radius: 8px;
-  padding: 8px; font-family: var(--mono); font-size: 10px; color: var(--text3);
-  cursor: pointer; transition: all .2s; text-align: center;
-}
-.bk-expand-btn:hover { border-color: var(--gold); color: var(--gold); }
-
 @media (max-width: 600px) {
-  .bk-header { flex-direction: column; gap: 8px; align-items: stretch; }
+  .bk-header { flex-direction: column; align-items: stretch; }
   .bk-generate-btn { min-height: 36px; text-align: center; }
-  .bk-content { padding: 14px 16px; }
+  .bk-card-header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .bk-card-actions { justify-content: flex-end; }
 }
