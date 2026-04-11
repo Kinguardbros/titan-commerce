@@ -15,6 +15,7 @@ const ProductDetail = lazy(() => import('../components/ProductDetail'));
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creatives' },
   { key: 'product_shot', label: 'Product Shots' },
+  { key: 'product_photo_beach', label: 'Beach Photo' },
   { key: 'lifestyle', label: 'Lifestyle' },
   { key: 'review_ugc', label: 'Review / UGC' },
   { key: 'static_clean', label: 'Clean Minimal' },

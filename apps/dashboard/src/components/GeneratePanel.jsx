@@ -6,6 +6,7 @@ import './GeneratePanel.css';
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creative', desc: 'Campaign-ready Meta ad — studio lighting, gold tones', group: 'Custom' },
   { key: 'product_shot', label: 'Product Shot', desc: 'Clean white background, product focus, detail shots', group: 'Custom' },
+  { key: 'product_photo_beach', label: 'Beach Photo', desc: 'Beach setting — warm golden tones, real woman on sand with ocean bokeh', group: 'Custom' },
   { key: 'lifestyle', label: 'Lifestyle', desc: 'Real setting — café, office, street, natural light', group: 'Custom' },
   { key: 'review_ugc', label: 'Review / UGC', desc: 'Casual smartphone mirror selfie, authentic feel', group: 'Custom' },
   { key: 'static_clean', label: 'Clean Minimal', desc: 'White bg, centered, Apple-style — same for every product', group: 'Static Templates' },
