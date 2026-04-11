@@ -7,6 +7,8 @@ import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
 import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
+import fs from 'fs';
+import path from 'path';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -238,6 +240,59 @@ async function handler(req, res) {
         ]);
 
         return res.status(200).json({ product: fullProduct, metafields });
+      }
+
+      // ─── STORE DOCS (filesystem) ───
+      if (action === 'store_docs') {
+        const storeName = req.query.store_name;
+        if (!storeName) return res.status(400).json({ error: 'store_name required' });
+
+        const docsRoot = path.resolve(process.cwd(), 'Docs', 'Stores', storeName);
+        if (!fs.existsSync(docsRoot)) return res.status(200).json({ tree: [] });
+
+        function readTree(dir, rel = '') {
+          const entries = fs.readdirSync(dir, { withFileTypes: true })
+            .filter((e) => !e.name.startsWith('.'))
+            .sort((a, b) => (a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1));
+          return entries.map((e) => {
+            const relPath = rel ? `${rel}/${e.name}` : e.name;
+            if (e.isDirectory()) {
+              return { name: e.name, type: 'folder', path: relPath, children: readTree(path.join(dir, e.name), relPath) };
+            }
+            const ext = path.extname(e.name).toLowerCase();
+            const stat = fs.statSync(path.join(dir, e.name));
+            return { name: e.name, type: 'file', path: relPath, ext, size: stat.size };
+          });
+        }
+
+        return res.status(200).json({ tree: readTree(docsRoot) });
+      }
+
+      // ─── STORE DOCS DOWNLOAD ───
+      if (action === 'store_docs_download') {
+        const storeName = req.query.store_name;
+        const filePath = req.query.file_path;
+        if (!storeName || !filePath) return res.status(400).json({ error: 'store_name and file_path required' });
+
+        // Prevent path traversal
+        const docsRoot = path.resolve(process.cwd(), 'Docs', 'Stores', storeName);
+        const fullPath = path.resolve(docsRoot, filePath);
+        if (!fullPath.startsWith(docsRoot)) return res.status(403).json({ error: 'Access denied' });
+        if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not found' });
+
+        const ext = path.extname(fullPath).toLowerCase();
+        const mimeTypes = {
+          '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
+          '.csv': 'text/csv', '.txt': 'text/plain', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        const fileName = path.basename(fullPath);
+
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+        const fileBuffer = fs.readFileSync(fullPath);
+        return res.send(fileBuffer);
       }
 
       // ─── META OVERVIEW ───

@@ -306,3 +306,13 @@ export function updateProductFull(storeId, productId, updates) {
     body: JSON.stringify({ store_id: storeId, product_id: productId, updates }),
   });
 }
+
+// Store Docs
+export function getStoreDocs(storeName) {
+  return fetchJSON(`/api/system?action=store_docs&store_name=${encodeURIComponent(storeName)}`);
+}
+
+export function getStoreDocDownloadUrl(storeName, filePath) {
+  const token = localStorage.getItem('auth_token');
+  return `/api/system?action=store_docs_download&store_name=${encodeURIComponent(storeName)}&file_path=${encodeURIComponent(filePath)}${token ? `&token=${token}` : ''}`;
+}

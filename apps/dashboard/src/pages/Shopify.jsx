@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import ShopifyDashboard from '../components/ShopifyDashboard';
 import { getAllProducts, bulkUpdatePrices, getShopifyOverview } from '../lib/api';
+import DocsBrowser from '../components/DocsBrowser';
 import { useToast } from '../hooks/useToast.jsx';
 import './Shopify.css';
 
@@ -106,6 +107,9 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
           </div>
         </div>
       )}
+
+      {/* Docs browser */}
+      {store?.name && <DocsBrowser storeName={store.name} />}
     </div>
   );
 }
