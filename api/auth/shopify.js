@@ -11,7 +11,7 @@ const SCOPES = [
   'write_discounts', 'read_discounts', 'read_reports',
 ].join(',');
 
-const REDIRECT_URI = (process.env.SITE_URL || 'https://titan-commerce.vercel.app') + '/api/auth/shopify?action=callback';
+const REDIRECT_URI = (process.env.SITE_URL || 'https://titan-commerce.vercel.app') + '/api/auth/shopify';
 
 function verifyHmac(query, secret) {
   const { hmac, ...params } = query;
@@ -28,10 +28,11 @@ function verifyHmac(query, secret) {
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  const action = req.query.action;
+  // Route: if `code` is present → callback; if `store_id` → connect
+  const isCallback = !!req.query.code;
 
   // ═══ CONNECT — initiate OAuth ═══
-  if (action === 'connect') {
+  if (!isCallback) {
     const storeId = req.query.store_id;
     if (!storeId) return res.status(400).json({ error: 'store_id required' });
 
@@ -59,7 +60,7 @@ export default async function handler(req, res) {
   }
 
   // ═══ CALLBACK — exchange code for token ═══
-  if (action === 'callback') {
+  if (isCallback) {
     const { code, shop, state, hmac } = req.query;
 
     if (!code || !shop || !state) {
@@ -136,5 +137,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return res.status(400).json({ error: 'Unknown action. Use ?action=connect or callback.' });
+  return res.status(400).json({ error: 'Provide store_id to connect or code for callback.' });
 }
