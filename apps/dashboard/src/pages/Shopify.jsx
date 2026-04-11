@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ShopifyDashboard from '../components/ShopifyDashboard';
 import { getAllProducts, bulkUpdatePrices, getShopifyOverview } from '../lib/api';
 import DocsBrowser from '../components/DocsBrowser';
+import BrandKnowledge from '../components/BrandKnowledge';
 import { useToast } from '../hooks/useToast.jsx';
 import './Shopify.css';
 
@@ -107,6 +108,9 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
           </div>
         </div>
       )}
+
+      {/* Brand Knowledge */}
+      {storeId && <BrandKnowledge storeId={storeId} storeName={store?.name} />}
 
       {/* Docs browser */}
       {store?.name && <DocsBrowser storeName={store.name} storeId={storeId} />}

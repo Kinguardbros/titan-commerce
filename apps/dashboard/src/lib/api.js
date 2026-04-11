@@ -312,6 +312,10 @@ export function getStoreDocs(storeName) {
   return fetchJSON(`/api/system?action=store_docs&store_name=${encodeURIComponent(storeName)}`);
 }
 
+export function generateSkill(storeId) {
+  return fetchJSON(`/api/system?action=generate_skill&store_id=${storeId}`);
+}
+
 export function processInbox(storeId) {
   return fetchJSON('/api/system?action=process_inbox', {
     method: 'POST',

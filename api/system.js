@@ -286,6 +286,70 @@ async function handler(req, res) {
         return res.status(200).json({ url: data?.publicUrl });
       }
 
+      // ─── GENERATE SKILL (compiled brand knowledge) ───
+      if (action === 'generate_skill') {
+        const storeId = req.query.store_id;
+        if (!storeId) return res.status(400).json({ error: 'store_id required' });
+
+        const store = await getStore(storeId);
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        const { data: knowledge } = await supabase.from('store_knowledge')
+          .select('source_file, category, insights, processed_at')
+          .eq('store_id', storeId)
+          .order('processed_at', { ascending: false });
+
+        if (!knowledge?.length) {
+          return res.status(200).json({ markdown: null, doc_count: 0, insight_count: 0 });
+        }
+
+        // Group by category
+        const grouped = {};
+        for (const k of knowledge) {
+          if (!grouped[k.category]) grouped[k.category] = [];
+          grouped[k.category].push(k.insights);
+        }
+        const groupedText = Object.entries(grouped)
+          .map(([cat, insights]) => `## ${cat}\n${insights.join('\n')}`)
+          .join('\n\n');
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 3000,
+          messages: [{
+            role: 'user',
+            content: `You are compiling a brand knowledge document from extracted insights.
+Store: ${store.name}
+
+Insights by category:
+${groupedText}
+
+Generate a structured brand knowledge document with these sections:
+- Brand Positioning
+- Target Audience & Personas
+- Product Knowledge
+- Creative Direction
+- Winning Hooks & Copy
+- Visual Direction
+
+Use only the insights provided. Be specific, not generic. Use markdown formatting with ## headings and bullet points. Skip sections that have no relevant data.`,
+          }],
+        });
+
+        const markdown = response.content[0].text;
+        const insightCount = knowledge.reduce((s, k) => s + (k.insights.match(/^[-•*]/gm) || []).length, 0);
+
+        return res.status(200).json({
+          markdown,
+          doc_count: knowledge.length,
+          insight_count: insightCount,
+          sources: [...new Set(knowledge.map((k) => k.source_file))],
+        });
+      }
+
       // ─── META OVERVIEW ───
       if (action === 'meta_overview') {
         if (!isMetaConnected()) return res.status(200).json({ connected: false });
@@ -786,11 +850,15 @@ async function handler(req, res) {
             if (text) {
               const category = await classifyDocument(text, safeName, anthropic);
 
-              // Dedup: remove old file + insights if same name exists in category
-              await supabase.from('store_knowledge').delete().eq('store_id', store_id).eq('source_file', safeName);
+              // Dedup: if same filename exists in category, rename new file with timestamp
+              const nameBase = safeName.includes('.') ? safeName.slice(0, safeName.lastIndexOf('.')) : safeName;
+              const nameExt = safeName.includes('.') ? safeName.slice(safeName.lastIndexOf('.')) : '';
+              const { data: existingFiles } = await supabase.storage.from(DOCS_BUCKET).list(`${store_name}/${category}`);
+              const destName = existingFiles?.some((f) => f.name === safeName)
+                ? `${nameBase}_${Date.now()}${nameExt}` : safeName;
 
               // Move to category folder
-              const destPath = `${store_name}/${category}/${safeName}`;
+              const destPath = `${store_name}/${category}/${destName}`;
               await supabase.storage.from(DOCS_BUCKET).upload(destPath, buffer, { upsert: true });
               await supabase.storage.from(DOCS_BUCKET).remove([storagePath]);
 
@@ -868,11 +936,15 @@ async function handler(req, res) {
             // Classify
             const category = await classifyDocument(text, file.name, anthropic);
 
-            // Dedup: remove old insights if same file was processed before
-            await supabase.from('store_knowledge').delete().eq('store_id', store_id).eq('source_file', file.name);
+            // Dedup: if same filename exists in category, rename with timestamp
+            const fBase = file.name.includes('.') ? file.name.slice(0, file.name.lastIndexOf('.')) : file.name;
+            const fExt = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '';
+            const { data: existFiles } = await supabase.storage.from(DOCS_BUCKET).list(`${storeName}/${category}`);
+            const destFileName = existFiles?.some((f) => f.name === file.name)
+              ? `${fBase}_${Date.now()}${fExt}` : file.name;
 
             // Move file: copy to category folder, delete from Inbox
-            const destPath = `${storeName}/${category}/${file.name}`;
+            const destPath = `${storeName}/${category}/${destFileName}`;
             await supabase.storage.from(DOCS_BUCKET).upload(destPath, Buffer.from(buffer), { upsert: true });
             await supabase.storage.from(DOCS_BUCKET).remove([filePath]);
 
