@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives } from '../lib/api';
-import GeneratePanel from '../components/GeneratePanel';
+import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import { approveAd, rejectAd } from '../lib/api';
 import supabase from '../lib/supabase';
@@ -230,12 +230,10 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
       )}
 
       {showGeneratePanel && selectedProduct && (
-        <GeneratePanel
+        <CreativeStudio
           product={selectedProduct}
-          mode="image"
-          defaultStyle="ad_creative"
-          creatives={filteredCreatives}
           storeId={storeId}
+          creatives={filteredCreatives}
           onClose={() => setShowGeneratePanel(false)}
           onGenerated={() => { setShowGeneratePanel(false); fetchCreatives(); }}
         />

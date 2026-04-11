@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import { getProductCreatives } from '../lib/api';
 import supabase from '../lib/supabase';
-import GeneratePanel from '../components/GeneratePanel';
+import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import OptimizePanel from '../components/OptimizePanel';
 import { approveAd, rejectAd, updateCreative } from '../lib/api';
@@ -182,8 +182,8 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
       {/* Modals */}
       {showGenerate && (
-        <GeneratePanel product={product} mode={generateMode} defaultStyle={activeStyle} creatives={creatives}
-          storeId={storeId} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
+        <CreativeStudio product={product} storeId={storeId} creatives={creatives}
+          onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
       )}
       <CreativeEditor creative={editingCreative} open={!!editingCreative} storeId={storeId}
         onClose={() => setEditingCreative(null)} onApprove={handleApprove} onReject={handleReject} onSave={handleSave} />
