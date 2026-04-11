@@ -109,7 +109,7 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
       )}
 
       {/* Docs browser */}
-      {store?.name && <DocsBrowser storeName={store.name} />}
+      {store?.name && <DocsBrowser storeName={store.name} storeId={storeId} />}
     </div>
   );
 }

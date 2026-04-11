@@ -7,6 +7,7 @@ import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
 import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
+import { extractText, classifyDocument, extractInsights } from '../lib/doc-processor.js';
 const DOCS_BUCKET = 'store-docs';
 
 const supabase = createClient(
@@ -505,13 +506,14 @@ async function handler(req, res) {
 
         const contextualPrompt = `[${brandContext}${logoNote ? `\n${logoNote}` : ''}]\n\nUser request: ${prompt}`;
 
-        const fullPrompt = buildStyledPrompt({
+        const fullPrompt = await buildStyledPrompt({
           product_name: brandName,
           price: '',
           style,
           custom_prompt: contextualPrompt,
           showModel: show_model,
           feedback: '',
+          storeId: store_id,
         });
 
         // Use store logo as input_image for branded banners/social (adds brand identity)
@@ -590,7 +592,7 @@ async function handler(req, res) {
               const { data: product } = await supabase.from('products').select('*').eq('id', sa.product_id).single();
               if (product) {
                 const images = JSON.parse(product.images || '[]');
-                const prompt = buildStyledPrompt({ product_name: product.title, price: product.price ? `$${product.price}` : '', style, custom_prompt: '', showModel: true, feedback: '' });
+                const prompt = await buildStyledPrompt({ product_name: product.title, price: product.price ? `$${product.price}` : '', style, custom_prompt: '', showModel: true, feedback: '', storeId: product.store_id });
                 const { higgsfield } = await import('@higgsfield/client/v2');
                 const jobSet = await higgsfield.subscribe('/v1/text2image/nano-banana', { input: { params: { prompt, input_images: images.slice(0, 1).map(u => ({ type: 'image_url', image_url: u })), aspect_ratio: '1:1' } }, withPolling: false });
                 // Don't wait for completion — just queue it
@@ -775,6 +777,79 @@ async function handler(req, res) {
         }
 
         return res.status(200).json({ ok: true, path: `Inbox/${safeName}`, size: buffer.length });
+      }
+
+      // ─── PROCESS INBOX ───
+      if (action === 'process_inbox') {
+        const { store_id } = req.body;
+        if (!store_id) return res.status(400).json({ error: 'store_id required' });
+
+        const store = await getStore(store_id);
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        const storeName = store.name;
+        const inboxPrefix = `${storeName}/Inbox/`;
+
+        // List inbox files
+        const { data: inboxFiles } = await supabase.storage.from(DOCS_BUCKET).list(`${storeName}/Inbox`, { sortBy: { column: 'name', order: 'asc' } });
+        const files = (inboxFiles || []).filter((f) => f.id !== null && f.name !== '.emptyFolderPlaceholder');
+
+        if (files.length === 0) return res.status(200).json({ processed: 0, message: 'Inbox is empty', results: [] });
+        if (files.length > 10) return res.status(400).json({ error: 'Max 10 files per batch. Process in multiple rounds.' });
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const results = [];
+        for (const file of files) {
+          try {
+            // Download
+            const filePath = `${storeName}/Inbox/${file.name}`;
+            const { data: fileData, error: dlErr } = await supabase.storage.from(DOCS_BUCKET).download(filePath);
+            if (dlErr || !fileData) { results.push({ filename: file.name, error: 'Download failed' }); continue; }
+            const buffer = await fileData.arrayBuffer();
+
+            // Extract text
+            const text = await extractText(buffer, file.name, anthropic);
+            if (!text) { results.push({ filename: file.name, error: 'Unsupported format' }); continue; }
+
+            // Classify
+            const category = await classifyDocument(text, file.name, anthropic);
+
+            // Move file: copy to category folder, delete from Inbox
+            const destPath = `${storeName}/${category}/${file.name}`;
+            await supabase.storage.from(DOCS_BUCKET).upload(destPath, Buffer.from(buffer), { upsert: true });
+            await supabase.storage.from(DOCS_BUCKET).remove([filePath]);
+
+            // Extract insights (skip for logos/images with no meaningful text)
+            let insightsText = '';
+            let insightsCount = 0;
+            if (category !== 'Logos' && text.length > 50) {
+              insightsText = await extractInsights(text, file.name, storeName, anthropic);
+              insightsCount = (insightsText.match(/^[-•*]/gm) || []).length;
+
+              // Save to store_knowledge
+              await supabase.from('store_knowledge').insert({
+                store_id, source_file: file.name, category, insights: insightsText,
+              });
+            }
+
+            results.push({ filename: file.name, category, insights_count: insightsCount });
+          } catch (err) {
+            console.error(`[process_inbox] Error processing ${file.name}:`, err.message);
+            results.push({ filename: file.name, error: err.message });
+          }
+        }
+
+        const successCount = results.filter((r) => !r.error).length;
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'DOC_PROCESSOR',
+          message: `Processed ${successCount}/${files.length} files from Inbox`,
+          level: successCount > 0 ? 'success' : 'error',
+          metadata: { results },
+        });
+
+        return res.status(200).json({ processed: successCount, results });
       }
 
       // ─── SAVE SIZE CHART ───

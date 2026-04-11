@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getStoreDocs, getStoreDocDownloadUrl, uploadStoreDoc } from '../lib/api';
+import { getStoreDocs, getStoreDocDownloadUrl, uploadStoreDoc, processInbox } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './DocsBrowser.css';
 
@@ -61,7 +61,7 @@ function TreeNode({ node, storeName, depth = 0 }) {
   );
 }
 
-export default function DocsBrowser({ storeName }) {
+export default function DocsBrowser({ storeName, storeId }) {
   const toast = useToast();
   const fileRef = useRef(null);
   const [tree, setTree] = useState(null);
@@ -69,6 +69,8 @@ export default function DocsBrowser({ storeName }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [processResult, setProcessResult] = useState(null);
   const dragCounter = useRef(0);
 
   const fetchDocs = useCallback(async () => {
@@ -150,6 +152,32 @@ export default function DocsBrowser({ storeName }) {
     if (fileRef.current) fileRef.current.value = '';
   };
 
+  // Count inbox files
+  const inboxNode = tree?.find((n) => n.type === 'folder' && n.name === 'Inbox');
+  const inboxCount = inboxNode?.children?.length || 0;
+
+  const handleProcess = async () => {
+    if (!storeId) return;
+    setProcessing(true);
+    setProcessResult(null);
+    try {
+      const result = await processInbox(storeId);
+      setProcessResult(result);
+      if (result.processed > 0) {
+        const totalInsights = result.results.reduce((s, r) => s + (r.insights_count || 0), 0);
+        toast.success(`Processed ${result.processed} files, ${totalInsights} insights extracted`);
+      } else {
+        toast.info(result.message || 'No files to process');
+      }
+      fetchDocs();
+    } catch (err) {
+      console.error('[DocsBrowser] Process error:', err);
+      toast.error(`Process failed: ${err.message}`);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
     <div className="db-section">
       <div className="db-title">Store Documents</div>
@@ -174,6 +202,31 @@ export default function DocsBrowser({ storeName }) {
         )}
         <input ref={fileRef} type="file" multiple accept=".pdf,.docx,.png,.jpg,.jpeg,.txt,.md,.xlsx,.csv,.webp" style={{ display: 'none' }} onChange={handleFileSelect} />
       </div>
+
+      {/* Process Inbox */}
+      {inboxCount > 0 && !loading && (
+        <div className="db-process-bar">
+          <span className="db-process-info">{inboxCount} file{inboxCount !== 1 ? 's' : ''} in Inbox</span>
+          <button className="db-process-btn" onClick={handleProcess} disabled={processing}>
+            {processing ? 'Processing...' : 'Process Inbox'}
+          </button>
+        </div>
+      )}
+
+      {/* Process result */}
+      {processResult && processResult.results?.length > 0 && (
+        <div className="db-process-result">
+          {processResult.results.map((r, i) => (
+            <div key={i} className={`db-process-item${r.error ? ' db-process-item--error' : ''}`}>
+              <span>{r.error ? '\u2717' : '\u2713'}</span>
+              <span className="db-process-filename">{r.filename}</span>
+              {r.category && <span className="db-process-category">{r.category}</span>}
+              {r.insights_count > 0 && <span className="db-process-insights">{r.insights_count} insights</span>}
+              {r.error && <span className="db-process-error">{r.error}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Tree */}
       {loading ? (

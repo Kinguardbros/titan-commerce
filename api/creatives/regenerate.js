@@ -103,12 +103,13 @@ async function handler(req, res) {
 
       const images = JSON.parse(product.images || '[]');
       imageUrls = images.slice(0, 1);
-      prompt = buildStyledPrompt({
+      prompt = await buildStyledPrompt({
         product_name: product.title,
         price: product.price ? `$${product.price}` : '',
         style: creative.style || 'ad_creative',
         custom_prompt: creative.hook_used || '',
         showModel: true,
+        storeId: creative.store_id,
       });
     } else {
       throw new Error('Creative has no brief or product reference');

@@ -312,6 +312,13 @@ export function getStoreDocs(storeName) {
   return fetchJSON(`/api/system?action=store_docs&store_name=${encodeURIComponent(storeName)}`);
 }
 
+export function processInbox(storeId) {
+  return fetchJSON('/api/system?action=process_inbox', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
+  });
+}
+
 export function uploadStoreDoc(storeName, fileName, fileData) {
   return fetchJSON('/api/system?action=upload_store_doc', {
     method: 'POST',

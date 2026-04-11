@@ -102,11 +102,12 @@ async function handler(req, res) {
       feedback += `\nLEARNING — Client REJECTED these and explained why: ${reasons.join('; ')}. AVOID making the same mistakes.`;
     }
 
-    const prompt = buildStyledPrompt({
+    const prompt = await buildStyledPrompt({
       product_name: product.title,
       price: product.price ? `$${product.price}` : '',
       style, custom_prompt, showModel: show_model, feedback,
       textOverlay: text_overlay, overlayText: overlay_text,
+      storeId: store_id,
     });
 
     // Generate ONE image per call (fits within 60s timeout)
