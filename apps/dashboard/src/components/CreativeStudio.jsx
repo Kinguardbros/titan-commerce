@@ -428,20 +428,25 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [camera, setCamera] = useState("Auto");
   const [cfg, setCfg] = useState(7);
   // Style management
-  const [favorites, setFavorites] = useState(new Set(["ad-creative"]));
+  const [favorites, setFavorites] = useState(() => {
+    try { const s = localStorage.getItem('cs_favorites'); return s ? new Set(JSON.parse(s)) : new Set(["ad-creative"]); } catch { return new Set(["ad-creative"]); }
+  });
   const [collapsedCats, setCollapsedCats] = useState(new Set());
   const [showBuilder, setShowBuilder] = useState(false);
-  const [customStyles, setCustomStyles] = useState([]);
+  const [customStyles, setCustomStyles] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('cs_custom_styles') || '[]'); } catch { return []; }
+  });
   const [showFavsOnly, setShowFavsOnly] = useState(false);
 
   const toggleFav = useCallback((id) => {
-    setFavorites((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setFavorites((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); localStorage.setItem('cs_favorites', JSON.stringify([...n])); return n; });
   }, []);
   const toggleCat = useCallback((catId) => {
     setCollapsedCats((p) => { const n = new Set(p); n.has(catId) ? n.delete(catId) : n.add(catId); return n; });
   }, []);
   const handleSaveCustomStyle = useCallback((style) => {
-    setCustomStyles((p) => [...p, style]); setImgStyle(style.id); setShowBuilder(false);
+    setCustomStyles((p) => { const n = [...p, style]; localStorage.setItem('cs_custom_styles', JSON.stringify(n)); return n; });
+    setImgStyle(style.id); setShowBuilder(false);
   }, []);
 
   const allStyles = useMemo(() => {
