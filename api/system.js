@@ -915,13 +915,17 @@ Use only the insights provided. Be specific, not generic. Use markdown formattin
         const files = (inboxFiles || []).filter((f) => f.id !== null && f.name !== '.emptyFolderPlaceholder');
 
         if (files.length === 0) return res.status(200).json({ processed: 0, message: 'Inbox is empty', results: [] });
-        if (files.length > 10) return res.status(400).json({ error: 'Max 10 files per batch. Process in multiple rounds.' });
+
+        // Process in batches of 10 to stay within Vercel timeout
+        const batch = files.slice(0, 10);
+        const remaining = files.length - batch.length;
+        const files_to_process = batch;
 
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
         const results = [];
-        for (const file of files) {
+        for (const file of files_to_process) {
           try {
             // Download
             const filePath = `${storeName}/Inbox/${file.name}`;
@@ -976,7 +980,10 @@ Use only the insights provided. Be specific, not generic. Use markdown formattin
           metadata: { results },
         });
 
-        return res.status(200).json({ processed: successCount, results });
+        return res.status(200).json({
+          processed: successCount, results, remaining,
+          message: remaining > 0 ? `${remaining} file(s) still in Inbox — run again` : undefined,
+        });
       }
 
       // ─── SAVE SIZE CHART ───

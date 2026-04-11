@@ -177,7 +177,8 @@ export default function DocsBrowser({ storeName, storeId }) {
       setProcessResult(result);
       if (result.processed > 0) {
         const totalInsights = result.results.reduce((s, r) => s + (r.insights_count || 0), 0);
-        toast.success(`Processed ${result.processed} files, ${totalInsights} insights extracted`);
+        const msg = `Processed ${result.processed} files, ${totalInsights} insights extracted`;
+        toast.success(result.remaining > 0 ? `${msg}. ${result.remaining} remaining — run again.` : msg);
       } else {
         toast.info(result.message || 'No files to process');
       }
