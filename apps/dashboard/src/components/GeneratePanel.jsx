@@ -23,7 +23,7 @@ const STYLES = [
   { key: 'static_urgency', label: 'Urgency / Sale', desc: 'Bold gradient, dynamic pose — flash sale energy', group: 'Static Templates' },
 ];
 
-export default function GeneratePanel({ product, mode = 'image', defaultStyle, creatives = [], onClose, onGenerated }) {
+export default function GeneratePanel({ product, mode = 'image', defaultStyle, creatives = [], onClose, onGenerated, storeId }) {
   const toast = useToast();
   const [style, setStyle] = useState(defaultStyle || 'ad_creative');
   const [aiModel, setAiModel] = useState('fal_nano_banana');
@@ -42,8 +42,9 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
 
   // Load personas from audience-personas skill
   useEffect(() => {
-    if (!product?.store_id) return;
-    getSkills(product.store_id).then((data) => {
+    const sid = storeId || product?.store_id;
+    if (!sid) return;
+    getSkills(sid).then((data) => {
       const audienceSkill = (data.skills || []).find((s) => s.skill_type === 'audience-personas');
       if (audienceSkill?.content) {
         // Parse personas: "### Maria (42) — The Hiding Mom" or "**Maria (42)** — The Hiding Mom"
@@ -56,7 +57,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
         if (parsed.length) setPersonas(parsed);
       }
     }).catch(() => {});
-  }, [product?.store_id]);
+  }, [storeId, product?.store_id]);
 
   const isVideo = mode === 'video';
   const sourceImages = creatives.filter((c) => c.format === 'image' && (c.status === 'approved' || c.status === 'pending') && c.file_url);
@@ -83,7 +84,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
       const promises = Array.from({ length: count }, () =>
         generateCreatives({
           product_id: product.id,
-          store_id: product.store_id,
+          store_id: storeId || product.store_id,
           style,
           ai_model: aiModel,
           custom_prompt: customPrompt,

@@ -235,6 +235,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
           mode="image"
           defaultStyle="ad_creative"
           creatives={filteredCreatives}
+          storeId={storeId}
           onClose={() => setShowGeneratePanel(false)}
           onGenerated={() => { setShowGeneratePanel(false); fetchCreatives(); }}
         />

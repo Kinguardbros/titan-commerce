@@ -183,7 +183,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
       {/* Modals */}
       {showGenerate && (
         <GeneratePanel product={product} mode={generateMode} defaultStyle={activeStyle} creatives={creatives}
-          onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
+          storeId={storeId} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
       )}
       <CreativeEditor creative={editingCreative} open={!!editingCreative}
         onClose={() => setEditingCreative(null)} onApprove={handleApprove} onReject={handleReject} onSave={handleSave} />
