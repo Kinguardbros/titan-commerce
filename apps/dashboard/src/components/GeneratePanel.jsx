@@ -6,10 +6,10 @@ import './GeneratePanel.css';
 const STYLES_WITH_MODEL = ['ad_creative', 'lifestyle', 'review_ugc', 'product_photo_beach', 'static_split', 'static_urgency'];
 
 const AI_MODELS = [
-  { key: 'flux_kontext', label: 'Flux Kontext Max', desc: 'Fast, high quality' },
+  { key: 'fal_nano_banana', label: 'Nano Banana (fal.ai)', desc: 'Reference-based, high fidelity' },
+  { key: 'flux_kontext', label: 'Flux Kontext Max', desc: 'Text-to-image, fast' },
   { key: 'soul', label: 'Soul', desc: 'Creative, stylized' },
-  { key: 'soul_ref', label: 'Soul Reference', desc: 'Reference-based' },
-  { key: 'fal_flux', label: 'fal.ai FLUX', desc: 'Coming soon', disabled: true },
+  { key: 'soul_ref', label: 'Soul Reference', desc: 'Max reference fidelity' },
 ];
 
 const STYLES = [
@@ -26,7 +26,7 @@ const STYLES = [
 export default function GeneratePanel({ product, mode = 'image', defaultStyle, creatives = [], onClose, onGenerated }) {
   const toast = useToast();
   const [style, setStyle] = useState(defaultStyle || 'ad_creative');
-  const [aiModel, setAiModel] = useState('flux_kontext');
+  const [aiModel, setAiModel] = useState('fal_nano_banana');
   const [customPrompt, setCustomPrompt] = useState('');
   const [showModel, setShowModel] = useState(true);
   const [count, setCount] = useState(2);

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildStyledPrompt, generateFluxKontext } from '../../lib/higgsfield.js';
+import { generateFal } from '../../lib/fal.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -44,7 +45,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  const { product_id, store_id, style = 'ad_creative', ai_model = 'flux_kontext', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience } = req.body;
+  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience } = req.body;
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
@@ -111,42 +112,49 @@ async function handler(req, res) {
     });
 
     // Route by selected AI model
-    const useFlux = ai_model === 'flux_kontext';
-    const useSoulRef = ai_model === 'soul_ref';
-
     let imageUrl;
     let requestId = null;
+    const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
-    if (useFlux) {
-      // Flux Kontext — text-to-image, no reference needed but enrich prompt with product details
-      const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
+    if (ai_model === 'fal_nano_banana') {
+      // fal.ai Nano Banana — image-to-image with reference
+      console.log('[generate] Using fal.ai Nano Banana');
+      const result = await generateFal({
+        model: 'fal-ai/nano-banana',
+        prompt,
+        imageUrl: images[0] || null,
+      });
+      imageUrl = result.url;
+      requestId = result.requestId;
+    } else if (ai_model === 'flux_kontext') {
+      // Higgsfield Flux Kontext Max — text-to-image
       const fluxPrompt = `PRODUCT: ${product.title}${product.price ? ` ($${product.price})` : ''}${productDesc ? `\nProduct details: ${productDesc}` : ''}\n\n${prompt}`;
-      console.log('[generate] Using Flux Kontext Max, prompt length:', fluxPrompt.length);
+      console.log('[generate] Using Flux Kontext Max');
       try {
         const result = await generateFluxKontext({ prompt: fluxPrompt, aspectRatio: '1:1' });
         imageUrl = result.url;
         requestId = result.jobId;
       } catch (fluxErr) {
-        console.error('[generate] Flux failed, falling back to Soul:', fluxErr.message);
-        const refImages = images.slice(0, 3);
-        requestId = await submitJob(prompt, refImages);
-        imageUrl = await pollUntilDone(requestId);
+        console.error('[generate] Flux failed, falling back to fal.ai:', fluxErr.message);
+        const result = await generateFal({ model: 'fal-ai/nano-banana', prompt, imageUrl: images[0] || null });
+        imageUrl = result.url;
+        requestId = result.requestId;
       }
     } else {
-      // Soul / Soul Reference — image-to-image with reference photos
-      const refImages = images.slice(0, useSoulRef ? 5 : 3);
-      console.log(`[generate] Using ${useSoulRef ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
+      // Higgsfield Soul / Soul Reference — image-to-image
+      const refImages = images.slice(0, ai_model === 'soul_ref' ? 5 : 3);
+      console.log(`[generate] Using ${ai_model === 'soul_ref' ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
       try {
         requestId = await submitJob(prompt, refImages);
       } catch (submitErr) {
-        console.error('[generate] submitJob FAILED:', submitErr.message);
+        console.error('[generate] Soul failed:', submitErr.message);
         throw new Error(`Higgsfield submit failed: ${submitErr.message}`);
       }
       if (!requestId) throw new Error('No request ID from Higgsfield');
       imageUrl = await pollUntilDone(requestId);
     }
 
-    if (!imageUrl) throw new Error('Generation timed out');
+    if (!imageUrl) throw new Error('Generation failed — no image URL');
 
     // Upload to storage
     const storagePath = `creatives/${product.handle}_${style}_${Date.now()}.png`;
