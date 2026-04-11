@@ -26,50 +26,13 @@ async function pollUntilDone(requestId) {
 }
 
 async function submitJob(prompt, imageUrls) {
-  const creds = process.env.HF_CREDENTIALS;
-  const headers = {
-    'Authorization': `Key ${creds}`,
-    'Content-Type': 'application/json',
-    'User-Agent': 'higgsfield-server-js/2.0',
-  };
-
+  const { higgsfield } = await import('@higgsfield/client/v2');
   const input_images = imageUrls.map((url) => ({ type: 'image_url', image_url: url }));
-
-  // Try endpoints in order of preference
-  const endpoints = [
-    '/v1/text2image/nano-banana',
-    '/v1/text2image/nano-banana-pro',
-    '/v1/text2image/soul',
-  ];
-
-  for (const endpoint of endpoints) {
-    try {
-      const res = await fetch(`https://platform.higgsfield.ai${endpoint}`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ params: { prompt, input_images, aspect_ratio: '1:1', width_and_height: '1024x1024' } }),
-      });
-
-      if (res.status === 404) {
-        console.log(`[generate] Endpoint ${endpoint} returned 404, trying next...`);
-        continue;
-      }
-
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`${endpoint} returned ${res.status}: ${errBody}`);
-      }
-
-      const data = await res.json();
-      console.log(`[generate] Success with ${endpoint}, request ID:`, data.id || data.request_id);
-      return data.id || data.request_id;
-    } catch (err) {
-      if (err.message.includes('404')) continue;
-      throw err;
-    }
-  }
-
-  throw new Error('All Higgsfield endpoints returned 404 — check API docs or credentials');
+  const jobSet = await higgsfield.subscribe('/v1/text2image/soul', {
+    input: { params: { prompt, input_images, width_and_height: '1024x1024' } },
+    withPolling: false,
+  });
+  return jobSet.id;
 }
 
 async function handler(req, res) {
