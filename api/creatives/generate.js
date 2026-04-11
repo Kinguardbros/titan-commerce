@@ -110,11 +110,12 @@ async function handler(req, res) {
       storeId: store_id,
     });
 
-    // Generate ONE image per call (fits within 60s timeout)
-    console.log('[generate] Submitting job, prompt length:', prompt.length, 'images:', images.slice(0, 1).length);
+    // Generate ONE image per call — send up to 3 reference photos for better fidelity
+    const refImages = images.slice(0, 3);
+    console.log('[generate] Submitting job, prompt length:', prompt.length, 'ref images:', refImages.length);
     let requestId;
     try {
-      requestId = await submitJob(prompt, images.slice(0, 1));
+      requestId = await submitJob(prompt, refImages);
     } catch (submitErr) {
       console.error('[generate] submitJob FAILED:', submitErr.message, submitErr.response?.status, JSON.stringify(submitErr.response?.data || {}).slice(0, 500));
       throw new Error(`Higgsfield submit failed: ${submitErr.message}`);
