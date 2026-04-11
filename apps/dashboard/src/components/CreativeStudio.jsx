@@ -548,12 +548,35 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   };
 
   return (
+    <div onClick={(e) => { if (e.target === e.currentTarget && onClose) onClose(); }} style={{
+      position: "fixed", inset: 0, zIndex: 300,
+      background: "rgba(8,8,11,0.85)", backdropFilter: "blur(8px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      animation: "fadeIn 0.2s ease",
+    }}>
     <div style={{
-      maxWidth: 760, margin: "0 auto", padding: "2rem 1.5rem",
+      maxWidth: 760, width: "95vw", maxHeight: "90vh", overflowY: "auto",
+      padding: "2rem 1.5rem",
       fontFamily: "'DM Sans', sans-serif", color: "#fff",
-      background: BG_DEEP, minHeight: "100vh", borderRadius: 16,
+      background: BG_DEEP, borderRadius: 16, position: "relative",
+      animation: "fadeIn 0.3s cubic-bezier(.22,1,.36,1)",
+      border: `1px solid ${BORDER_DEFAULT}`,
     }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+      {/* Close button */}
+      {onClose && (
+        <button onClick={onClose} style={{
+          position: "absolute", top: 14, right: 14, zIndex: 2,
+          background: BG_SURFACE, border: `1px solid ${BORDER_DEFAULT}`,
+          color: TEXT_MID, width: 32, height: 32, borderRadius: 8,
+          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 14, transition: "all 0.25s",
+        }}
+        onMouseEnter={(e) => { e.target.style.borderColor = NEON; e.target.style.color = NEON; }}
+        onMouseLeave={(e) => { e.target.style.borderColor = BORDER_DEFAULT; e.target.style.color = TEXT_MID; }}
+        >✕</button>
+      )}
 
       {/* Header */}
       <div style={{ marginBottom: "2rem" }}>
@@ -908,6 +931,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
         }
         ::placeholder { color: rgba(255,255,255,0.18); }
       `}</style>
+    </div>
     </div>
   );
 }
