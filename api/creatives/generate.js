@@ -168,7 +168,7 @@ async function handler(req, res) {
 
     if (falModel) {
       // All fal.ai models
-      const maxRef = falModel.includes('ideogram') ? 1 : falModel.includes('flux-2') ? 5 : 3;
+      const maxRef = falModel.includes('ideogram') ? 1 : falModel.includes('flux-2') ? 4 : 3;
       const refImages = images.slice(0, maxRef);
       console.log(`[generate] Using fal.ai ${falModel}, ref images: ${refImages.length}`);
 
