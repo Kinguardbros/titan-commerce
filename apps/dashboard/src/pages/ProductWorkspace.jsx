@@ -185,7 +185,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
         <GeneratePanel product={product} mode={generateMode} defaultStyle={activeStyle} creatives={creatives}
           storeId={storeId} onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
       )}
-      <CreativeEditor creative={editingCreative} open={!!editingCreative}
+      <CreativeEditor creative={editingCreative} open={!!editingCreative} storeId={storeId}
         onClose={() => setEditingCreative(null)} onApprove={handleApprove} onReject={handleReject} onSave={handleSave} />
       {showOptimize && (
         <OptimizePanel product={product} onClose={() => setShowOptimize(false)} onApplied={() => { setShowOptimize(false); }} />

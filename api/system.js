@@ -1188,6 +1188,46 @@ Only include sections that have specific, actionable rules from the sources.` }]
         });
       }
 
+      // ─── PUSH CREATIVE TO SHOPIFY ───
+      if (action === 'push_creative_to_shopify') {
+        const { creative_id, store_id } = req.body;
+        if (!creative_id || !store_id) return res.status(400).json({ error: 'creative_id and store_id required' });
+
+        const { data: creative } = await supabase.from('creatives').select('file_url, product_id, status').eq('id', creative_id).single();
+        if (!creative?.file_url) return res.status(404).json({ error: 'Creative not found' });
+        if (creative.status !== 'approved') return res.status(400).json({ error: 'Only approved creatives can be pushed' });
+
+        const { data: product } = await supabase.from('products').select('shopify_id, title').eq('id', creative.product_id).single();
+        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found or missing Shopify ID' });
+
+        const store = await getStore(store_id);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        // Add image to Shopify product (append, not replace)
+        const addResult = await fetch(`https://${store.shopify_url}/admin/api/2024-01/products/${product.shopify_id}/images.json`, {
+          method: 'POST',
+          headers: { 'X-Shopify-Access-Token': store.admin_token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: { src: creative.file_url } }),
+        });
+
+        if (!addResult.ok) {
+          const errText = await addResult.text();
+          console.error('[push_creative] Shopify error:', errText);
+          return res.status(500).json({ error: 'Failed to add image to Shopify' });
+        }
+
+        // Mark creative as published
+        await supabase.from('creatives').update({ status: 'published' }).eq('id', creative_id);
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'PUBLISHER',
+          message: `Pushed creative to Shopify product images for "${product.title}"`,
+          level: 'success', metadata: { creative_id, product_id: creative.product_id, shopify_id: product.shopify_id },
+        });
+
+        return res.status(200).json({ ok: true, message: 'Image added to product on Shopify' });
+      }
+
       // ─── SAVE SIZE CHART ───
       if (action === 'save_size_chart') {
         const { store_id, product_id, size_chart_text } = req.body;

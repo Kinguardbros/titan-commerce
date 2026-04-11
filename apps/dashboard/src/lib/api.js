@@ -82,6 +82,13 @@ export function generateCreatives({ product_id, style, ai_model, custom_prompt, 
   });
 }
 
+export function pushCreativeToShopify(creativeId, storeId) {
+  return fetchJSON('/api/system?action=push_creative_to_shopify', {
+    method: 'POST',
+    body: JSON.stringify({ creative_id: creativeId, store_id: storeId }),
+  });
+}
+
 export function convertToVideo(creativeId) {
   return fetchJSON('/api/creatives/convert-to-video', {
     method: 'POST',

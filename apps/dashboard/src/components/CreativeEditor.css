@@ -188,6 +188,11 @@
   background: transparent; color: var(--text4);
 }
 .ce-btn.reject:hover { color: var(--coral); border-color: rgba(212,96,92,.3); background: var(--coral-glow); }
+.ce-btn.publish {
+  background: rgba(96,165,250,.1); color: var(--azure); border-color: rgba(96,165,250,.2);
+}
+.ce-btn.publish:hover { background: rgba(96,165,250,.2); }
+.ce-btn.publish:disabled { opacity: .5; cursor: not-allowed; }
 .ce-btn.save {
   background: var(--gold-glow); color: var(--gold);
   border-color: rgba(201,168,76,.2);

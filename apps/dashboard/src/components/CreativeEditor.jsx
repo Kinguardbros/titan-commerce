@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { regenerateCreative, convertToVideo } from '../lib/api';
+import { regenerateCreative, convertToVideo, pushCreativeToShopify } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './CreativeEditor.css';
 
-export default function CreativeEditor({ creative, open, onClose, onApprove, onReject, onSave, onRegenerate }) {
+export default function CreativeEditor({ creative, open, onClose, onApprove, onReject, onSave, onRegenerate, storeId }) {
   const toast = useToast();
   const [hook, setHook] = useState('');
   const [headline, setHeadline] = useState('');
@@ -11,6 +11,7 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
   const [saving, setSaving] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [pushing, setPushing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -256,6 +257,18 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
                     </button>
                   </div>
                 </div>
+              )}
+              {creative.status === 'approved' && storeId && (
+                <button className="ce-btn publish" disabled={pushing} onClick={async () => {
+                  setPushing(true);
+                  try {
+                    await pushCreativeToShopify(creative.id, storeId);
+                    toast.success('Image added to product on Shopify!');
+                  } catch (err) { toast.error(`Push failed: ${err.message}`); }
+                  finally { setPushing(false); }
+                }}>
+                  {pushing ? 'Pushing...' : 'Push to Shopify'}
+                </button>
               )}
             </div>
           </div>

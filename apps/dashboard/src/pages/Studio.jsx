@@ -244,6 +244,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
       <CreativeEditor
         creative={editingCreative}
         open={!!editingCreative}
+        storeId={storeId}
         onClose={() => setEditingCreative(null)}
         onApprove={handleApprove}
         onReject={handleReject}
