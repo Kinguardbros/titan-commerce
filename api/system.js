@@ -917,7 +917,7 @@ Use only the insights provided. Be specific, not generic. Use markdown formattin
         if (files.length === 0) return res.status(200).json({ processed: 0, message: 'Inbox is empty', results: [] });
 
         // Process in batches of 10 to stay within Vercel timeout
-        const batch = files.slice(0, 10);
+        const batch = files.slice(0, 20);
         const remaining = files.length - batch.length;
         const files_to_process = batch;
 
