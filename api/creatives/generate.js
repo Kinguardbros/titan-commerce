@@ -117,16 +117,15 @@ async function handler(req, res) {
     const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
     if (ai_model === 'fal_nano_banana') {
-      // fal.ai Nano Banana — image-to-image with reference
-      console.log('[generate] Using fal.ai Nano Banana');
-      const falPrompt = images[0]
-        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image. Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
+      // fal.ai Nano Banana 2 Edit — image-to-image with reference
+      console.log('[generate] Using fal.ai Nano Banana 2 Edit, ref images:', Math.min(images.length, 3));
+      const falPrompt = images.length > 0
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
         : prompt;
       const result = await generateFal({
-        model: 'fal-ai/nano-banana',
+        model: 'fal-ai/nano-banana-2/edit',
         prompt: falPrompt,
-        imageUrl: images[0] || null,
-        strength: 0.5,
+        imageUrl: images.slice(0, 3),
       });
       imageUrl = result.url;
       requestId = result.requestId;
@@ -140,7 +139,7 @@ async function handler(req, res) {
         requestId = result.jobId;
       } catch (fluxErr) {
         console.error('[generate] Flux failed, falling back to fal.ai:', fluxErr.message);
-        const result = await generateFal({ model: 'fal-ai/nano-banana', prompt, imageUrl: images[0] || null });
+        const result = await generateFal({ model: 'fal-ai/nano-banana-2/edit', prompt, imageUrl: images.slice(0, 3) });
         imageUrl = result.url;
         requestId = result.requestId;
       }

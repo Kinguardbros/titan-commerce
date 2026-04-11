@@ -6,7 +6,7 @@ import './GeneratePanel.css';
 const STYLES_WITH_MODEL = ['ad_creative', 'lifestyle', 'review_ugc', 'product_photo_beach', 'static_split', 'static_urgency'];
 
 const AI_MODELS = [
-  { key: 'fal_nano_banana', label: 'Nano Banana (fal.ai)', desc: 'Reference-based, high fidelity' },
+  { key: 'fal_nano_banana', label: 'Nano Banana 2 (fal.ai)', desc: 'Reference-based editing' },
   { key: 'flux_kontext', label: 'Flux Kontext Max', desc: 'Text-to-image, fast' },
   { key: 'soul', label: 'Soul', desc: 'Creative, stylized' },
   { key: 'soul_ref', label: 'Soul Reference', desc: 'Max reference fidelity' },
