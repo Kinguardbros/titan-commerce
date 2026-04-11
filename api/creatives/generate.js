@@ -29,7 +29,7 @@ async function submitJob(prompt, imageUrls) {
   const { higgsfield } = await import('@higgsfield/client/v2');
   const input_images = imageUrls.map((url) => ({ type: 'image_url', image_url: url }));
   const jobSet = await higgsfield.subscribe('/v1/text2image/soul', {
-    input: { params: { prompt, input_images, width_and_height: '1024x1024' } },
+    input: { params: { prompt, input_images, width_and_height: '1536x1536' } },
     withPolling: false,
   });
   return jobSet.id;

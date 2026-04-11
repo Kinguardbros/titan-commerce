@@ -584,7 +584,7 @@ async function handler(req, res) {
 
         const { higgsfield } = await import('@higgsfield/client/v2');
         const jobSet = await higgsfield.subscribe('/v1/text2image/soul', {
-          input: { params: { prompt: fullPrompt, input_images: inputImages, width_and_height: '1024x1024' } },
+          input: { params: { prompt: fullPrompt, input_images: inputImages, width_and_height: '1536x1536' } },
           withPolling: false,
         });
         const imageUrl = await pollDone(jobSet.id);
@@ -637,7 +637,7 @@ async function handler(req, res) {
                 const images = JSON.parse(product.images || '[]');
                 const prompt = await buildStyledPrompt({ product_name: product.title, price: product.price ? `$${product.price}` : '', style, custom_prompt: '', showModel: true, feedback: '', storeId: product.store_id });
                 const { higgsfield } = await import('@higgsfield/client/v2');
-                const jobSet = await higgsfield.subscribe('/v1/text2image/soul', { input: { params: { prompt, input_images: images.slice(0, 1).map(u => ({ type: 'image_url', image_url: u })), width_and_height: '1024x1024' } }, withPolling: false });
+                const jobSet = await higgsfield.subscribe('/v1/text2image/soul', { input: { params: { prompt, input_images: images.slice(0, 1).map(u => ({ type: 'image_url', image_url: u })), width_and_height: '1536x1536' } }, withPolling: false });
                 // Don't wait for completion — just queue it
                 await supabase.from('creatives').insert({ product_id: sa.product_id, store_id: proposal.store_id, variant_index: 1, format: 'image', file_url: null, hook_used: style, headline: product.title, hf_job_id: jobSet.id, status: 'generating', style });
               }
