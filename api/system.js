@@ -258,16 +258,29 @@ async function handler(req, res) {
         const productId = req.query.product_id;
         if (!storeId || !productId) return res.status(400).json({ error: 'store_id and product_id required' });
 
-        const store = await getStore(storeId);
-        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+        const { data: dbProduct } = await supabase.from('products').select('*').eq('id', productId).single();
+        if (!dbProduct) return res.status(404).json({ error: 'Product not found' });
 
-        const { data: product } = await supabase.from('products').select('shopify_id').eq('id', productId).single();
-        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found' });
+        const store = await getStore(storeId);
+
+        // If no shopify_id or no admin token, return DB-only data
+        if (!dbProduct.shopify_id || !store?.admin_token) {
+          const imgs = JSON.parse(dbProduct.images || '[]');
+          return res.status(200).json({
+            product: {
+              id: dbProduct.shopify_id, title: dbProduct.title, body_html: dbProduct.description || '',
+              vendor: '', product_type: dbProduct.product_type || '', tags: dbProduct.tags || '',
+              status: 'active', variants: [], images: imgs.map((src, i) => ({ id: i, src, position: i + 1 })),
+            },
+            metafields: [],
+            db_only: true,
+          });
+        }
 
         const client = createShopifyClient(store.shopify_url, store.admin_token);
         const [fullProduct, metafields] = await Promise.all([
-          client.getFullProduct(product.shopify_id),
-          client.getProductMetafields(product.shopify_id),
+          client.getFullProduct(dbProduct.shopify_id),
+          client.getProductMetafields(dbProduct.shopify_id),
         ]);
 
         return res.status(200).json({ product: fullProduct, metafields });
