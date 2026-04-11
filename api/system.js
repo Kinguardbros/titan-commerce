@@ -15,6 +15,37 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+async function upsertSkill(supabaseClient, storeId, skillType, title, newInsights, prompt, anthropic, productName = null) {
+  const query = supabaseClient.from('store_skills').select('content')
+    .eq('store_id', storeId).eq('skill_type', skillType);
+  if (productName) query.eq('product_name', productName);
+  else query.is('product_name', null);
+  const { data: existing } = await query.single();
+
+  let content;
+  if (existing?.content) {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514', max_tokens: 4000,
+      messages: [{ role: 'user', content: `You are updating a brand knowledge document. Merge the existing content with new insights. Keep all existing specific data, add new information, refine if there are updates. Remove duplicates. Return the complete merged document in markdown.\n\nEXISTING DOCUMENT:\n${existing.content}\n\nNEW INSIGHTS TO MERGE:\n${newInsights.slice(0, 6000)}\n\nReturn the full merged document:` }],
+    });
+    content = response.content[0].text;
+  } else {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514', max_tokens: 4000,
+      messages: [{ role: 'user', content: `${prompt}\n\nSource insights:\n${newInsights.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights.` }],
+    });
+    content = response.content[0].text;
+  }
+
+  const sourceCount = (newInsights.match(/^[-•*]/gm) || []).length || 1;
+  await supabaseClient.from('store_skills').upsert({
+    store_id: storeId, skill_type: skillType, title, product_name: productName || null,
+    content, source_count: sourceCount, generated_at: new Date().toISOString(),
+  }, { onConflict: 'store_id,skill_type,product_name' });
+
+  return content;
+}
+
 async function handler(req, res) {
   const action = req.query.action || req.body?.action;
 
@@ -803,14 +834,7 @@ async function handler(req, res) {
         for (const [category, insightsList] of Object.entries(storeLevel)) {
           const mapping = SKILL_MAP[category];
           const insightsText = insightsList.join('\n\n');
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514', max_tokens: 3000,
-            messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights.` }],
-          });
-          await supabase.from('store_skills').upsert({
-            store_id, skill_type: mapping.type, title: mapping.title, product_name: null,
-            content: response.content[0].text, source_count: insightsList.length, generated_at: new Date().toISOString(),
-          }, { onConflict: 'store_id,skill_type,product_name' });
+          await upsertSkill(supabase, store_id, mapping.type, mapping.title, insightsText, mapping.prompt, anthropic);
           results.push({ skill_type: mapping.type, title: mapping.title, source_count: insightsList.length });
         }
 
@@ -854,10 +878,7 @@ Only include sections that have specific, actionable rules from the sources.` }]
             const regex = new RegExp(`##\\s*${func.type}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, 'i');
             const match = splitText.match(regex);
             if (match?.[1]?.trim()) {
-              await supabase.from('store_skills').upsert({
-                store_id, skill_type: func.type, title: func.title, product_name: null,
-                content: match[1].trim(), source_count: storeLevel.Creative.length, generated_at: new Date().toISOString(),
-              }, { onConflict: 'store_id,skill_type,product_name' });
+              await upsertSkill(supabase, store_id, func.type, func.title, match[1].trim(), func.prompt, anthropic);
               results.push({ skill_type: func.type, title: func.title, source_count: storeLevel.Creative.length });
             }
           }
@@ -868,14 +889,7 @@ Only include sections that have specific, actionable rules from the sources.` }]
           const skillType = `product-${productName.toLowerCase().replace(/\s+/g, '-')}`;
           const prompt = `Generate product knowledge for "${productName}" by ${store.name}. Include: unique mechanism, key features with benefits, belief statements, objection counters, sizing, materials. Be specific to THIS product only.`;
           const insightsText = insightsList.join('\n\n');
-          const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514', max_tokens: 3000,
-            messages: [{ role: 'user', content: `${prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown. Only include specific, actionable insights.` }],
-          });
-          await supabase.from('store_skills').upsert({
-            store_id, skill_type: skillType, title: productName, product_name: productName,
-            content: response.content[0].text, source_count: insightsList.length, generated_at: new Date().toISOString(),
-          }, { onConflict: 'store_id,skill_type,product_name' });
+          await upsertSkill(supabase, store_id, skillType, productName, insightsText, prompt, anthropic, productName);
           results.push({ skill_type: skillType, title: productName, product_name: productName, source_count: insightsList.length });
         }
 
@@ -913,7 +927,6 @@ Only include sections that have specific, actionable rules from the sources.` }]
         let query, prompt, title;
 
         if (skill_type.startsWith('product-') && product_name) {
-          // Per-product skill
           query = supabase.from('store_knowledge').select('insights')
             .eq('store_id', store_id).eq('product_name', product_name)
             .order('processed_at', { ascending: false });
@@ -933,16 +946,7 @@ Only include sections that have specific, actionable rules from the sources.` }]
         if (!knowledge?.length) return res.status(200).json({ error: 'No insights found for this skill' });
 
         const insightsText = knowledge.map((k) => k.insights).join('\n\n');
-        const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514', max_tokens: 3000,
-          messages: [{ role: 'user', content: `${prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown. Only include specific, actionable insights.` }],
-        });
-
-        const content = response.content[0].text;
-        await supabase.from('store_skills').upsert({
-          store_id, skill_type, title, product_name: product_name || null,
-          content, source_count: knowledge.length, generated_at: new Date().toISOString(),
-        }, { onConflict: 'store_id,skill_type,product_name' });
+        const content = await upsertSkill(supabase, store_id, skill_type, title, insightsText, prompt, anthropic, product_name || null);
 
         return res.status(200).json({ skill_type, title, product_name, content, source_count: knowledge.length });
       }
