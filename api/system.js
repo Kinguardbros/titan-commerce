@@ -731,6 +731,21 @@ async function handler(req, res) {
         const { image_url } = req.body;
         if (!image_url) return res.status(400).json({ error: 'image_url required' });
 
+        // Build image source — handle base64 data URLs and regular URLs
+        let imageSource;
+        if (image_url.startsWith('data:')) {
+          const match = image_url.match(/^data:(image\/\w+);base64,(.+)$/);
+          if (!match) return res.status(400).json({ error: 'Invalid data URL format' });
+          imageSource = { type: 'base64', media_type: match[1], data: match[2] };
+        } else {
+          // Fetch remote image and convert to base64
+          const imgRes = await fetch(image_url);
+          if (!imgRes.ok) return res.status(400).json({ error: 'Failed to fetch image' });
+          const buf = Buffer.from(await imgRes.arrayBuffer());
+          const contentType = imgRes.headers.get('content-type') || 'image/png';
+          imageSource = { type: 'base64', media_type: contentType.split(';')[0], data: buf.toString('base64') };
+        }
+
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -740,7 +755,7 @@ async function handler(req, res) {
           messages: [{
             role: 'user',
             content: [
-              { type: 'image', source: { type: 'url', url: image_url } },
+              { type: 'image', source: imageSource },
               { type: 'text', text: 'Extract the size chart from this image.\nIf sizes are in COLUMNS (horizontal), transpose them to ROWS.\nAlways return CSV format where each ROW is one size:\n\nFirst line = headers: Size, [measurement names]\nEach next line = one size with values.\n\nExample output:\nSize, Bust (cm), Waist (cm), Hips (cm)\nS, 86, 66, 91\nM, 90, 70, 95\nL, 94, 74, 99\n\nHandle transposed tables, multiple sections, and merged cells.\nReturn ONLY the CSV text, nothing else.' },
             ],
           }],
