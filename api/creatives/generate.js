@@ -103,6 +103,41 @@ async function handler(req, res) {
       feedback += `\nLEARNING — Client REJECTED these and explained why: ${reasons.join('; ')}. AVOID making the same mistakes.`;
     }
 
+    // Auto-generate product skill from photos if it doesn't exist yet
+    if (store_id && images.length > 0) {
+      const productSlug = (product.handle || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')).replace(/^-|-$/g, '');
+      const { data: existingSkill } = await supabase.from('store_skills').select('id')
+        .eq('store_id', store_id).eq('skill_type', `product-${productSlug}`).limit(1).single();
+
+      if (!existingSkill) {
+        try {
+          console.log(`[generate] Auto-creating product skill for ${productSlug}`);
+          const imgRes = await fetch(images[0]);
+          const imgBuf = Buffer.from(await imgRes.arrayBuffer());
+          const base64 = imgBuf.toString('base64');
+          const ext = images[0].includes('.png') ? 'image/png' : 'image/jpeg';
+
+          const Anthropic = (await import('@anthropic-ai/sdk')).default;
+          const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+          const skillRes = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+            messages: [{ role: 'user', content: [
+              { type: 'image', source: { type: 'base64', media_type: ext, data: base64 } },
+              { type: 'text', text: `Analyze this product photo and extract detailed product knowledge.\n\nProduct: ${product.title}\nPrice: ${product.price || 'N/A'}\n\nReturn:\n## PRODUCT IDENTITY\n- Exact colors, patterns, textures\n- Cut/style details\n- Key design elements (ties, straps, panels)\n- Material appearance\n\n## UNIQUE FEATURES\n- What makes this product visually distinct\n- Special construction details\n\n## VISUAL REPRODUCTION RULES\n- Exact description to recreate this product in AI generation\n- "The product MUST have [detail]"\n\n## DO NOT\n- What would make the generated product look WRONG\n- Common AI mistakes for this product type\n\nBe extremely specific — this ensures AI-generated photos show THIS EXACT product.` },
+            ] }],
+          });
+
+          await supabase.from('store_skills').insert({
+            store_id, skill_type: `product-${productSlug}`, product_name: product.title,
+            title: product.title, content: skillRes.content[0].text, source_count: 1,
+          });
+          console.log(`[generate] Product skill created for ${productSlug}`);
+        } catch (skillErr) {
+          console.error('[generate] Auto-skill creation failed (non-blocking):', skillErr.message);
+        }
+      }
+    }
+
     const prompt = await buildStyledPrompt({
       product_name: product.title,
       price: product.price ? `$${product.price}` : '',
