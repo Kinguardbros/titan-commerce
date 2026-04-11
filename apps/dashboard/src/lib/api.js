@@ -316,6 +316,13 @@ export function generateSkill(storeId) {
   return fetchJSON(`/api/system?action=generate_skill&store_id=${storeId}`);
 }
 
+export function processSingleFile(storeId, filename) {
+  return fetchJSON('/api/system?action=process_single_file', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, filename }),
+  });
+}
+
 export function processInbox(storeId) {
   return fetchJSON('/api/system?action=process_inbox', {
     method: 'POST',

@@ -119,6 +119,13 @@
 }
 .db-process-insights { color: var(--gold); font-size: 9px; }
 .db-process-error { color: var(--coral); font-size: 9px; }
+.db-process-item--active { color: var(--azure); }
+.db-process-spinner {
+  width: 10px; height: 10px; border: 1.5px solid var(--edge);
+  border-top-color: var(--azure); border-radius: 50%;
+  animation: dbSpin .8s linear infinite; flex-shrink: 0;
+}
+@keyframes dbSpin { to { transform: rotate(360deg); } }
 
 @media (max-width: 600px) {
   .db-row { padding: 10px 12px; min-height: 40px; }

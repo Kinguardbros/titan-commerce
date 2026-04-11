@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getStoreDocs, getStoreDocDownloadUrl, uploadStoreDoc, processInbox } from '../lib/api';
+import { getStoreDocs, getStoreDocDownloadUrl, uploadStoreDoc, processSingleFile } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './DocsBrowser.css';
 
@@ -169,26 +169,43 @@ export default function DocsBrowser({ storeName, storeId }) {
   const inboxCount = inboxNode?.children?.length || 0;
 
   const handleProcess = async () => {
-    if (!storeId) return;
+    if (!storeId || !inboxNode?.children?.length) return;
+    const filesToProcess = inboxNode.children.filter((f) => f.type === 'file');
+    if (filesToProcess.length === 0) return;
+
     setProcessing(true);
-    setProcessResult(null);
-    try {
-      const result = await processInbox(storeId);
-      setProcessResult(result);
-      if (result.processed > 0) {
-        const totalInsights = result.results.reduce((s, r) => s + (r.insights_count || 0), 0);
-        const msg = `Processed ${result.processed} files, ${totalInsights} insights extracted`;
-        toast.success(result.remaining > 0 ? `${msg}. ${result.remaining} remaining — run again.` : msg);
-      } else {
-        toast.info(result.message || 'No files to process');
+    setProcessResult({ results: [], total: filesToProcess.length });
+
+    let successCount = 0;
+    for (let i = 0; i < filesToProcess.length; i++) {
+      const file = filesToProcess[i];
+      // Update progress — mark current file as processing
+      setProcessResult((prev) => ({
+        ...prev,
+        current: i,
+        currentFile: file.name,
+      }));
+
+      try {
+        const result = await processSingleFile(storeId, file.name);
+        successCount++;
+        setProcessResult((prev) => ({
+          ...prev,
+          results: [...prev.results, { filename: file.name, category: result.category, insights_count: result.insights_count || 0 }],
+        }));
+      } catch (err) {
+        console.error(`[DocsBrowser] Process error for ${file.name}:`, err);
+        setProcessResult((prev) => ({
+          ...prev,
+          results: [...prev.results, { filename: file.name, error: err.message }],
+        }));
       }
-      fetchDocs();
-    } catch (err) {
-      console.error('[DocsBrowser] Process error:', err);
-      toast.error(`Process failed: ${err.message}`);
-    } finally {
-      setProcessing(false);
     }
+
+    setProcessing(false);
+    const totalInsights = processResult?.results?.reduce((s, r) => s + (r.insights_count || 0), 0) || 0;
+    toast.success(`Processed ${successCount}/${filesToProcess.length} files, ${totalInsights} insights`);
+    fetchDocs();
   };
 
   return (
@@ -221,15 +238,15 @@ export default function DocsBrowser({ storeName, storeId }) {
         <div className="db-process-bar">
           <span className="db-process-info">{inboxCount} file{inboxCount !== 1 ? 's' : ''} in Inbox</span>
           <button className="db-process-btn" onClick={handleProcess} disabled={processing}>
-            {processing ? 'Processing...' : 'Process Inbox'}
+            {processing && processResult ? `Processing... ${processResult.results?.length || 0}/${processResult.total}` : 'Process Inbox'}
           </button>
         </div>
       )}
 
-      {/* Process result */}
-      {processResult && processResult.results?.length > 0 && (
+      {/* Live progress + results */}
+      {processResult && (processResult.results?.length > 0 || processing) && (
         <div className="db-process-result">
-          {processResult.results.map((r, i) => (
+          {processResult.results?.map((r, i) => (
             <div key={i} className={`db-process-item${r.error ? ' db-process-item--error' : ''}`}>
               <span>{r.error ? '\u2717' : '\u2713'}</span>
               <span className="db-process-filename">{r.filename}</span>
@@ -238,6 +255,12 @@ export default function DocsBrowser({ storeName, storeId }) {
               {r.error && <span className="db-process-error">{r.error}</span>}
             </div>
           ))}
+          {processing && processResult.currentFile && (
+            <div className="db-process-item db-process-item--active">
+              <span className="db-process-spinner" />
+              <span className="db-process-filename">{processResult.currentFile}</span>
+            </div>
+          )}
         </div>
       )}
 

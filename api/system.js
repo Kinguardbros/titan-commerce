@@ -900,6 +900,61 @@ Use only the insights provided. Be specific, not generic. Use markdown formattin
       }
 
       // ─── PROCESS INBOX ───
+      // ─── PROCESS SINGLE FILE ───
+      if (action === 'process_single_file') {
+        const { store_id, filename } = req.body;
+        if (!store_id || !filename) return res.status(400).json({ error: 'store_id and filename required' });
+
+        const store = await getStore(store_id);
+        if (!store) return res.status(404).json({ error: 'Store not found' });
+
+        const storeName = store.name;
+        const filePath = `${storeName}/Inbox/${filename}`;
+
+        const { data: fileData, error: dlErr } = await supabase.storage.from(DOCS_BUCKET).download(filePath);
+        if (dlErr || !fileData) return res.status(404).json({ error: `File not found: ${filename}` });
+
+        const buffer = await fileData.arrayBuffer();
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const text = await extractText(buffer, filename, anthropic);
+        if (!text) return res.status(200).json({ filename, category: null, error: 'Unsupported format' });
+
+        const category = await classifyDocument(text, filename, anthropic);
+
+        // Dedup: rename if same name exists in category
+        const fBase = filename.includes('.') ? filename.slice(0, filename.lastIndexOf('.')) : filename;
+        const fExt = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '';
+        const { data: existFiles } = await supabase.storage.from(DOCS_BUCKET).list(`${storeName}/${category}`);
+        const destName = existFiles?.some((f) => f.name === filename) ? `${fBase}_${Date.now()}${fExt}` : filename;
+
+        // Move
+        const destPath = `${storeName}/${category}/${destName}`;
+        await supabase.storage.from(DOCS_BUCKET).upload(destPath, Buffer.from(buffer), { upsert: true });
+        await supabase.storage.from(DOCS_BUCKET).remove([filePath]);
+
+        // Extract insights
+        let insightsCount = 0;
+        if (category !== 'Logos' && text.length > 50) {
+          const insightsText = await extractInsights(text, filename, storeName, anthropic);
+          insightsCount = (insightsText.match(/^[-•*]/gm) || []).length;
+          await supabase.from('store_knowledge').insert({
+            store_id, source_file: destName, category, insights: insightsText,
+          });
+        }
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'DOC_PROCESSOR',
+          message: `Processed "${filename}" → ${category}`,
+          level: 'info', metadata: { filename: destName, category, insights_count: insightsCount },
+        });
+
+        return res.status(200).json({ filename, category, insights_count: insightsCount });
+      }
+
+      // ─── PROCESS INBOX (batch — legacy) ───
       if (action === 'process_inbox') {
         const { store_id } = req.body;
         if (!store_id) return res.status(400).json({ error: 'store_id required' });
