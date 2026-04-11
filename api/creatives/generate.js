@@ -119,10 +119,14 @@ async function handler(req, res) {
     if (ai_model === 'fal_nano_banana') {
       // fal.ai Nano Banana — image-to-image with reference
       console.log('[generate] Using fal.ai Nano Banana');
+      const falPrompt = images[0]
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image. Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
+        : prompt;
       const result = await generateFal({
         model: 'fal-ai/nano-banana',
-        prompt,
+        prompt: falPrompt,
         imageUrl: images[0] || null,
+        strength: 0.5,
       });
       imageUrl = result.url;
       requestId = result.requestId;
