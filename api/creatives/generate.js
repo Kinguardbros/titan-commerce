@@ -44,7 +44,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  const { product_id, store_id, style = 'ad_creative', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience } = req.body;
+  const { product_id, store_id, style = 'ad_creative', ai_model = 'flux_kontext', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience } = req.body;
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
@@ -110,9 +110,9 @@ async function handler(req, res) {
       storeId: store_id,
     });
 
-    // Route: Flux Kontext Max for quality styles, Soul for others
-    const FLUX_STYLES = ['product_photo_beach', 'ad_creative', 'lifestyle', 'product_shot', 'review_ugc'];
-    const useFlux = FLUX_STYLES.includes(style);
+    // Route by selected AI model
+    const useFlux = ai_model === 'flux_kontext';
+    const useSoulRef = ai_model === 'soul_ref';
 
     let imageUrl;
     if (useFlux) {
@@ -131,9 +131,9 @@ async function handler(req, res) {
         imageUrl = await pollUntilDone(requestId);
       }
     } else {
-      // Soul — image-to-image with reference photos
-      const refImages = images.slice(0, 3);
-      console.log('[generate] Using Soul, ref images:', refImages.length);
+      // Soul / Soul Reference — image-to-image with reference photos
+      const refImages = images.slice(0, useSoulRef ? 5 : 3);
+      console.log(`[generate] Using ${useSoulRef ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
       let requestId;
       try {
         requestId = await submitJob(prompt, refImages);

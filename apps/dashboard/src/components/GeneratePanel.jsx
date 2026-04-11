@@ -5,6 +5,13 @@ import './GeneratePanel.css';
 
 const STYLES_WITH_MODEL = ['ad_creative', 'lifestyle', 'review_ugc', 'product_photo_beach', 'static_split', 'static_urgency'];
 
+const AI_MODELS = [
+  { key: 'flux_kontext', label: 'Flux Kontext Max', desc: 'Fast, high quality' },
+  { key: 'soul', label: 'Soul', desc: 'Creative, stylized' },
+  { key: 'soul_ref', label: 'Soul Reference', desc: 'Reference-based' },
+  { key: 'fal_flux', label: 'fal.ai FLUX', desc: 'Coming soon', disabled: true },
+];
+
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creative', desc: 'Campaign-ready Meta ad — studio lighting, gold tones', group: 'Custom' },
   { key: 'product_shot', label: 'Product Shot', desc: 'Clean white background, product focus, detail shots', group: 'Custom' },
@@ -19,6 +26,7 @@ const STYLES = [
 export default function GeneratePanel({ product, mode = 'image', defaultStyle, creatives = [], onClose, onGenerated }) {
   const toast = useToast();
   const [style, setStyle] = useState(defaultStyle || 'ad_creative');
+  const [aiModel, setAiModel] = useState('flux_kontext');
   const [customPrompt, setCustomPrompt] = useState('');
   const [showModel, setShowModel] = useState(true);
   const [count, setCount] = useState(2);
@@ -77,6 +85,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
           product_id: product.id,
           store_id: product.store_id,
           style,
+          ai_model: aiModel,
           custom_prompt: customPrompt,
           show_model: showModel,
           text_overlay: textOverlay,
@@ -176,6 +185,13 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
                 </div>
               </div>
             ))}
+
+            <div className="gp-section">Model</div>
+            <select className="gp-audience-select" value={aiModel} onChange={(e) => setAiModel(e.target.value)} disabled={generating}>
+              {AI_MODELS.map((m) => (
+                <option key={m.key} value={m.key} disabled={m.disabled}>{m.label} — {m.desc}</option>
+              ))}
+            </select>
 
             <div className="gp-section">Subject</div>
             <div className="gp-toggle">
