@@ -7,7 +7,7 @@ import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
 import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
-import { extractText, classifyDocument, extractInsights } from '../lib/doc-processor.js';
+import { extractText, classifyDocument, extractInsights, identifyProduct } from '../lib/doc-processor.js';
 const DOCS_BUCKET = 'store-docs';
 
 const supabase = createClient(
@@ -770,7 +770,7 @@ async function handler(req, res) {
         if (!store) return res.status(404).json({ error: 'Store not found' });
 
         const { data: knowledge } = await supabase.from('store_knowledge')
-          .select('category, insights').eq('store_id', store_id)
+          .select('category, insights, product_name').eq('store_id', store_id)
           .order('processed_at', { ascending: false });
 
         if (!knowledge?.length) return res.status(200).json({ generated: 0, skills: [] });
@@ -779,38 +779,55 @@ async function handler(req, res) {
           Ads: { type: 'ad-hooks', title: 'Ad Hooks & Copy', prompt: `From these ad transcripts and ad library analyses for "${store.name}", extract: winning hooks (exact quotes), failing hooks, hook patterns/structures, ad frameworks, CTA styles. Be maximally specific — include exact examples.` },
           Creative: { type: 'creative-direction', title: 'Creative Direction', prompt: `From these creative playbooks for "${store.name}", extract: visual rules (colors, settings, model types, lighting), what works vs what doesn't, testing framework, KPI benchmarks, format guidelines.` },
           Audience: { type: 'audience-personas', title: 'Audience Personas', prompt: `From these audience docs for "${store.name}", extract: detailed personas (name, age, core emotion, exact quotes), pain points, objections, trigger phrases, customer language patterns. Be maximally specific.` },
-          Products: { type: 'product-knowledge', title: 'Product Knowledge', prompt: `From these product docs for "${store.name}", extract: unique mechanism per product, key features with benefits, belief statements, objection counters, competitor failures. Organize per product.` },
           Brand: { type: 'brand-voice', title: 'Brand Voice', prompt: `From these brand docs for "${store.name}", extract: brand positioning statement, voice & tone rules, messaging do's and don'ts, taglines, key messages, brand story elements.` },
         };
 
-        const grouped = {};
+        // Separate store-level (non-product) and product-level insights
+        const storeLevel = {};
+        const productLevel = {};
         for (const k of knowledge) {
-          if (!grouped[k.category]) grouped[k.category] = [];
-          grouped[k.category].push(k.insights);
+          if (k.category === 'Products' && k.product_name) {
+            if (!productLevel[k.product_name]) productLevel[k.product_name] = [];
+            productLevel[k.product_name].push(k.insights);
+          } else if (SKILL_MAP[k.category]) {
+            if (!storeLevel[k.category]) storeLevel[k.category] = [];
+            storeLevel[k.category].push(k.insights);
+          }
         }
 
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         const results = [];
 
-        for (const [category, insightsList] of Object.entries(grouped)) {
+        // Store-level skills
+        for (const [category, insightsList] of Object.entries(storeLevel)) {
           const mapping = SKILL_MAP[category];
-          if (!mapping) continue;
-
           const insightsText = insightsList.join('\n\n');
           const response = await anthropic.messages.create({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 3000,
-            messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights from the sources.` }],
+            model: 'claude-sonnet-4-20250514', max_tokens: 3000,
+            messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights.` }],
           });
-
-          const content = response.content[0].text;
           await supabase.from('store_skills').upsert({
-            store_id, skill_type: mapping.type, title: mapping.title,
-            content, source_count: insightsList.length, generated_at: new Date().toISOString(),
-          }, { onConflict: 'store_id,skill_type' });
-
+            store_id, skill_type: mapping.type, title: mapping.title, product_name: null,
+            content: response.content[0].text, source_count: insightsList.length, generated_at: new Date().toISOString(),
+          }, { onConflict: 'store_id,skill_type,product_name' });
           results.push({ skill_type: mapping.type, title: mapping.title, source_count: insightsList.length });
+        }
+
+        // Per-product skills
+        for (const [productName, insightsList] of Object.entries(productLevel)) {
+          const skillType = `product-${productName.toLowerCase().replace(/\s+/g, '-')}`;
+          const prompt = `Generate product knowledge for "${productName}" by ${store.name}. Include: unique mechanism, key features with benefits, belief statements, objection counters, sizing, materials. Be specific to THIS product only.`;
+          const insightsText = insightsList.join('\n\n');
+          const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514', max_tokens: 3000,
+            messages: [{ role: 'user', content: `${prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown. Only include specific, actionable insights.` }],
+          });
+          await supabase.from('store_skills').upsert({
+            store_id, skill_type: skillType, title: productName, product_name: productName,
+            content: response.content[0].text, source_count: insightsList.length, generated_at: new Date().toISOString(),
+          }, { onConflict: 'store_id,skill_type,product_name' });
+          results.push({ skill_type: skillType, title: productName, product_name: productName, source_count: insightsList.length });
         }
 
         await supabase.from('pipeline_log').insert({
@@ -824,46 +841,57 @@ async function handler(req, res) {
 
       // ─── REGENERATE SINGLE SKILL ───
       if (action === 'regenerate_skill') {
-        const { store_id, skill_type } = req.body;
+        const { store_id, skill_type, product_name } = req.body;
         if (!store_id || !skill_type) return res.status(400).json({ error: 'store_id and skill_type required' });
 
         const store = await getStore(store_id);
         if (!store) return res.status(404).json({ error: 'Store not found' });
 
-        const SKILL_MAP = {
+        const STORE_SKILL_MAP = {
           'ad-hooks': { category: 'Ads', title: 'Ad Hooks & Copy', prompt: `From these ad transcripts and ad library analyses for "${store.name}", extract: winning hooks (exact quotes), failing hooks, hook patterns/structures, ad frameworks, CTA styles. Be maximally specific.` },
           'creative-direction': { category: 'Creative', title: 'Creative Direction', prompt: `From these creative playbooks for "${store.name}", extract: visual rules, what works vs doesn't, testing framework, KPI benchmarks.` },
           'audience-personas': { category: 'Audience', title: 'Audience Personas', prompt: `From these audience docs for "${store.name}", extract: detailed personas, pain points, objections, trigger phrases, customer language.` },
-          'product-knowledge': { category: 'Products', title: 'Product Knowledge', prompt: `From these product docs for "${store.name}", extract: unique mechanism, features, belief statements, objection counters.` },
           'brand-voice': { category: 'Brand', title: 'Brand Voice', prompt: `From these brand docs for "${store.name}", extract: positioning, voice & tone rules, messaging do/don't, taglines.` },
         };
-
-        const mapping = SKILL_MAP[skill_type];
-        if (!mapping) return res.status(400).json({ error: `Unknown skill_type: ${skill_type}` });
-
-        const { data: knowledge } = await supabase.from('store_knowledge')
-          .select('insights').eq('store_id', store_id).eq('category', mapping.category)
-          .order('processed_at', { ascending: false });
-
-        if (!knowledge?.length) return res.status(200).json({ error: `No ${mapping.category} insights found` });
 
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
         const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+        let query, prompt, title;
+
+        if (skill_type.startsWith('product-') && product_name) {
+          // Per-product skill
+          query = supabase.from('store_knowledge').select('insights')
+            .eq('store_id', store_id).eq('product_name', product_name)
+            .order('processed_at', { ascending: false });
+          prompt = `Generate product knowledge for "${product_name}" by ${store.name}. Include: unique mechanism, key features, belief statements, objection counters, sizing, materials. Be specific to THIS product only.`;
+          title = product_name;
+        } else {
+          const mapping = STORE_SKILL_MAP[skill_type];
+          if (!mapping) return res.status(400).json({ error: `Unknown skill_type: ${skill_type}` });
+          query = supabase.from('store_knowledge').select('insights')
+            .eq('store_id', store_id).eq('category', mapping.category)
+            .order('processed_at', { ascending: false });
+          prompt = mapping.prompt;
+          title = mapping.title;
+        }
+
+        const { data: knowledge } = await query;
+        if (!knowledge?.length) return res.status(200).json({ error: 'No insights found for this skill' });
+
         const insightsText = knowledge.map((k) => k.insights).join('\n\n');
         const response = await anthropic.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 3000,
-          messages: [{ role: 'user', content: `${mapping.prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown with bullet points. Only include specific, actionable insights.` }],
+          model: 'claude-sonnet-4-20250514', max_tokens: 3000,
+          messages: [{ role: 'user', content: `${prompt}\n\nSource insights:\n${insightsText.slice(0, 8000)}\n\nReturn as structured markdown. Only include specific, actionable insights.` }],
         });
 
         const content = response.content[0].text;
         await supabase.from('store_skills').upsert({
-          store_id, skill_type, title: mapping.title,
+          store_id, skill_type, title, product_name: product_name || null,
           content, source_count: knowledge.length, generated_at: new Date().toISOString(),
-        }, { onConflict: 'store_id,skill_type' });
+        }, { onConflict: 'store_id,skill_type,product_name' });
 
-        return res.status(200).json({ skill_type, title: mapping.title, content, source_count: knowledge.length });
+        return res.status(200).json({ skill_type, title, product_name, content, source_count: knowledge.length });
       }
 
       // ─── UPLOAD STORE DOC (with auto-processing) ───
@@ -977,14 +1005,22 @@ async function handler(req, res) {
 
         const category = await classifyDocument(text, filename, anthropic);
 
-        // Dedup: rename if same name exists in category
+        // Product identification for Products category
+        let productName = null;
+        if (category === 'Products') {
+          productName = await identifyProduct(text, filename, anthropic);
+        }
+
+        // Dedup: rename if same name exists in target folder
         const fBase = filename.includes('.') ? filename.slice(0, filename.lastIndexOf('.')) : filename;
         const fExt = filename.includes('.') ? filename.slice(filename.lastIndexOf('.')) : '';
-        const { data: existFiles } = await supabase.storage.from(DOCS_BUCKET).list(`${storeName}/${category}`);
+        const targetFolder = category === 'Products' && productName && productName !== 'General'
+          ? `${storeName}/Products/${productName}` : `${storeName}/${category}`;
+        const { data: existFiles } = await supabase.storage.from(DOCS_BUCKET).list(targetFolder);
         const destName = existFiles?.some((f) => f.name === filename) ? `${fBase}_${Date.now()}${fExt}` : filename;
 
         // Move
-        const destPath = `${storeName}/${category}/${destName}`;
+        const destPath = `${targetFolder}/${destName}`;
         await supabase.storage.from(DOCS_BUCKET).upload(destPath, Buffer.from(buffer), { upsert: true });
         await supabase.storage.from(DOCS_BUCKET).remove([filePath]);
 
@@ -995,16 +1031,17 @@ async function handler(req, res) {
           insightsCount = (insightsText.match(/^[-•*]/gm) || []).length;
           await supabase.from('store_knowledge').insert({
             store_id, source_file: destName, category, insights: insightsText,
+            product_name: productName && productName !== 'General' ? productName : null,
           });
         }
 
         await supabase.from('pipeline_log').insert({
           store_id, agent: 'DOC_PROCESSOR',
-          message: `Processed "${filename}" → ${category}`,
-          level: 'info', metadata: { filename: destName, category, insights_count: insightsCount },
+          message: `Processed "${filename}" → ${category}${productName ? ` (${productName})` : ''}`,
+          level: 'info', metadata: { filename: destName, category, product_name: productName, insights_count: insightsCount },
         });
 
-        return res.status(200).json({ filename, category, insights_count: insightsCount });
+        return res.status(200).json({ filename, category, product_name: productName, insights_count: insightsCount });
       }
 
       // ─── PROCESS INBOX (batch — legacy) ───

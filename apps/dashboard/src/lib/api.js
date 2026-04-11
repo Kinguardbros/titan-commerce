@@ -323,10 +323,10 @@ export function generateSkills(storeId) {
   });
 }
 
-export function regenerateSkill(storeId, skillType) {
+export function regenerateSkill(storeId, skillType, productName = null) {
   return fetchJSON('/api/system?action=regenerate_skill', {
     method: 'POST',
-    body: JSON.stringify({ store_id: storeId, skill_type: skillType }),
+    body: JSON.stringify({ store_id: storeId, skill_type: skillType, product_name: productName }),
   });
 }
 

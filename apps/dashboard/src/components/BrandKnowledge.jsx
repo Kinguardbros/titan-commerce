@@ -7,7 +7,6 @@ const SKILL_ICONS = {
   'ad-hooks': '\u{1F3AF}',
   'creative-direction': '\u{1F3A8}',
   'audience-personas': '\u{1F465}',
-  'product-knowledge': '\u{1F4E6}',
   'brand-voice': '\u{1F4AC}',
 };
 
@@ -15,7 +14,6 @@ const SKILL_DESCRIPTIONS = {
   'ad-hooks': 'Winning hooks, ad copy patterns, CTA styles',
   'creative-direction': 'Visual rules, testing framework, KPI benchmarks',
   'audience-personas': 'Personas, pain points, triggers, customer language',
-  'product-knowledge': 'Unique mechanism, features, belief statements',
   'brand-voice': 'Positioning, tone rules, messaging do/don\'t',
 };
 
@@ -56,11 +54,11 @@ export default function BrandKnowledge({ storeId, storeName }) {
     }
   };
 
-  const handleRegenerate = async (skillType) => {
+  const handleRegenerate = async (skillType, productName) => {
     setRegenerating(skillType);
     try {
-      await regenerateSkill(storeId, skillType);
-      toast.success(`Regenerated ${skillType}`);
+      await regenerateSkill(storeId, skillType, productName);
+      toast.success(`Regenerated ${productName || skillType}`);
       fetchSkills();
     } catch (err) {
       toast.error(`Failed: ${err.message}`);
@@ -81,13 +79,15 @@ export default function BrandKnowledge({ storeId, storeName }) {
 
   if (loading) return null;
 
+  const storeSkills = skills.filter((s) => !s.product_name);
+  const productSkills = skills.filter((s) => !!s.product_name);
   const totalSources = skills.reduce((s, sk) => s + (sk.source_count || 0), 0);
 
   return (
     <div className="bk-section">
       <div className="bk-header">
         <div>
-          <div className="bk-title">Brand Knowledge</div>
+          <div className="bk-title">Skills</div>
           {skills.length > 0 && (
             <div className="bk-subtitle">{skills.length} skills from {totalSources} documents</div>
           )}
@@ -105,51 +105,72 @@ export default function BrandKnowledge({ storeId, storeName }) {
 
       {skills.length === 0 && categories.length > 0 && (
         <div className="bk-empty">
-          {categories.length} document categories available. Click Generate Skills to compile brand knowledge.
+          {categories.length} document categories available. Click Generate Skills to compile.
         </div>
       )}
 
-      {skills.length > 0 && (
+      {/* Store-level skills */}
+      {storeSkills.length > 0 && (
         <div className="bk-cards">
-          {skills.map((skill) => {
-            const isExpanded = expandedSkill === skill.skill_type;
-            const isRegen = regenerating === skill.skill_type;
-            const icon = SKILL_ICONS[skill.skill_type] || '\u{1F4CB}';
-            const desc = SKILL_DESCRIPTIONS[skill.skill_type] || '';
-            const age = getTimeAgo(skill.generated_at);
+          {storeSkills.map((skill) => (
+            <SkillCard key={skill.skill_type} skill={skill}
+              expanded={expandedSkill === skill.skill_type}
+              regenerating={regenerating === skill.skill_type}
+              onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
+              onRegenerate={() => handleRegenerate(skill.skill_type, null)}
+              onExport={() => handleExport(skill)} />
+          ))}
+        </div>
+      )}
 
-            return (
-              <div key={skill.skill_type} className="bk-card">
-                <div className="bk-card-header">
-                  <div className="bk-card-left">
-                    <span className="bk-card-icon">{icon}</span>
-                    <div>
-                      <div className="bk-card-title">{skill.title}</div>
-                      <div className="bk-card-desc">{desc}</div>
-                    </div>
-                  </div>
-                  <div className="bk-card-actions">
-                    <button className="bk-card-btn" onClick={() => setExpandedSkill(isExpanded ? null : skill.skill_type)}>
-                      {isExpanded ? 'Close' : 'View'}
-                    </button>
-                    <button className="bk-card-btn" onClick={() => handleRegenerate(skill.skill_type)} disabled={isRegen}>
-                      {isRegen ? '...' : 'Regen'}
-                    </button>
-                    <button className="bk-card-btn" onClick={() => handleExport(skill)}>MD</button>
-                  </div>
-                </div>
-                <div className="bk-card-meta">
-                  <span>{skill.source_count} source{skill.source_count !== 1 ? 's' : ''}</span>
-                  <span>{age}</span>
-                </div>
-                {isExpanded && (
-                  <div className="bk-card-content">
-                    <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+      {/* Product-level skills */}
+      {productSkills.length > 0 && (
+        <>
+          <div className="bk-product-heading">Product Skills</div>
+          <div className="bk-cards">
+            {productSkills.map((skill) => (
+              <SkillCard key={skill.skill_type} skill={skill} isProduct
+                expanded={expandedSkill === skill.skill_type}
+                regenerating={regenerating === skill.skill_type}
+                onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
+                onRegenerate={() => handleRegenerate(skill.skill_type, skill.product_name)}
+                onExport={() => handleExport(skill)} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onExport, isProduct }) {
+  const icon = isProduct ? '\u{1F4E6}' : (SKILL_ICONS[skill.skill_type] || '\u{1F4CB}');
+  const desc = isProduct ? `Product-specific knowledge` : (SKILL_DESCRIPTIONS[skill.skill_type] || '');
+  const age = getTimeAgo(skill.generated_at);
+
+  return (
+    <div className="bk-card">
+      <div className="bk-card-header">
+        <div className="bk-card-left">
+          <span className="bk-card-icon">{icon}</span>
+          <div>
+            <div className="bk-card-title">{skill.title}</div>
+            <div className="bk-card-desc">{desc}</div>
+          </div>
+        </div>
+        <div className="bk-card-actions">
+          <button className="bk-card-btn" onClick={onToggle}>{expanded ? 'Close' : 'View'}</button>
+          <button className="bk-card-btn" onClick={onRegenerate} disabled={regenerating}>{regenerating ? '...' : 'Regen'}</button>
+          <button className="bk-card-btn" onClick={onExport}>MD</button>
+        </div>
+      </div>
+      <div className="bk-card-meta">
+        <span>{skill.source_count} source{skill.source_count !== 1 ? 's' : ''}</span>
+        <span>{age}</span>
+      </div>
+      {expanded && (
+        <div className="bk-card-content">
+          <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
         </div>
       )}
     </div>

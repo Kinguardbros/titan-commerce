@@ -25,6 +25,12 @@
   background: var(--deep); border: 1px dashed var(--edge); border-radius: 10px;
 }
 
+/* Product heading */
+.bk-product-heading {
+  font-family: var(--mono); font-size: 10px; color: var(--text4);
+  letter-spacing: 1.5px; text-transform: uppercase; margin: 16px 0 8px;
+}
+
 /* Skill cards */
 .bk-cards { display: flex; flex-direction: column; gap: 8px; }
 
