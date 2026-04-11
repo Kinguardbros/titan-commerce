@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { generateCreatives, convertToVideo, getSkills } from '../lib/api';
+import { useState, useEffect, useMemo } from 'react';
+import { generateCreatives, convertToVideo, getSkills, getProductDetail } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './GeneratePanel.css';
 
@@ -36,9 +36,29 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
   const [selectedSource, setSelectedSource] = useState(null);
   const [audience, setAudience] = useState('auto');
   const [personas, setPersonas] = useState([]);
+  const [selectedColor, setSelectedColor] = useState('All colors');
+  const [colors, setColors] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [failed, setFailed] = useState(0);
+
+  // Load product colors from Shopify variants
+  useEffect(() => {
+    const sid = storeId || product?.store_id;
+    if (!sid || !product?.id) return;
+    getProductDetail(sid, product.id).then((data) => {
+      if (!data?.product?.variants) return;
+      const sizes = new Set(['S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', 'XS', 'OS', 'One Size']);
+      const colorSet = new Set();
+      for (const v of data.product.variants) {
+        // Color is usually option1 or option2 — pick the one that isn't a size
+        for (const opt of [v.option1, v.option2, v.option3]) {
+          if (opt && !sizes.has(opt)) colorSet.add(opt);
+        }
+      }
+      if (colorSet.size > 0) setColors(['All colors', ...colorSet]);
+    }).catch(() => {});
+  }, [storeId, product?.id, product?.store_id]);
 
   // Load personas from audience-personas skill
   useEffect(() => {
@@ -87,7 +107,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
           store_id: storeId || product.store_id,
           style,
           ai_model: aiModel,
-          custom_prompt: customPrompt,
+          custom_prompt: (selectedColor !== 'All colors' ? `Product color: ${selectedColor}. The product MUST be in this exact color variant.\n` : '') + (customPrompt || ''),
           show_model: showModel,
           text_overlay: textOverlay,
           overlay_text: overlayText,
@@ -193,6 +213,16 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
                 <option key={m.key} value={m.key} disabled={m.disabled}>{m.label} — {m.desc}</option>
               ))}
             </select>
+
+            {/* Color picker */}
+            {colors.length > 1 && (
+              <>
+                <div className="gp-section">Color</div>
+                <select className="gp-audience-select" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} disabled={generating}>
+                  {colors.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </>
+            )}
 
             <div className="gp-section">Subject</div>
             <div className="gp-toggle">
