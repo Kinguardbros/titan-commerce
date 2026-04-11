@@ -741,7 +741,7 @@ async function handler(req, res) {
             role: 'user',
             content: [
               { type: 'image', source: { type: 'url', url: image_url } },
-              { type: 'text', text: 'Extract the size chart from this image. Return ONLY CSV format with no markdown or code fences: first line is headers separated by commas, each following line is one size row separated by commas. Example:\nSize, US, Bust (in), Waist (in)\nS, 4-6, 34-35, 27-28\nM, 8-10, 36-37, 29-30' },
+              { type: 'text', text: 'Extract the size chart from this image.\nIf sizes are in COLUMNS (horizontal), transpose them to ROWS.\nAlways return CSV format where each ROW is one size:\n\nFirst line = headers: Size, [measurement names]\nEach next line = one size with values.\n\nExample output:\nSize, Bust (cm), Waist (cm), Hips (cm)\nS, 86, 66, 91\nM, 90, 70, 95\nL, 94, 74, 99\n\nHandle transposed tables, multiple sections, and merged cells.\nReturn ONLY the CSV text, nothing else.' },
             ],
           }],
         });
