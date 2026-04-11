@@ -8,6 +8,13 @@ const SKILL_ICONS = {
   'creative-direction': '\u{1F3A8}',
   'audience-personas': '\u{1F465}',
   'brand-voice': '\u{1F4AC}',
+  'product-photo': '\u{1F4F7}',
+  'lifestyle-photo': '\u{1F334}',
+  'ad-creative': '\u{1F4E2}',
+  'ugc-content': '\u{1F933}',
+  'banner-design': '\u{1F5BC}',
+  'video-direction': '\u{1F3AC}',
+  'social-content': '\u{1F4F1}',
 };
 
 const SKILL_DESCRIPTIONS = {
@@ -15,7 +22,17 @@ const SKILL_DESCRIPTIONS = {
   'creative-direction': 'Visual rules, testing framework, KPI benchmarks',
   'audience-personas': 'Personas, pain points, triggers, customer language',
   'brand-voice': 'Positioning, tone rules, messaging do/don\'t',
+  'product-photo': 'Product photography rules',
+  'lifestyle-photo': 'Lifestyle photo direction',
+  'ad-creative': 'Ad creative composition rules',
+  'ugc-content': 'UGC & review content style',
+  'banner-design': 'Banner layout & branding',
+  'video-direction': 'Video creative direction',
+  'social-content': 'Social media content style',
 };
+
+const STORE_SKILL_TYPES = ['ad-hooks', 'audience-personas', 'brand-voice', 'creative-direction'];
+const STUDIO_SKILL_TYPES = ['product-photo', 'lifestyle-photo', 'ad-creative', 'ugc-content', 'banner-design', 'video-direction', 'social-content'];
 
 export default function BrandKnowledge({ storeId, storeName }) {
   const toast = useToast();
@@ -79,7 +96,8 @@ export default function BrandKnowledge({ storeId, storeName }) {
 
   if (loading) return null;
 
-  const storeSkills = skills.filter((s) => !s.product_name);
+  const storeSkills = skills.filter((s) => !s.product_name && STORE_SKILL_TYPES.includes(s.skill_type));
+  const studioSkills = skills.filter((s) => !s.product_name && STUDIO_SKILL_TYPES.includes(s.skill_type));
   const productSkills = skills.filter((s) => !!s.product_name);
   const totalSources = skills.reduce((s, sk) => s + (sk.source_count || 0), 0);
 
@@ -121,6 +139,35 @@ export default function BrandKnowledge({ storeId, storeName }) {
               onExport={() => handleExport(skill)} />
           ))}
         </div>
+      )}
+
+      {/* Studio skills */}
+      {studioSkills.length > 0 && (
+        <>
+          <div className="bk-product-heading">Studio Skills</div>
+          <div className="bk-cards">
+            {studioSkills.map((skill) => (
+              <SkillCard key={skill.skill_type} skill={skill}
+                expanded={expandedSkill === skill.skill_type}
+                regenerating={regenerating === skill.skill_type}
+                onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
+                onRegenerate={() => handleRegenerate(skill.skill_type, null)}
+                onExport={() => handleExport(skill)} />
+            ))}
+            {/* Show placeholders for missing studio skills */}
+            {STUDIO_SKILL_TYPES.filter((t) => !studioSkills.some((s) => s.skill_type === t)).map((type) => (
+              <div key={type} className="bk-card bk-card--empty">
+                <div className="bk-card-left">
+                  <span className="bk-card-icon">{SKILL_ICONS[type]}</span>
+                  <div>
+                    <div className="bk-card-title bk-card-title--muted">{SKILL_DESCRIPTIONS[type]}</div>
+                    <div className="bk-card-desc">Not generated yet</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* Product-level skills */}

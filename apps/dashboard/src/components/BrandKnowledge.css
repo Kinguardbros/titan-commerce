@@ -39,6 +39,9 @@
   padding: 14px 16px; transition: border-color .2s;
 }
 .bk-card:hover { border-color: var(--edge2); }
+.bk-card--empty { opacity: .5; padding: 10px 16px; }
+.bk-card--empty .bk-card-left { display: flex; align-items: center; gap: 10px; }
+.bk-card-title--muted { color: var(--text4); }
 
 .bk-card-header {
   display: flex; justify-content: space-between; align-items: center; gap: 12px;

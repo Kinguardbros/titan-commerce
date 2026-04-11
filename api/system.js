@@ -814,6 +814,55 @@ async function handler(req, res) {
           results.push({ skill_type: mapping.type, title: mapping.title, source_count: insightsList.length });
         }
 
+        // Per-function studio skills (split from Creative insights)
+        if (storeLevel.Creative?.length) {
+          const creativeText = storeLevel.Creative.join('\n\n');
+          const FUNC_SKILLS = [
+            { type: 'product-photo', title: 'Product Photo', prompt: 'Rules for product photography: backgrounds, lighting, angles, props, product styling' },
+            { type: 'lifestyle-photo', title: 'Lifestyle Photo', prompt: 'Rules for lifestyle photos: settings, model type/age/body, mood, colors, scenarios' },
+            { type: 'ad-creative', title: 'Ad Creative', prompt: 'Rules for ad creatives: composition, text placement, hook style, before/after, social proof' },
+            { type: 'ugc-content', title: 'UGC Content', prompt: 'Rules for UGC/review content: authenticity cues, smartphone look, testimonial style' },
+          ];
+          const splitResponse = await anthropic.messages.create({
+            model: 'claude-sonnet-4-20250514', max_tokens: 4000,
+            messages: [{ role: 'user', content: `From these creative insights for "${store.name}", split the rules by generation type. For each type that has relevant rules, output a section. Skip types with no relevant data.
+
+Types:
+${FUNC_SKILLS.map((f) => `- ${f.type}: ${f.prompt}`).join('\n')}
+
+Source insights:
+${creativeText.slice(0, 8000)}
+
+Output format — use EXACTLY these headers:
+## product-photo
+(rules here)
+
+## lifestyle-photo
+(rules here)
+
+## ad-creative
+(rules here)
+
+## ugc-content
+(rules here)
+
+Only include sections that have specific, actionable rules from the sources.` }],
+          });
+
+          const splitText = splitResponse.content[0].text;
+          for (const func of FUNC_SKILLS) {
+            const regex = new RegExp(`## ${func.type}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+            const match = splitText.match(regex);
+            if (match?.[1]?.trim()) {
+              await supabase.from('store_skills').upsert({
+                store_id, skill_type: func.type, title: func.title, product_name: null,
+                content: match[1].trim(), source_count: storeLevel.Creative.length, generated_at: new Date().toISOString(),
+              }, { onConflict: 'store_id,skill_type,product_name' });
+              results.push({ skill_type: func.type, title: func.title, source_count: storeLevel.Creative.length });
+            }
+          }
+        }
+
         // Per-product skills
         for (const [productName, insightsList] of Object.entries(productLevel)) {
           const skillType = `product-${productName.toLowerCase().replace(/\s+/g, '-')}`;
@@ -852,6 +901,10 @@ async function handler(req, res) {
           'creative-direction': { category: 'Creative', title: 'Creative Direction', prompt: `From these creative playbooks for "${store.name}", extract: visual rules, what works vs doesn't, testing framework, KPI benchmarks.` },
           'audience-personas': { category: 'Audience', title: 'Audience Personas', prompt: `From these audience docs for "${store.name}", extract: detailed personas, pain points, objections, trigger phrases, customer language.` },
           'brand-voice': { category: 'Brand', title: 'Brand Voice', prompt: `From these brand docs for "${store.name}", extract: positioning, voice & tone rules, messaging do/don't, taglines.` },
+          'product-photo': { category: 'Creative', title: 'Product Photo', prompt: `From these creative docs for "${store.name}", extract rules for product photography: backgrounds, lighting, angles, props, product styling.` },
+          'lifestyle-photo': { category: 'Creative', title: 'Lifestyle Photo', prompt: `From these creative docs for "${store.name}", extract rules for lifestyle photos: settings, model type/age/body, mood, colors, scenarios.` },
+          'ad-creative': { category: 'Creative', title: 'Ad Creative', prompt: `From these creative docs for "${store.name}", extract rules for ad creatives: composition, text placement, hook style, before/after, social proof.` },
+          'ugc-content': { category: 'Creative', title: 'UGC Content', prompt: `From these creative docs for "${store.name}", extract rules for UGC/review content: authenticity, smartphone look, testimonial style.` },
         };
 
         const Anthropic = (await import('@anthropic-ai/sdk')).default;
