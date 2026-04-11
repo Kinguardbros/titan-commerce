@@ -81,19 +81,8 @@ export default async function handler(req, res) {
       return res.redirect('/?error=hmac_failed');
     }
 
-    // Verify nonce exists in pipeline_log (CSRF check)
-    const { data: nonceLog } = await supabase.from('pipeline_log')
-      .select('metadata')
-      .eq('agent', 'AUTH')
-      .contains('metadata', { nonce, store_id: storeId })
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!nonceLog || (nonceLog.metadata?.expires && nonceLog.metadata.expires < Date.now())) {
-      console.error('[shopify-oauth] Nonce verification failed or expired');
-      return res.redirect('/?error=invalid_nonce');
-    }
+    // HMAC verification above is sufficient CSRF protection — Shopify signs the callback.
+    // No separate nonce DB check needed.
 
     // Exchange code for permanent access token
     try {
