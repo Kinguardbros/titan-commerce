@@ -320,6 +320,11 @@ export function uploadStoreDoc(storeName, fileName, fileData) {
 }
 
 export function getStoreDocDownloadUrl(storeName, filePath) {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (supabaseUrl) {
+    return `${supabaseUrl}/storage/v1/object/public/store-docs/${encodeURIComponent(storeName)}/${filePath.split('/').map(encodeURIComponent).join('/')}`;
+  }
+  // Fallback to API proxy
   const token = localStorage.getItem('auth_token');
   return `/api/system?action=store_docs_download&store_name=${encodeURIComponent(storeName)}&file_path=${encodeURIComponent(filePath)}${token ? `&token=${token}` : ''}`;
 }

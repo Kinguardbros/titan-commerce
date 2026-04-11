@@ -7,8 +7,7 @@ import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
 import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
-import fs from 'fs';
-import path from 'path';
+const DOCS_BUCKET = 'store-docs';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -242,57 +241,48 @@ async function handler(req, res) {
         return res.status(200).json({ product: fullProduct, metafields });
       }
 
-      // ─── STORE DOCS (filesystem) ───
+      // ─── STORE DOCS (Supabase Storage) ───
       if (action === 'store_docs') {
         const storeName = req.query.store_name;
         if (!storeName) return res.status(400).json({ error: 'store_name required' });
 
-        const docsRoot = path.resolve(process.cwd(), 'Docs', 'Stores', storeName);
-        if (!fs.existsSync(docsRoot)) return res.status(200).json({ tree: [] });
-
-        function readTree(dir, rel = '') {
-          const entries = fs.readdirSync(dir, { withFileTypes: true })
-            .filter((e) => !e.name.startsWith('.'))
-            .sort((a, b) => (a.isDirectory() === b.isDirectory() ? a.name.localeCompare(b.name) : a.isDirectory() ? -1 : 1));
-          return entries.map((e) => {
-            const relPath = rel ? `${rel}/${e.name}` : e.name;
-            if (e.isDirectory()) {
-              return { name: e.name, type: 'folder', path: relPath, children: readTree(path.join(dir, e.name), relPath) };
+        async function listRecursive(prefix) {
+          const { data, error } = await supabase.storage.from(DOCS_BUCKET).list(prefix, { sortBy: { column: 'name', order: 'asc' } });
+          if (error || !data) return [];
+          const items = [];
+          for (const item of data) {
+            if (item.name === '.emptyFolderPlaceholder') continue;
+            const itemPath = prefix ? `${prefix}${item.name}` : item.name;
+            if (item.id === null) {
+              // folder
+              const children = await listRecursive(`${itemPath}/`);
+              items.push({ name: item.name, type: 'folder', path: itemPath, children });
+            } else {
+              const ext = item.name.includes('.') ? '.' + item.name.split('.').pop().toLowerCase() : '';
+              items.push({ name: item.name, type: 'file', path: itemPath, ext, size: item.metadata?.size || 0 });
             }
-            const ext = path.extname(e.name).toLowerCase();
-            const stat = fs.statSync(path.join(dir, e.name));
-            return { name: e.name, type: 'file', path: relPath, ext, size: stat.size };
-          });
+          }
+          // Sort: folders first, then files
+          items.sort((a, b) => a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'folder' ? -1 : 1);
+          return items;
         }
 
-        return res.status(200).json({ tree: readTree(docsRoot) });
+        const tree = await listRecursive(`${storeName}/`);
+        return res.status(200).json({ tree });
       }
 
-      // ─── STORE DOCS DOWNLOAD ───
+      // ─── STORE DOCS DOWNLOAD URL ───
       if (action === 'store_docs_download') {
         const storeName = req.query.store_name;
         const filePath = req.query.file_path;
         if (!storeName || !filePath) return res.status(400).json({ error: 'store_name and file_path required' });
 
-        // Prevent path traversal
-        const docsRoot = path.resolve(process.cwd(), 'Docs', 'Stores', storeName);
-        const fullPath = path.resolve(docsRoot, filePath);
-        if (!fullPath.startsWith(docsRoot)) return res.status(403).json({ error: 'Access denied' });
-        if (!fs.existsSync(fullPath)) return res.status(404).json({ error: 'File not found' });
+        // Path traversal check
+        if (filePath.includes('..')) return res.status(403).json({ error: 'Access denied' });
 
-        const ext = path.extname(fullPath).toLowerCase();
-        const mimeTypes = {
-          '.pdf': 'application/pdf', '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
-          '.csv': 'text/csv', '.txt': 'text/plain', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        };
-        const contentType = mimeTypes[ext] || 'application/octet-stream';
-        const fileName = path.basename(fullPath);
-
-        res.setHeader('Content-Type', contentType);
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-        const fileBuffer = fs.readFileSync(fullPath);
-        return res.send(fileBuffer);
+        const fullPath = `${storeName}/${filePath}`;
+        const { data } = supabase.storage.from(DOCS_BUCKET).getPublicUrl(fullPath);
+        return res.status(200).json({ url: data?.publicUrl });
       }
 
       // ─── META OVERVIEW ───
@@ -764,22 +754,25 @@ async function handler(req, res) {
 
         // Validate extension
         const allowed = ['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.txt', '.md', '.xlsx', '.csv', '.webp'];
-        const ext = path.extname(file_name).toLowerCase();
+        const ext = file_name.includes('.') ? '.' + file_name.split('.').pop().toLowerCase() : '';
         if (!allowed.includes(ext)) return res.status(400).json({ error: `File type ${ext} not allowed` });
 
         // Sanitize filename
         const safeName = file_name.replace(/[^a-zA-Z0-9._\-\s]/g, '_');
+        if (safeName.includes('..')) return res.status(403).json({ error: 'Access denied' });
 
-        const inboxDir = path.resolve(process.cwd(), 'Docs', 'Stores', store_name, 'Inbox');
-        if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
-
-        // Prevent path traversal
-        const fullPath = path.resolve(inboxDir, safeName);
-        if (!fullPath.startsWith(inboxDir)) return res.status(403).json({ error: 'Access denied' });
-
-        // Decode base64 and write
+        const storagePath = `${store_name}/Inbox/${safeName}`;
         const buffer = Buffer.from(file_data, 'base64');
-        fs.writeFileSync(fullPath, buffer);
+
+        const { error } = await supabase.storage.from(DOCS_BUCKET).upload(storagePath, buffer, {
+          upsert: true,
+          contentType: 'application/octet-stream',
+        });
+
+        if (error) {
+          console.error('[system/upload_store_doc] Storage error:', error);
+          return res.status(500).json({ error: `Upload failed: ${error.message}` });
+        }
 
         return res.status(200).json({ ok: true, path: `Inbox/${safeName}`, size: buffer.length });
       }
