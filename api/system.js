@@ -757,6 +757,33 @@ async function handler(req, res) {
         return res.status(200).json({ deleted, total_checked: stale?.length || 0 });
       }
 
+      // ─── UPLOAD STORE DOC ───
+      if (action === 'upload_store_doc') {
+        const { store_name, file_name, file_data } = req.body;
+        if (!store_name || !file_name || !file_data) return res.status(400).json({ error: 'store_name, file_name, and file_data (base64) required' });
+
+        // Validate extension
+        const allowed = ['.pdf', '.docx', '.png', '.jpg', '.jpeg', '.txt', '.md', '.xlsx', '.csv', '.webp'];
+        const ext = path.extname(file_name).toLowerCase();
+        if (!allowed.includes(ext)) return res.status(400).json({ error: `File type ${ext} not allowed` });
+
+        // Sanitize filename
+        const safeName = file_name.replace(/[^a-zA-Z0-9._\-\s]/g, '_');
+
+        const inboxDir = path.resolve(process.cwd(), 'Docs', 'Stores', store_name, 'Inbox');
+        if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+
+        // Prevent path traversal
+        const fullPath = path.resolve(inboxDir, safeName);
+        if (!fullPath.startsWith(inboxDir)) return res.status(403).json({ error: 'Access denied' });
+
+        // Decode base64 and write
+        const buffer = Buffer.from(file_data, 'base64');
+        fs.writeFileSync(fullPath, buffer);
+
+        return res.status(200).json({ ok: true, path: `Inbox/${safeName}`, size: buffer.length });
+      }
+
       // ─── SAVE SIZE CHART ───
       if (action === 'save_size_chart') {
         const { store_id, product_id, size_chart_text } = req.body;

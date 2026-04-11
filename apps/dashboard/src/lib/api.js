@@ -312,6 +312,13 @@ export function getStoreDocs(storeName) {
   return fetchJSON(`/api/system?action=store_docs&store_name=${encodeURIComponent(storeName)}`);
 }
 
+export function uploadStoreDoc(storeName, fileName, fileData) {
+  return fetchJSON('/api/system?action=upload_store_doc', {
+    method: 'POST',
+    body: JSON.stringify({ store_name: storeName, file_name: fileName, file_data: fileData }),
+  });
+}
+
 export function getStoreDocDownloadUrl(storeName, filePath) {
   const token = localStorage.getItem('auth_token');
   return `/api/system?action=store_docs_download&store_name=${encodeURIComponent(storeName)}&file_path=${encodeURIComponent(filePath)}${token ? `&token=${token}` : ''}`;

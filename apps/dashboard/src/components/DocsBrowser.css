@@ -11,12 +11,39 @@
   background: var(--deep); border: 1px dashed var(--edge); border-radius: 10px;
 }
 
+/* ══ DROP ZONE ══ */
+.db-dropzone {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; padding: 24px;
+  background: var(--deep); border: 2px dashed var(--edge); border-radius: 12px;
+  margin-bottom: 12px; transition: all .2s; cursor: default;
+  min-height: 100px;
+}
+.db-dropzone--active {
+  border-color: var(--gold); background: rgba(201,168,76,.05);
+}
+.db-dropzone--uploading {
+  border-color: var(--azure); background: rgba(96,165,250,.05);
+}
+.db-drop-icon { font-size: 24px; opacity: .7; }
+.db-drop-text {
+  font-family: var(--sans); font-size: 12px; color: var(--text3);
+}
+.db-drop-browse {
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 8px;
+  padding: 6px 16px; font-family: var(--mono); font-size: 10px; color: var(--text2);
+  cursor: pointer; transition: all .2s;
+}
+.db-drop-browse:hover { border-color: var(--gold); color: var(--gold); }
+.db-drop-hint {
+  font-family: var(--mono); font-size: 9px; color: var(--text4); letter-spacing: .3px;
+}
+
+/* ══ TREE ══ */
 .db-tree {
   background: var(--deep); border: 1px solid var(--edge); border-radius: 10px;
   overflow: hidden;
 }
-
-.db-node { }
 
 .db-row {
   display: flex; align-items: center; gap: 8px;
@@ -49,6 +76,9 @@
   font-family: var(--mono); font-size: 9px; color: var(--text4);
   background: var(--surface); padding: 1px 6px; border-radius: 8px;
 }
+.db-count--new {
+  color: var(--emerald); background: var(--emerald-glow);
+}
 
 .db-size {
   font-family: var(--mono); font-size: 9px; color: var(--text4);
@@ -57,4 +87,6 @@
 
 @media (max-width: 600px) {
   .db-row { padding: 10px 12px; min-height: 40px; }
+  .db-dropzone { padding: 20px; }
+  .db-drop-browse { min-height: 36px; }
 }
