@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { generateCreatives, convertToVideo } from '../lib/api';
+import { useState, useEffect } from 'react';
+import { generateCreatives, convertToVideo, getSkills } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './GeneratePanel.css';
+
+const STYLES_WITH_MODEL = ['ad_creative', 'lifestyle', 'review_ugc', 'product_photo_beach', 'static_split', 'static_urgency'];
 
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creative', desc: 'Campaign-ready Meta ad — studio lighting, gold tones', group: 'Custom' },
@@ -24,9 +26,29 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
   const [overlayText, setOverlayText] = useState('');
   const [videoSource, setVideoSource] = useState('from_image'); // from_image | generate_new
   const [selectedSource, setSelectedSource] = useState(null);
+  const [audience, setAudience] = useState('auto');
+  const [personas, setPersonas] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [completed, setCompleted] = useState(0);
   const [failed, setFailed] = useState(0);
+
+  // Load personas from audience-personas skill
+  useEffect(() => {
+    if (!product?.store_id) return;
+    getSkills(product.store_id).then((data) => {
+      const audienceSkill = (data.skills || []).find((s) => s.skill_type === 'audience-personas');
+      if (audienceSkill?.content) {
+        // Parse personas: "### Maria (42) — The Hiding Mom" or "**Maria (42)** — The Hiding Mom"
+        const parsed = [];
+        const regex = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
+        let m;
+        while ((m = regex.exec(audienceSkill.content)) !== null) {
+          parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, '') });
+        }
+        if (parsed.length) setPersonas(parsed);
+      }
+    }).catch(() => {});
+  }, [product?.store_id]);
 
   const isVideo = mode === 'video';
   const sourceImages = creatives.filter((c) => c.format === 'image' && (c.status === 'approved' || c.status === 'pending') && c.file_url);
@@ -59,6 +81,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
           show_model: showModel,
           text_overlay: textOverlay,
           overlay_text: overlayText,
+          audience: audience !== 'auto' ? audience : undefined,
         })
           .then((data) => { setCompleted((p) => p + 1); results.push(data); })
           .catch((err) => { setFailed((p) => p + 1); toast.error(`Generation failed: ${err.message}`); })
@@ -163,6 +186,19 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
                 Product Only
               </button>
             </div>
+
+            {/* Audience picker — only for styles with model */}
+            {STYLES_WITH_MODEL.includes(style) && personas.length > 0 && (
+              <>
+                <div className="gp-section">Audience</div>
+                <select className="gp-audience-select" value={audience} onChange={(e) => setAudience(e.target.value)} disabled={generating}>
+                  <option value="auto">Auto — best match</option>
+                  {personas.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name} ({p.age}) — {p.label}</option>
+                  ))}
+                </select>
+              </>
+            )}
 
             <div className="gp-section">Text in Image</div>
             <div className="gp-toggle gp-toggle--triple">
