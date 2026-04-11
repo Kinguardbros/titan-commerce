@@ -146,6 +146,9 @@ async function handler(req, res) {
       storeId: store_id,
     });
 
+    // Debug: log prompt to verify skills are loaded
+    console.log('[generate] Prompt length:', prompt.length, 'Contains NO BRANDING:', prompt.includes('NO BRANDING'), 'Contains STRICT:', prompt.includes('STRICT'), 'Contains text-free:', prompt.includes('text-free'));
+
     // Route by selected AI model
     let imageUrl;
     let requestId = null;
