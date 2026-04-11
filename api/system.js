@@ -786,6 +786,9 @@ async function handler(req, res) {
             if (text) {
               const category = await classifyDocument(text, safeName, anthropic);
 
+              // Dedup: remove old file + insights if same name exists in category
+              await supabase.from('store_knowledge').delete().eq('store_id', store_id).eq('source_file', safeName);
+
               // Move to category folder
               const destPath = `${store_name}/${category}/${safeName}`;
               await supabase.storage.from(DOCS_BUCKET).upload(destPath, buffer, { upsert: true });
@@ -864,6 +867,9 @@ async function handler(req, res) {
 
             // Classify
             const category = await classifyDocument(text, file.name, anthropic);
+
+            // Dedup: remove old insights if same file was processed before
+            await supabase.from('store_knowledge').delete().eq('store_id', store_id).eq('source_file', file.name);
 
             // Move file: copy to category folder, delete from Inbox
             const destPath = `${storeName}/${category}/${file.name}`;
