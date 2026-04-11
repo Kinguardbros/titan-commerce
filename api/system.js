@@ -851,7 +851,7 @@ Only include sections that have specific, actionable rules from the sources.` }]
 
           const splitText = splitResponse.content[0].text;
           for (const func of FUNC_SKILLS) {
-            const regex = new RegExp(`## ${func.type}\\n([\\s\\S]*?)(?=\\n## |$)`, 'i');
+            const regex = new RegExp(`##\\s*${func.type}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, 'i');
             const match = splitText.match(regex);
             if (match?.[1]?.trim()) {
               await supabase.from('store_skills').upsert({

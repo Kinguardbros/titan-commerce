@@ -110,11 +110,9 @@ export default function BrandKnowledge({ storeId, storeName }) {
             <div className="bk-subtitle">{skills.length} skills from {totalSources} documents</div>
           )}
         </div>
-        {(categories.length > 0 || skills.length > 0) && (
-          <button className="bk-generate-btn" onClick={handleGenerateAll} disabled={generating}>
-            {generating ? 'Generating...' : skills.length > 0 ? 'Regenerate All' : 'Generate Skills'}
-          </button>
-        )}
+        <button className="bk-generate-btn" onClick={handleGenerateAll} disabled={generating}>
+          {generating ? 'Generating...' : skills.length > 0 ? 'Regenerate All' : 'Generate Skills'}
+        </button>
       </div>
 
       {skills.length === 0 && categories.length === 0 && (
