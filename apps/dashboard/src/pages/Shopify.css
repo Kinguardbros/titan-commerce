@@ -1,6 +1,18 @@
 .sh-page {}
-.sh-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.sh-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .sh-title { font-size: 16px; }
+
+/* Sub-tabs */
+.sh-sub-tabs { display: flex; gap: 4px; margin-left: auto; }
+.sh-sub-tab {
+  background: transparent; border: 1px solid var(--edge); border-radius: 8px;
+  padding: 6px 16px; font-family: var(--mono); font-size: 10px; color: var(--text4);
+  cursor: pointer; transition: all .2s; letter-spacing: .3px;
+}
+.sh-sub-tab:hover { border-color: var(--edge2); color: var(--text2); }
+.sh-sub-tab--active { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
+
+.sh-knowledge { }
 .sh-periods { display: flex; gap: 4px; margin-left: auto; }
 .sh-period {
   background: transparent; border: 1px solid var(--edge); border-radius: 6px;
@@ -147,6 +159,8 @@
 @media (max-width: 600px) {
   .sh-kpis { grid-template-columns: 1fr; }
   .sh-header { flex-wrap: wrap; gap: 8px; }
+  .sh-sub-tabs { margin-left: 0; width: 100%; }
+  .sh-sub-tab { flex: 1; text-align: center; min-height: 40px; display: flex; align-items: center; justify-content: center; }
   .sh-periods { margin-left: 0; flex-wrap: wrap; }
   .sh-period { min-height: 44px; display: flex; align-items: center; padding: 8px 14px; }
   .sh-bottom { grid-template-columns: 1fr; }

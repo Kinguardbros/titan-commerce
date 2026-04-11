@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import ShopifyDashboard from '../components/ShopifyDashboard';
-import { getAllProducts, bulkUpdatePrices, getShopifyOverview } from '../lib/api';
+import { getAllProducts, bulkUpdatePrices } from '../lib/api';
 import DocsBrowser from '../components/DocsBrowser';
 import BrandKnowledge from '../components/BrandKnowledge';
 import { useToast } from '../hooks/useToast.jsx';
 import './Shopify.css';
 
+const SUB_TABS = [
+  { key: 'dashboard', label: 'Dashboard' },
+  { key: 'knowledge', label: 'Knowledge' },
+  { key: 'pricing', label: 'Pricing' },
+];
+
 export default function Shopify({ onNavigateToProduct, storeId, store }) {
   const toast = useToast();
   const hasAdmin = !!store?.admin_token;
+  const [subTab, setSubTab] = useState('dashboard');
 
   // Pricing state
   const [products, setProducts] = useState([]);
@@ -19,9 +26,9 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [search, setSearch] = useState('');
 
-  // Load products + collections for pricing (single call)
+  // Load products for pricing tab
   useEffect(() => {
-    if (storeId && hasAdmin) {
+    if (storeId && hasAdmin && subTab === 'pricing') {
       getAllProducts(storeId).then((prods) => {
         setProducts(prods || []);
         const colSet = new Set();
@@ -32,7 +39,7 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
         setCollections(['all', ...Array.from(colSet).sort()]);
       }).catch(() => {});
     }
-  }, [storeId, hasAdmin]);
+  }, [storeId, hasAdmin, subTab]);
 
   const toggleSelect = (id) => {
     setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -64,16 +71,32 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
     <div className="sh-page">
       <div className="sh-header">
         <div className="sh-title gradient-heading">Shopify</div>
+        <div className="sh-sub-tabs">
+          {SUB_TABS.map((t) => (
+            <button key={t.key} className={`sh-sub-tab${subTab === t.key ? ' sh-sub-tab--active' : ''}`}
+              onClick={() => setSubTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Dashboard section */}
-      <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
+      {/* Dashboard */}
+      {subTab === 'dashboard' && (
+        <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
+      )}
 
-      {/* Pricing section — below dashboard */}
-      {hasAdmin && (
-        <div className="sh-pricing-section" id="pricing-section">
-          <div className="sh-pricing-title gradient-heading">Pricing</div>
+      {/* Knowledge */}
+      {subTab === 'knowledge' && (
+        <div className="sh-knowledge">
+          <BrandKnowledge storeId={storeId} storeName={store?.name} />
+          {store?.name && <DocsBrowser storeName={store.name} storeId={storeId} />}
+        </div>
+      )}
 
+      {/* Pricing */}
+      {subTab === 'pricing' && hasAdmin && (
+        <div className="sh-pricing-section">
           <div className="sh-pricing-controls">
             <select className="sh-pricing-select" value={collectionFilter} onChange={(e) => setCollectionFilter(e.target.value)}>
               {collections.map((c) => <option key={c} value={c}>{c === 'all' ? 'All Collections' : c}</option>)}
@@ -109,11 +132,9 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
         </div>
       )}
 
-      {/* Brand Knowledge */}
-      {storeId && <BrandKnowledge storeId={storeId} storeName={store?.name} />}
-
-      {/* Docs browser */}
-      {store?.name && <DocsBrowser storeName={store.name} storeId={storeId} />}
+      {subTab === 'pricing' && !hasAdmin && (
+        <div className="sh-pricing-empty">Connect Shopify Admin to manage pricing</div>
+      )}
     </div>
   );
 }
