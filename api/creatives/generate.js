@@ -47,7 +47,7 @@ async function submitJob(prompt, imageUrls) {
       const res = await fetch(`https://platform.higgsfield.ai${endpoint}`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ params: { prompt, input_images, aspect_ratio: '1:1' } }),
+        body: JSON.stringify({ params: { prompt, input_images, aspect_ratio: '1:1', width_and_height: '1024x1024' } }),
       });
 
       if (res.status === 404) {
