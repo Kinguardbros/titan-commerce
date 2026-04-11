@@ -44,7 +44,7 @@ export default function BrandKnowledge({ storeId, storeName }) {
   const [expandedSkill, setExpandedSkill] = useState(null);
 
   const fetchSkills = useCallback(async () => {
-    if (!storeId) return;
+    if (!storeId) { setLoading(false); return; }
     try {
       const data = await getSkills(storeId);
       setSkills(data.skills || []);
@@ -94,7 +94,7 @@ export default function BrandKnowledge({ storeId, storeName }) {
     URL.revokeObjectURL(url);
   };
 
-  if (loading) return null;
+  if (loading) return <div className="bk-section"><div className="bk-title">Skills</div><div className="bk-empty">Loading...</div></div>;
 
   const storeSkills = skills.filter((s) => !s.product_name && STORE_SKILL_TYPES.includes(s.skill_type));
   const studioSkills = skills.filter((s) => !s.product_name && STUDIO_SKILL_TYPES.includes(s.skill_type));
