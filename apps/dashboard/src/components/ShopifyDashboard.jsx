@@ -9,7 +9,7 @@ const PERIODS = [
   { key: 90, label: '90D' },
 ];
 
-export default function ShopifyDashboard({ storeId, onNavigateToProduct }) {
+export default function ShopifyDashboard({ storeId, store, onNavigateToProduct }) {
   const [days, setDays] = useState(7);
   const { data, loading } = useShopifyOverview(days, storeId);
 
@@ -25,6 +25,12 @@ export default function ShopifyDashboard({ storeId, onNavigateToProduct }) {
       <div className="sdb-empty-icon">🔌</div>
       <div className="sdb-empty-title">Shopify Admin not connected</div>
       <div className="sdb-empty-desc">Connect your Shopify Admin API to see orders, revenue, and analytics.</div>
+      {store?.client_id && !store?.admin_token && (
+        <a href={`/api/auth/shopify?action=connect&store_id=${store.id}`} className="sdb-connect-btn">Connect Shopify Admin</a>
+      )}
+      {!store?.client_id && !store?.admin_token && (
+        <div className="sdb-empty-hint">Contact admin to set up Shopify connection for this store.</div>
+      )}
     </div>
   );
 

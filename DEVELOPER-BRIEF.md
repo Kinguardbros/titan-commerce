@@ -353,7 +353,179 @@ Ale: logovat VSECHNY zmeny do pipeline_log s before/after hodnotami pro audit tr
 
 ---
 
+---
+
+## URGENTNI: Shopify OAuth Flow — Connect button pro story bez admin tokenu
+
+### Problem
+Isola (a budouci nove story) nemaji admin_token protoze Shopify zrusil legacy custom apps. Token se musi ziskat pres OAuth flow. Ted Shopify tab ukazuje "Admin API not connected" BEZ tlacitka na pripojeni.
+
+### DB zmena — pridat OAuth credentials do stores
+
+```sql
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS client_id TEXT;
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS client_secret TEXT;
+
+-- Set credentials in Supabase SQL Editor (NOT in code):
+-- UPDATE stores SET client_id = '<client_id>', client_secret = '<secret>'
+-- WHERE slug = 'isola';
+```
+
+### Endpoint 1: `api/auth/shopify-connect.js` — NOVY
+
+Inicializuje OAuth flow. Frontend na nej redirectne uzivatele.
+
+```
+GET /api/auth/shopify-connect?store_id=uuid
+```
+
+Flow:
+1. Nacist store z DB (client_id, shopify_url)
+2. Vygenerovat random `state` nonce (CSRF ochrana) — ulozit do cookie nebo query
+3. Redirect uzivatele na:
+```
+https://{shopify_url}/admin/oauth/authorize
+  ?client_id={client_id}
+  &scope=read_all_orders,read_analytics,read_products,write_products,read_customers,read_inventory,read_orders,write_metaobjects,write_metaobject_definitions,read_metaobjects,read_metaobject_definitions,write_discounts,read_discounts,read_reports
+  &redirect_uri=https://titan-commerce.vercel.app/api/auth/shopify-callback
+  &state={nonce}
+```
+
+**POZOR:** Tento endpoint NESMI pouzivat `withAuth()` — je to redirect, ne API call. Ale state nonce musi byt overitelny.
+
+### Endpoint 2: `api/auth/shopify-callback.js` — NOVY
+
+Shopify redirectne sem po autorizaci. Vymeni code za permanent token.
+
+```
+GET /api/auth/shopify-callback?code=AUTH_CODE&shop=swimwear-brand.myshopify.com&state=NONCE&hmac=SIGNATURE
+```
+
+Flow:
+1. **Overit HMAC** — Shopify podepisuje callback. MUSI se overit:
+```js
+import crypto from 'crypto';
+
+function verifyHmac(query, secret) {
+  const { hmac, ...params } = query;
+  const message = Object.keys(params).sort()
+    .map(k => `${k}=${params[k]}`).join('&');
+  const digest = crypto.createHmac('sha256', secret)
+    .update(message).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
+}
+```
+
+2. **Overit state** — musi matchovat co jsme poslali v connect endpointu (CSRF)
+
+3. **Vymenit code za token:**
+```js
+const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    client_id: store.client_id,
+    client_secret: store.client_secret,
+    code: query.code,
+  }),
+});
+const { access_token } = await tokenResponse.json();
+// access_token = "shpat_xxxx..." — PERMANENT, no refresh needed
+```
+
+4. **Ulozit token do DB:**
+```js
+await supabase.from('stores')
+  .update({ admin_token: access_token })
+  .eq('shopify_url', shop);
+```
+
+5. **Pipeline log:**
+```js
+await supabase.from('pipeline_log').insert({
+  agent: 'AUTH', message: `Shopify Admin connected for ${shop}`, level: 'info'
+});
+```
+
+6. **Redirect zpet do dashboardu:**
+```js
+res.redirect('/?connected=true');
+// Frontend detekuje ?connected=true → toast "Shopify Admin connected!"
+```
+
+### Frontend — Connect button
+
+Vsude kde se ukazuje "Admin API not connected" pridat tlacitko:
+
+```jsx
+// V ShopifyDashboard, ShopifyPricing, nebo kdekoli je "not connected" placeholder:
+{!store.admin_token && store.client_id && (
+  <a href={`/api/auth/shopify-connect?store_id=${store.id}`} className="connect-btn">
+    Connect Shopify Admin →
+  </a>
+)}
+```
+
+**DULEZITE:** Je to `<a href>` (ne fetch) — protoze to je redirect na Shopify, ne API call.
+
+Pokud store nema ani `client_id` → zobrazit "Contact admin to set up Shopify connection".
+
+### Frontend — detekce uspesneho pripojeni
+
+V `App.jsx` nebo `useActiveStore`:
+```js
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('connected') === 'true') {
+    toast.success('Shopify Admin connected!');
+    window.history.replaceState({}, '', '/'); // vycistit URL
+    // Refresh stores data
+    refreshStores();
+  }
+}, []);
+```
+
+### Shopify Dev Dashboard nastaveni (MUSI UDELAT UZIVATEL)
+
+V Isola Dashboard app v Dev Dashboard:
+1. Configuration → **App URL:** `https://titan-commerce.vercel.app`
+2. Configuration → **Allowed redirection URL(s):** pridat `https://titan-commerce.vercel.app/api/auth/shopify-callback`
+
+BEZ TOHO callback neprojde — Shopify odmitne redirect na nepovoleny URL.
+
+### Bezpecnost
+- HMAC verifikace na callback (Shopify podepisuje)
+- State nonce pro CSRF ochranu
+- Token je PERMANENT — nepotrebuje refresh
+- Token se uklada jen do DB (nikdy v kodu, nikdy v env vars)
+- client_secret se drzi v DB (ne v kodu)
+
+### Soubory
+| Soubor | Akce |
+|--------|------|
+| `api/auth/shopify-connect.js` | **NOVY** — OAuth initiation redirect |
+| `api/auth/shopify-callback.js` | **NOVY** — OAuth callback, token exchange |
+| `sql/add-oauth-columns.sql` | **NOVY** — client_id, client_secret columns |
+| `components/ShopifyDashboard.jsx` | Edit — pridat Connect button |
+| `components/ShopifyPanel.jsx` | Edit — pridat Connect button |
+| `apps/dashboard/src/App.jsx` | Edit — detekce ?connected=true |
+| `lib/api.js` | Mozna — pokud potrebujes API call misto redirect |
+
+### Testovani
+1. Prepni na Isola v store switcher
+2. Shopify tab → vidis "Admin API not connected" + **[Connect Shopify Admin →]** button
+3. Klikni → redirect na Shopify → "Isola Dashboard wants access" → Approve
+4. Redirect zpet do Titan Commerce → toast "Shopify Admin connected!"
+5. Shopify tab ted ukazuje data (revenue, orders, products...)
+6. V DB: `stores.admin_token` pro Isola je naplneny (`shpat_...`)
+7. Size Chart, Pricing, Product Editor — vsechno funguje pro Isola
+
+---
+
 ## Poradi prace — DELEJ V TOMTO PORADI
+
+### Krok 0: OAuth Flow (URGENTNI — bez toho Isola nema admin pristup)
+DB migrace (client_id, client_secret). Vytvorit `api/auth/shopify-connect.js` + `api/auth/shopify-callback.js`. Pridat Connect button do UI. **Uzivatel musi nastavit redirect URL v Shopify Dev Dashboard** (viz sekce vyse). Otestovat: klik Connect → Shopify autorizace → token ulozen → Isola ma admin pristup.
 
 ### Krok 1: Size Chart backend (Faze 1)
 Pridat `updateMetafield()`, `getMetafield()` do shopify-admin.js. Pridat `save_size_chart`, `read_size_chart`, `parse_size_chart_image` akce do system.js. Otestovat: zapise size chart do Shopify metafield.

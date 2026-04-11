@@ -65,7 +65,7 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
       </div>
 
       {/* Dashboard section */}
-      <ShopifyDashboard storeId={storeId} onNavigateToProduct={onNavigateToProduct} />
+      <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
 
       {/* Pricing section — below dashboard */}
       {hasAdmin && (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { StoreProvider, useActiveStore } from './hooks/useActiveStore.jsx';
-import { ToastProvider } from './hooks/useToast.jsx';
+import { ToastProvider, useToast } from './hooks/useToast.jsx';
 import Login from './pages/Login';
 import Tooltip from './components/Tooltip';
 import './App.css';
@@ -24,7 +24,7 @@ function isTokenValid() {
 }
 
 function AppContent() {
-  const { stores, activeStore, switchStore } = useActiveStore();
+  const { stores, activeStore, switchStore, refreshStores } = useActiveStore();
   const [activeTab, setActiveTab] = useState('Overview');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [studioProductId, setStudioProductId] = useState(null);
@@ -45,6 +45,20 @@ function AppContent() {
   }, []);
 
   useEffect(() => { setSelectedProduct(null); setStudioProductId(null); }, [storeId]);
+
+  // Detect successful Shopify OAuth connection
+  const toast = useToast();
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('connected') === 'true') {
+      toast.success('Shopify Admin connected!');
+      window.history.replaceState({}, '', '/');
+      refreshStores();
+    } else if (params.get('error')) {
+      toast.error(`Shopify connection failed: ${params.get('error')}`);
+      window.history.replaceState({}, '', '/');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSelectProduct = useCallback((p) => setSelectedProduct(p), []);
   const handleBackToProducts = useCallback(() => setSelectedProduct(null), []);

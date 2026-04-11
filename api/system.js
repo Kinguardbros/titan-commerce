@@ -6,6 +6,7 @@ import { withAuth } from '../lib/auth.js';
 import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
+import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -237,6 +238,15 @@ async function handler(req, res) {
         ]);
 
         return res.status(200).json({ product: fullProduct, metafields });
+      }
+
+      // ─── META OVERVIEW ───
+      if (action === 'meta_overview') {
+        if (!isMetaConnected()) return res.status(200).json({ connected: false });
+        const [insights, campaigns, activeAds] = await Promise.all([
+          getAccountInsights('last_7d'), getCampaigns(), getActiveAdsCount(),
+        ]);
+        return res.status(200).json({ connected: true, insights, campaigns, active_ads: activeAds });
       }
 
       return res.status(400).json({ error: 'Unknown GET action' });

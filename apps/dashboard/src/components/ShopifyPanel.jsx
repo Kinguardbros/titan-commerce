@@ -13,7 +13,7 @@ export default function ShopifyPanel() {
         <div className="ov-panel-header">Shopify</div>
         <div className="ov-placeholder">
           <div className="ov-placeholder-text">Shopify Admin not connected</div>
-          <div className="ov-placeholder-hint">Set SHOPIFY_ADMIN_TOKEN env var with read_orders scope</div>
+          <div className="ov-placeholder-hint">Use the Shopify tab to connect your store's Admin API</div>
         </div>
       </div>
     );

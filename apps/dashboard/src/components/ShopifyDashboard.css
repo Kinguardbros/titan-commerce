@@ -8,6 +8,16 @@
 .sdb-empty-icon { font-size: 32px; margin-bottom: 4px; }
 .sdb-empty-title { font-family: var(--font-body); font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .sdb-empty-desc { font-family: var(--font-body); font-size: 12px; color: var(--text-muted); text-align: center; max-width: 320px; }
+.sdb-connect-btn {
+  display: inline-block; margin-top: 12px;
+  background: var(--emerald); color: #fff; border: none; border-radius: 10px;
+  padding: 10px 24px; font-family: var(--font-body); font-size: 12px; font-weight: 600;
+  text-decoration: none; cursor: pointer; transition: all .2s;
+}
+.sdb-connect-btn:hover { filter: brightness(1.1); }
+.sdb-empty-hint {
+  font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); margin-top: 8px;
+}
 
 .sdb-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .sdb-kpi { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--card-radius); padding: 16px; display: flex; align-items: center; gap: 12px; }

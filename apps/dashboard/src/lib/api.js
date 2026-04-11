@@ -136,11 +136,11 @@ export function getShopifyOverview(days = 7, storeId) {
 
 // Meta
 export function getMetaOverview() {
-  return fetchJSON('/api/meta/overview');
+  return fetchJSON('/api/system?action=meta_overview');
 }
 
 export function syncMeta() {
-  return fetchJSON('/api/meta/overview', { method: 'POST' });
+  return fetchJSON('/api/system?action=meta_overview');
 }
 
 // Insights
