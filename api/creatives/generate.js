@@ -115,6 +115,8 @@ async function handler(req, res) {
     const useSoulRef = ai_model === 'soul_ref';
 
     let imageUrl;
+    let requestId = null;
+
     if (useFlux) {
       // Flux Kontext — text-to-image, no reference needed but enrich prompt with product details
       const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
@@ -123,18 +125,17 @@ async function handler(req, res) {
       try {
         const result = await generateFluxKontext({ prompt: fluxPrompt, aspectRatio: '1:1' });
         imageUrl = result.url;
+        requestId = result.jobId;
       } catch (fluxErr) {
         console.error('[generate] Flux failed, falling back to Soul:', fluxErr.message);
-        // Fallback to Soul
         const refImages = images.slice(0, 3);
-        const requestId = await submitJob(prompt, refImages);
+        requestId = await submitJob(prompt, refImages);
         imageUrl = await pollUntilDone(requestId);
       }
     } else {
       // Soul / Soul Reference — image-to-image with reference photos
       const refImages = images.slice(0, useSoulRef ? 5 : 3);
       console.log(`[generate] Using ${useSoulRef ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
-      let requestId;
       try {
         requestId = await submitJob(prompt, refImages);
       } catch (submitErr) {
