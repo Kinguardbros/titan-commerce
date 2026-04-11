@@ -11,7 +11,7 @@ const SCOPES = [
   'write_discounts', 'read_discounts', 'read_reports',
 ].join(',');
 
-const REDIRECT_URI = (process.env.SITE_URL || 'https://titan-commerce.vercel.app') + '/api/auth/shopify';
+const REDIRECT_URI = (process.env.APP_URL || 'https://titan-commerce.vercel.app') + '/api/auth/shopify';
 
 function verifyHmac(query, secret) {
   const { hmac, ...params } = query;
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
         metadata: { shop, scopes: SCOPES },
       });
 
-      return res.redirect('/?connected=true');
+      return res.redirect('/?tab=Shopify&connected=true');
     } catch (err) {
       console.error('[shopify-oauth] Error during token exchange:', err);
       return res.redirect('/?error=exchange_error');

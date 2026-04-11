@@ -52,6 +52,7 @@ function AppContent() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('connected') === 'true') {
       toast.success('Shopify Admin connected!');
+      if (params.get('tab')) setActiveTab(params.get('tab'));
       window.history.replaceState({}, '', '/');
       refreshStores();
     } else if (params.get('error')) {
