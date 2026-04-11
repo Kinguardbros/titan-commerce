@@ -319,10 +319,10 @@ export function processInbox(storeId) {
   });
 }
 
-export function uploadStoreDoc(storeName, fileName, fileData) {
+export function uploadStoreDoc(storeName, fileName, fileData, storeId = null, autoProcess = true) {
   return fetchJSON('/api/system?action=upload_store_doc', {
     method: 'POST',
-    body: JSON.stringify({ store_name: storeName, file_name: fileName, file_data: fileData }),
+    body: JSON.stringify({ store_name: storeName, file_name: fileName, file_data: fileData, store_id: storeId, auto_process: autoProcess }),
   });
 }
 

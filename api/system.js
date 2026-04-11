@@ -749,9 +749,9 @@ async function handler(req, res) {
         return res.status(200).json({ deleted, total_checked: stale?.length || 0 });
       }
 
-      // ─── UPLOAD STORE DOC ───
+      // ─── UPLOAD STORE DOC (with auto-processing) ───
       if (action === 'upload_store_doc') {
-        const { store_name, file_name, file_data } = req.body;
+        const { store_name, store_id, file_name, file_data, auto_process } = req.body;
         if (!store_name || !file_name || !file_data) return res.status(400).json({ error: 'store_name, file_name, and file_data (base64) required' });
 
         // Validate extension
@@ -776,7 +776,56 @@ async function handler(req, res) {
           return res.status(500).json({ error: `Upload failed: ${error.message}` });
         }
 
-        return res.status(200).json({ ok: true, path: `Inbox/${safeName}`, size: buffer.length });
+        // Auto-process this single file if requested
+        if (auto_process !== false && store_id) {
+          try {
+            const Anthropic = (await import('@anthropic-ai/sdk')).default;
+            const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+            const text = await extractText(buffer, safeName, anthropic);
+            if (text) {
+              const category = await classifyDocument(text, safeName, anthropic);
+
+              // Move to category folder
+              const destPath = `${store_name}/${category}/${safeName}`;
+              await supabase.storage.from(DOCS_BUCKET).upload(destPath, buffer, { upsert: true });
+              await supabase.storage.from(DOCS_BUCKET).remove([storagePath]);
+
+              // Extract insights
+              let insightsText = '';
+              let insightsCount = 0;
+              if (category !== 'Logos' && text.length > 50) {
+                insightsText = await extractInsights(text, safeName, store_name, anthropic);
+                insightsCount = (insightsText.match(/^[-•*]/gm) || []).length;
+                await supabase.from('store_knowledge').insert({
+                  store_id, source_file: safeName, category, insights: insightsText,
+                });
+              }
+
+              // Pipeline log
+              await supabase.from('pipeline_log').insert({
+                store_id, agent: 'DOC_PROCESSOR',
+                message: `Auto-processed "${safeName}" → ${category}`,
+                level: 'info', metadata: { filename: safeName, category, insights_count: insightsCount },
+              });
+
+              return res.status(200).json({
+                ok: true, auto_processed: true,
+                filename: safeName, category, insights_count: insightsCount, size: buffer.length,
+              });
+            }
+          } catch (procErr) {
+            console.error('[upload_store_doc] Auto-process error:', procErr.message);
+            // File is uploaded but processing failed — it stays in Inbox
+            await supabase.from('pipeline_log').insert({
+              store_id, agent: 'DOC_PROCESSOR',
+              message: `Auto-process failed for "${safeName}": ${procErr.message}`,
+              level: 'error',
+            });
+          }
+        }
+
+        return res.status(200).json({ ok: true, auto_processed: false, path: `Inbox/${safeName}`, size: buffer.length });
       }
 
       // ─── PROCESS INBOX ───

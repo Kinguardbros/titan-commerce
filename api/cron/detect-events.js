@@ -73,6 +73,31 @@ export default async function handler(req, res) {
       }
     }
 
+    // Check for unprocessed files in Inbox (all stores, no admin_token needed)
+    for (const store of stores || []) {
+      try {
+        const { data: inboxFiles } = await supabase.storage.from('store-docs').list(`${store.name}/Inbox`);
+        const realFiles = (inboxFiles || []).filter((f) => f.id !== null && f.name !== '.emptyFolderPlaceholder');
+        if (realFiles.length > 0) {
+          // Check if proposal already exists
+          const { data: existingProp } = await supabase.from('proposals').select('id')
+            .eq('store_id', store.id).eq('type', 'process_inbox').eq('status', 'pending').limit(1).single();
+          if (!existingProp) {
+            await supabase.from('proposals').insert({
+              store_id: store.id, type: 'process_inbox',
+              title: `Process ${realFiles.length} file(s) in ${store.name} Inbox`,
+              description: `Unprocessed: ${realFiles.map((f) => f.name).slice(0, 5).join(', ')}${realFiles.length > 5 ? '...' : ''}`,
+              suggested_action: JSON.stringify({ action: 'process_inbox', store_id: store.id, file_count: realFiles.length }),
+              expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+            });
+            totalProposals++;
+          }
+        }
+      } catch (inboxErr) {
+        console.error(`[cron] Inbox check failed for ${store.name}:`, inboxErr.message);
+      }
+    }
+
     await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals across ${stores?.length || 0} stores` });
     return res.status(200).json({ events: totalEvents, proposals: totalProposals });
   } catch (err) {

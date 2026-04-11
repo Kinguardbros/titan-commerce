@@ -102,16 +102,28 @@ export default function DocsBrowser({ storeName, storeId }) {
     setUploading(true);
     let uploaded = 0;
     for (const file of valid) {
-      setUploadProgress(`Uploading ${file.name} (${uploaded + 1}/${valid.length})...`);
+      // Auto-process only the first file (sync), rest just upload to Inbox
+      const isFirst = uploaded === 0;
+      setUploadProgress(isFirst
+        ? `Uploading & processing ${file.name}...`
+        : `Uploading ${file.name} (${uploaded + 1}/${valid.length})...`);
       try {
         const base64 = await fileToBase64(file);
-        await uploadStoreDoc(storeName, file.name, base64);
+        const result = await uploadStoreDoc(storeName, file.name, base64, storeId, isFirst);
         uploaded++;
-        toast.success(`Uploaded ${file.name} to Inbox`);
+        if (result.auto_processed) {
+          toast.success(`${file.name} → ${result.category} (${result.insights_count} insights)`);
+        } else {
+          toast.success(`Uploaded ${file.name} to Inbox`);
+        }
       } catch (err) {
         console.error('[DocsBrowser] Upload error:', err);
         toast.error(`Upload failed: ${file.name} — ${err.message}`);
       }
+    }
+    if (valid.length > 1) {
+      const remaining = valid.length - 1;
+      toast.info(`${remaining} file${remaining > 1 ? 's' : ''} remaining in Inbox — click Process Inbox`);
     }
     setUploading(false);
     setUploadProgress('');
