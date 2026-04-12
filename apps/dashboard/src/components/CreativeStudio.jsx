@@ -523,11 +523,12 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const customInstr = `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
+    const jobs = [];
     for (const sId of stylesToGen) {
       const bs = STYLE_MAP[sId] || "ad_creative";
       for (let i = 0; i < imgCount; i++) {
-        try {
-          await generateCreatives({
+        jobs.push(
+          generateCreatives({
             product_id: product.id, store_id: storeId, style: bs, ai_model: backendModel,
             custom_prompt: customInstr,
             show_model: subject === "On model",
@@ -535,11 +536,12 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             overlay_text: textMode === "Custom" ? customText : "",
             audience: audience !== "auto" ? audience : undefined,
             aspect_ratio: imgRatio,
-          });
-          setCompleted((p) => p + 1);
-        } catch (err) { toast.error(`Failed: ${err.message}`); }
+          }).then(() => setCompleted((p) => p + 1))
+            .catch((err) => toast.error(`Failed: ${err.message}`))
+        );
       }
     }
+    await Promise.all(jobs);
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();

@@ -214,32 +214,20 @@ async function handler(req, res) {
 
     if (!imageUrl) throw new Error('Generation failed — no image URL');
 
-    // Upload to storage
-    const storagePath = `creatives/${product.handle}_${style}_${Date.now()}.png`;
-    let fileUrl = imageUrl;
-    try {
-      const imgResp = await fetch(imageUrl);
-      const buf = await imgResp.arrayBuffer();
-      await supabase.storage.from('creatives').upload(storagePath, buf, { contentType: 'image/png', upsert: true });
-      const { data: pub } = supabase.storage.from('creatives').getPublicUrl(storagePath);
-      fileUrl = pub.publicUrl;
-    } catch (storageErr) {
-      console.error('[generate] Storage upload failed:', storageErr);
-    }
-
     // Use store_id from request, or fall back to product's store_id
     const effectiveStoreId = store_id || product.store_id || null;
+    const storagePath = `creatives/${product.handle}_${style}_${Date.now()}.png`;
 
-    // Save creative
+    // Save creative immediately with fal.ai URL (fast response)
     const creativeRecord = {
       product_id, variant_index: 1, format: 'image',
-      file_url: fileUrl, storage_path: storagePath,
+      file_url: imageUrl, storage_path: storagePath,
       hook_used: custom_prompt || style, headline: product.title,
       hf_job_id: requestId, status: 'pending', style,
       store_id: effectiveStoreId,
     };
 
-    console.log('[generate] Inserting creative:', JSON.stringify({ product_id, store_id: effectiveStoreId, style, file_url: fileUrl?.slice(0, 60) }));
+    console.log('[generate] Inserting creative:', JSON.stringify({ product_id, store_id: effectiveStoreId, style, file_url: imageUrl?.slice(0, 60) }));
 
     const { data: creative, error: cErr } = await supabase.from('creatives').insert(creativeRecord).select().single();
 
@@ -248,12 +236,25 @@ async function handler(req, res) {
       throw cErr;
     }
 
+    // Upload to Supabase Storage in background (don't block response)
+    (async () => {
+      try {
+        const imgResp = await fetch(imageUrl);
+        const buf = await imgResp.arrayBuffer();
+        await supabase.storage.from('creatives').upload(storagePath, buf, { contentType: 'image/png', upsert: true });
+        const { data: pub } = supabase.storage.from('creatives').getPublicUrl(storagePath);
+        await supabase.from('creatives').update({ file_url: pub.publicUrl }).eq('id', creative.id);
+      } catch (storageErr) {
+        console.error('[generate] Background storage upload failed:', storageErr.message);
+      }
+    })();
+
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info', store_id: effectiveStoreId,
       message: `Generated ${style} creative for ${product.title}`,
     });
 
-    return res.status(200).json({ creative_id: creative.id, file_url: fileUrl, generated: 1 });
+    return res.status(200).json({ creative_id: creative.id, file_url: imageUrl, generated: 1 });
   } catch (err) {
     console.error('[generate] Error:', err);
     const hint = err.message.includes('timeout') ? 'Image generation took too long. Try again.'
