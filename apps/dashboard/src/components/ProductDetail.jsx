@@ -42,6 +42,7 @@ export default function ProductDetail({ product, storeId, store }) {
       const data = await getProductDetail(storeId, product.id);
       const d = data.product;
       setDetail(d);
+      setDbOnly(!!data.db_only);
       setMetafields(data.metafields || []);
       // Populate edit state
       setTitle(d?.title || '');
@@ -116,6 +117,8 @@ export default function ProductDetail({ product, storeId, store }) {
     setDirty(false);
   };
 
+  const [dbOnly, setDbOnly] = useState(false);
+
   if (!hasAdmin) return null;
   if (loading) return <div className="pd-loading">Loading product details...</div>;
   if (!detail) return <div className="pd-empty">Could not load product details from Shopify</div>;
@@ -125,6 +128,11 @@ export default function ProductDetail({ product, storeId, store }) {
 
   return (
     <div className="pd">
+      {dbOnly && (
+        <div style={{ padding: '10px 14px', marginBottom: 16, borderRadius: 10, background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.25)', color: 'rgba(251,191,36,0.9)', fontSize: 12, fontFamily: 'var(--mono)' }}>
+          This product was deleted from Shopify — showing cached data. Editing is disabled.
+        </div>
+      )}
       {/* ══ TWO-COLUMN LAYOUT ══ */}
       <div className="pd-columns">
 
@@ -247,7 +255,7 @@ export default function ProductDetail({ product, storeId, store }) {
           <div className="pd-save-bar-inner">
             <span className="pd-save-bar-text">Unsaved changes</span>
             <button className="pd-discard-btn" onClick={handleDiscard}>Discard</button>
-            <button className="pd-save-btn" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+            <button className="pd-save-btn" onClick={handleSave} disabled={saving || dbOnly}>{saving ? 'Saving...' : dbOnly ? 'Read-only' : 'Save'}</button>
           </div>
         </div>
       )}

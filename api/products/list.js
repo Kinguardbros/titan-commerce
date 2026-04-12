@@ -28,20 +28,26 @@ async function handler(req, res) {
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);
     const offset = (page - 1) * limit;
 
+    const showArchived = req.query.show_archived === 'true';
+
     // Count total products
     let countQuery = supabase.from('products').select('id', { count: 'exact', head: true });
     if (storeId) countQuery = countQuery.eq('store_id', storeId);
+    if (!showArchived) countQuery = countQuery.or('status.eq.active,status.is.null');
     const { count: total } = await countQuery;
 
     // Fetch paginated products
     let productsQuery = supabase
       .from('products')
-      .select('id, shopify_id, handle, title, price, image_url, product_type, tags')
+      .select('id, shopify_id, handle, title, price, image_url, product_type, tags, status')
       .order('title')
       .range(offset, offset + limit - 1);
 
     if (storeId) {
       productsQuery = productsQuery.eq('store_id', storeId);
+    }
+    if (!showArchived) {
+      productsQuery = productsQuery.or('status.eq.active,status.is.null');
     }
 
     const { data: products, error } = await productsQuery;

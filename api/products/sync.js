@@ -97,6 +97,7 @@ async function handler(req, res) {
           tags: JSON.stringify(cols),
           synced_at: new Date().toISOString(),
         };
+      upsertData.status = 'active';
       if (storeId) {
         upsertData.store_id = storeId;
       }
@@ -112,14 +113,32 @@ async function handler(req, res) {
       }
     }
 
+    // Archive products that no longer exist in Shopify
+    let archived = 0;
+    if (storeId) {
+      const shopifyIds = allProducts.map((p) => String(p.id));
+      const { data: dbProducts } = await supabase.from('products')
+        .select('id, shopify_id').eq('store_id', storeId).eq('status', 'active');
+      const toArchive = (dbProducts || []).filter((p) => p.shopify_id && !shopifyIds.includes(String(p.shopify_id)));
+      for (const p of toArchive) {
+        await supabase.from('products').update({ status: 'archived' }).eq('id', p.id);
+        archived++;
+      }
+      if (archived > 0) {
+        console.log(`[sync] Archived ${archived} products no longer in Shopify`);
+      }
+    }
+
     await supabase.from('pipeline_log').insert({
       agent: 'SCRAPER',
-      message: `Shopify sync complete — ${synced} products, ${collections.length} collections`,
+      message: `Shopify sync complete — ${synced} products, ${collections.length} collections${archived > 0 ? `, ${archived} archived` : ''}`,
       level: 'info',
+      ...(storeId ? { store_id: storeId } : {}),
     });
 
     return res.status(200).json({
       synced,
+      archived,
       total: allProducts.length,
       collections: collections.length,
     });
