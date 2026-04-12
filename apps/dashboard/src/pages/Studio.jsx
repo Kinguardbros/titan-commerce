@@ -16,6 +16,7 @@ const BRANDED_TYPES = [
 
 const STYLES = [
   { key: 'ad_creative', label: 'Ad Creative' },
+  { key: 'product_photo_beach', label: 'Beach Photo' },
   { key: 'lifestyle', label: 'Lifestyle' },
   { key: 'static_clean', label: 'Clean Minimal' },
   { key: 'static_urgency', label: 'Urgency' },
