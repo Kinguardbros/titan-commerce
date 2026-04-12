@@ -206,6 +206,7 @@ function CreativeCard({ creative: c, onClick, status }) {
       }>
         {isVideo && <span className="pw-card-play">+</span>}
         {status === 'approved' && <span className="pw-card-check">+</span>}
+        {c.status === 'published' && <span className="pill published" style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, padding: '2px 7px' }}>Published</span>}
         {!status && <span className="pill pending">pending</span>}
       </div>
       <div className="pw-card-body">
