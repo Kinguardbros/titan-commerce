@@ -88,6 +88,11 @@
   background: var(--emerald-glow); border: 1px solid rgba(78,173,122,.15);
   padding: 2px 7px; border-radius: 10px; letter-spacing: .3px;
 }
+.product-card-badge--new {
+  top: 6px; left: 6px; right: auto;
+  color: var(--violet); background: var(--violet-glow);
+  border-color: rgba(139,92,246,.15); font-weight: 600;
+}
 .product-card-no-img {
   font-family: var(--mono); font-size: 9px; color: var(--text4);
 }

@@ -39,7 +39,7 @@ async function handler(req, res) {
     // Fetch paginated products
     let productsQuery = supabase
       .from('products')
-      .select('id, shopify_id, handle, title, price, image_url, product_type, tags, status')
+      .select('id, shopify_id, handle, title, price, image_url, product_type, tags, status, created_at')
       .order('title')
       .range(offset, offset + limit - 1);
 

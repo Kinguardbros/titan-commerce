@@ -23,6 +23,8 @@ const SORT_OPTIONS = [
 ];
 
 const PAGE_SIZE = 50;
+const TWO_HOURS = 2 * 60 * 60 * 1000;
+const isNew = (p) => p.created_at && (Date.now() - new Date(p.created_at).getTime()) < TWO_HOURS;
 
 export default function Products({ onSelectProduct, onNavigateToStudio, storeId }) {
   const toast = useToast();
@@ -242,6 +244,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                 <div key={p.id} className="product-card" onClick={() => onSelectProduct(p)}>
                   <div className="product-card-img">
                     {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : <span className="product-card-no-img">No image</span>}
+                    {isNew(p) && <span className="product-card-badge product-card-badge--new">New</span>}
                     {p.creative_count > 0 && <span className="product-card-badge">{p.creative_count} creatives</span>}
                   </div>
                   <div className="product-card-body">
@@ -261,7 +264,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                   {filtered.map((p) => (
                     <tr key={p.id} onClick={() => onSelectProduct(p)}>
                       <td><div className="products-table-img">{p.image_url && <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" />}</div></td>
-                      <td className="products-table-name">{p.title}</td>
+                      <td className="products-table-name">{p.title}{isNew(p) && <span className="pill" style={{ marginLeft: 6, background: 'var(--accent-primary-soft)', color: 'var(--accent-primary)', fontSize: 9, padding: '2px 6px' }}>New</span>}</td>
                       <td>${p.price || '—'}</td>
                       <td>{p.creative_count > 0 ? <span style={{ color: 'var(--accent-success)' }}>{p.creative_count}</span> : <span style={{ color: 'var(--accent-danger)' }}>0 ⚠</span>}</td>
                       <td>{p.cogs ? `$${p.cogs}` : '—'}</td>
@@ -281,7 +284,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                     {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : null}
                   </div>
                   <div className="products-card-info">
-                    <div className="products-card-name">{p.title}</div>
+                    <div className="products-card-name">{p.title}{isNew(p) && <span className="pill" style={{ marginLeft: 6, background: 'var(--accent-primary-soft)', color: 'var(--accent-primary)', fontSize: 9, padding: '2px 6px' }}>New</span>}</div>
                     <div className="products-card-meta">{p.product_type} {p.price ? `· $${p.price}` : ''} {p.cogs ? `· COGS: $${p.cogs}` : ''}</div>
                   </div>
                   <div className="products-card-stats">
