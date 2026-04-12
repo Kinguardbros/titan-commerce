@@ -224,7 +224,7 @@ async function handler(req, res) {
       file_url: imageUrl, storage_path: storagePath,
       hook_used: custom_prompt || style, headline: product.title,
       hf_job_id: requestId, status: 'pending', style,
-      store_id: effectiveStoreId,
+      store_id: effectiveStoreId, aspect_ratio,
     };
 
     console.log('[generate] Inserting creative:', JSON.stringify({ product_id, store_id: effectiveStoreId, style, file_url: imageUrl?.slice(0, 60) }));

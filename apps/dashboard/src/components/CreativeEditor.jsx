@@ -181,6 +181,9 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
                 <span>Format</span><span>{creative.format}</span>
               </div>
               <div className="ce-detail-row">
+                <span>Aspect ratio</span><span>{creative.aspect_ratio || '1:1'}</span>
+              </div>
+              <div className="ce-detail-row">
                 <span>Status</span><span className={`pill ${creative.status}`}>{creative.status}</span>
               </div>
               <div className="ce-detail-row">
