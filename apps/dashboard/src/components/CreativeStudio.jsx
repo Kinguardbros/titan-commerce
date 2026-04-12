@@ -129,7 +129,7 @@ const DURATIONS = ["5s", "10s", "15s", "30s"];
 const CAMERAS = ["Auto", "Static", "Pan left", "Pan right", "Zoom in", "Orbit"];
 const POSES = ["Standing", "Sitting", "Walking", "Leaning", "Dynamic / action", "Close-up"];
 const BODY_TYPES = ["Auto", "Slim", "Athletic", "Average", "Curvy", "Plus-size"];
-const FRAMINGS = ["Full body", "Head crop"];
+const FRAMINGS = ["Full body", "Cropped with head", "Head crop"];
 const IMG_RATIOS = [
   { label: "1:1", w: 40, h: 40 },
   { label: "4:5", w: 36, h: 45 },
@@ -513,7 +513,11 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
     const bodyHint = subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
-    const framingHint = subject === "On model" && framing === "Head crop" ? `Framing: crop from chest up, do NOT show full head — cut off the top of the head above the eyes. Focus on the product, not the face. ` : subject === "On model" ? `Framing: full body shot, show the model head to toe. ` : "";
+    const framingHint = subject === "On model" ? (
+      framing === "Head crop" ? `Framing: crop from chest up, do NOT show full head — cut off the top of the head above the eyes. Focus on the product, not the face. `
+      : framing === "Cropped with head" ? `Framing: crop from waist/hip up, show full head and face. Upper body portrait with the product clearly visible. `
+      : `Framing: full body shot, show the model head to toe. `
+    ) : "";
     const sceneHint = SCENE_STYLES.has(imgStyle) && scene !== "Auto" ? `Scene: ${scene}. ` : "";
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
     const customInstr = `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
