@@ -524,6 +524,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             text_overlay: textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom",
             overlay_text: textMode === "Custom" ? customText : "",
             audience: audience !== "auto" ? audience : undefined,
+            aspect_ratio: imgRatio,
           });
           setCompleted((p) => p + 1);
         } catch (err) { toast.error(`Failed: ${err.message}`); }

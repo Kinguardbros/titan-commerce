@@ -45,7 +45,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience } = req.body;
+  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience, aspect_ratio = '1:1' } = req.body;
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
@@ -180,6 +180,7 @@ async function handler(req, res) {
         model: falModel,
         prompt: falPrompt,
         imageUrl: refImages,
+        aspectRatio: aspect_ratio,
       });
       imageUrl = result.url;
       requestId = result.requestId;

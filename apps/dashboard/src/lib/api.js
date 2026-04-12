@@ -75,10 +75,10 @@ export function regenerateCreative(creativeId) {
   });
 }
 
-export function generateCreatives({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience }) {
+export function generateCreatives({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio }) {
   return fetchJSON('/api/creatives/generate', {
     method: 'POST',
-    body: JSON.stringify({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience }),
+    body: JSON.stringify({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio }),
   });
 }
 
