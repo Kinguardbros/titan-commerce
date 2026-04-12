@@ -18,7 +18,8 @@ async function handler(req, res) {
       .from('creatives')
       .select(`
         *,
-        brief:briefs(id, product_name, product_url, price)
+        brief:briefs(id, product_name, product_url, price),
+        product:products(id, title, image_url, handle)
       `)
       .order('created_at', { ascending: false });
 

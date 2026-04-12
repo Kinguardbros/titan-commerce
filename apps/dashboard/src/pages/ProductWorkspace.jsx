@@ -110,6 +110,9 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           <div className="pw-creatives-stats">
             <span>{totalPending} pending</span>
             <span>{totalApproved} approved</span>
+            {onNavigateToStudio && (
+              <button className="pw-action-btn pw-action-btn--muted" style={{ marginLeft: 8, fontSize: 10 }} onClick={() => onNavigateToStudio(product.id)}>View all in Studio →</button>
+            )}
           </div>
         </div>
 
