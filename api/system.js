@@ -1206,27 +1206,48 @@ Only include sections that have specific, actionable rules from the sources.` }]
         const { creative_id, store_id } = req.body;
         if (!creative_id || !store_id) return res.status(400).json({ error: 'creative_id and store_id required' });
 
-        const { data: creative } = await supabase.from('creatives').select('file_url, product_id, status').eq('id', creative_id).single();
+        const { data: creative } = await supabase.from('creatives').select('file_url, storage_path, product_id, status').eq('id', creative_id).single();
         if (!creative?.file_url) return res.status(404).json({ error: 'Creative not found' });
-        if (creative.status !== 'approved') return res.status(400).json({ error: 'Only approved creatives can be pushed' });
+        if (creative.status !== 'approved' && creative.status !== 'published') return res.status(400).json({ error: `Cannot push creative with status "${creative.status}" — approve it first` });
 
         const { data: product } = await supabase.from('products').select('shopify_id, title').eq('id', creative.product_id).single();
-        if (!product?.shopify_id) return res.status(404).json({ error: 'Product not found or missing Shopify ID' });
+        if (!product?.shopify_id) return res.status(400).json({ error: 'Product missing Shopify ID — sync the product first' });
 
         const store = await getStore(store_id);
         if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        // Ensure we use a persistent URL (Supabase Storage), not an expiring fal.ai URL
+        let pushUrl = creative.file_url;
+        if (pushUrl.includes('fal.run') || pushUrl.includes('fal.ai')) {
+          // Re-upload to Supabase Storage if file_url is still a fal.ai temporary URL
+          try {
+            console.log('[push_creative] Re-uploading from fal.ai to Supabase Storage');
+            const imgResp = await fetch(pushUrl);
+            if (!imgResp.ok) return res.status(400).json({ error: 'Creative image URL expired — regenerate the image' });
+            const buf = await imgResp.arrayBuffer();
+            const path = creative.storage_path || `creatives/push_${creative_id}_${Date.now()}.png`;
+            await supabase.storage.from('creatives').upload(path, buf, { contentType: 'image/png', upsert: true });
+            const { data: pub } = supabase.storage.from('creatives').getPublicUrl(path);
+            pushUrl = pub.publicUrl;
+            await supabase.from('creatives').update({ file_url: pushUrl, storage_path: path }).eq('id', creative_id);
+          } catch (uploadErr) {
+            console.error('[push_creative] Re-upload failed:', uploadErr.message);
+            return res.status(400).json({ error: 'Creative image expired and re-upload failed — regenerate the image' });
+          }
+        }
 
         // Add image to Shopify product (append, not replace)
         const addResult = await fetch(`https://${store.shopify_url}/admin/api/2024-01/products/${product.shopify_id}/images.json`, {
           method: 'POST',
           headers: { 'X-Shopify-Access-Token': store.admin_token, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: { src: creative.file_url } }),
+          body: JSON.stringify({ image: { src: pushUrl } }),
         });
 
         if (!addResult.ok) {
           const errText = await addResult.text();
           console.error('[push_creative] Shopify error:', errText);
-          return res.status(500).json({ error: 'Failed to add image to Shopify' });
+          const hint = errText.includes('could not be downloaded') ? 'Shopify could not download the image — try regenerating' : 'Shopify API error';
+          return res.status(500).json({ error: 'Failed to add image to Shopify', hint });
         }
 
         // Mark creative as published

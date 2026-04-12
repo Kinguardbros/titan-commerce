@@ -258,7 +258,7 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
                   </div>
                 </div>
               )}
-              {creative.status === 'approved' && storeId && (
+              {(creative.status === 'approved' || creative.status === 'published') && storeId && (
                 <button className="ce-btn publish" disabled={pushing} onClick={async () => {
                   setPushing(true);
                   try {
@@ -267,7 +267,7 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
                   } catch (err) { toast.error(`Push failed: ${err.message}`); }
                   finally { setPushing(false); }
                 }}>
-                  {pushing ? 'Pushing...' : 'Push to Shopify'}
+                  {pushing ? 'Pushing...' : creative.status === 'published' ? 'Re-push to Shopify' : 'Push to Shopify'}
                 </button>
               )}
             </div>
