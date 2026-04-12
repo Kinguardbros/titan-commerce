@@ -416,7 +416,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [tab, setTab] = useState("image");
   // Image config
   const [imgStyle, setImgStyle] = useState("ad-creative");
-  const [imgModel, setImgModel] = useState("flux2-edit");
+  const [imgModel, setImgModel] = useState("nano-banana");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
   const [customText, setCustomText] = useState("");
