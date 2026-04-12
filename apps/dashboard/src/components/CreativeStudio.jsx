@@ -129,6 +129,7 @@ const DURATIONS = ["5s", "10s", "15s", "30s"];
 const CAMERAS = ["Auto", "Static", "Pan left", "Pan right", "Zoom in", "Orbit"];
 const POSES = ["Standing", "Sitting", "Walking", "Leaning", "Dynamic / action", "Close-up"];
 const BODY_TYPES = ["Auto", "Slim", "Athletic", "Average", "Curvy", "Plus-size"];
+const FRAMINGS = ["Full body", "Head crop"];
 const IMG_RATIOS = [
   { label: "1:1", w: 40, h: 40 },
   { label: "4:5", w: 36, h: 45 },
@@ -426,6 +427,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [imgInstructions, setImgInstructions] = useState("");
   const [modelPose, setModelPose] = useState("Standing");
   const [bodyType, setBodyType] = useState("Auto");
+  const [framing, setFraming] = useState("Full body");
   const [scene, setScene] = useState("Auto");
   const [negPrompt, setNegPrompt] = useState("");
   const [showNegPrompt, setShowNegPrompt] = useState(false);
@@ -511,9 +513,10 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
     const bodyHint = subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
+    const framingHint = subject === "On model" && framing === "Head crop" ? `Framing: crop from chest up, do NOT show full head — cut off the top of the head above the eyes. Focus on the product, not the face. ` : subject === "On model" ? `Framing: full body shot, show the model head to toe. ` : "";
     const sceneHint = SCENE_STYLES.has(imgStyle) && scene !== "Auto" ? `Scene: ${scene}. ` : "";
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
-    const customInstr = `${colorPrefix}${poseHint}${bodyHint}${sceneHint}${imgInstructions}${negHint}`.trim();
+    const customInstr = `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
     for (const sId of stylesToGen) {
@@ -719,6 +722,18 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {BODY_TYPES.map((b) => (
                   <Pill key={b} active={bodyType === b} onClick={() => setBodyType(b)}>{b}</Pill>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Framing — conditional on model */}
+          {subject === "On model" && !abMode && (
+            <div>
+              <SectionLabel>Framing</SectionLabel>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {FRAMINGS.map((f) => (
+                  <Pill key={f} active={framing === f} onClick={() => setFraming(f)}>{f}</Pill>
                 ))}
               </div>
             </div>
