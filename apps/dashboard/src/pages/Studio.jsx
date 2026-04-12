@@ -41,6 +41,14 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [generating, setGenerating] = useState(false);
   const [genCompleted, setGenCompleted] = useState(0);
 
+  // Bulk generate state
+  const [bulkSelected, setBulkSelected] = useState(new Set());
+  const [bulkStyle, setBulkStyle] = useState('ad_creative');
+  const [bulkCount, setBulkCount] = useState(2);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkCompleted, setBulkCompleted] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+
   const fetchCreatives = useCallback(async () => {
     setLoading(true);
     try {
@@ -93,6 +101,39 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
     fetchCreatives();
   };
 
+  const handleBulkGenerate = async () => {
+    if (bulkSelected.size === 0) return;
+    setBulkGenerating(true);
+    setBulkCompleted(0);
+    const total = bulkSelected.size * bulkCount;
+    setBulkTotal(total);
+    toast.info(`Generating ${total} images across ${bulkSelected.size} products...`);
+
+    const jobs = [];
+    for (const productId of bulkSelected) {
+      for (let i = 0; i < bulkCount; i++) {
+        jobs.push(
+          generateCreatives({
+            product_id: productId, store_id: storeId, style: bulkStyle,
+            ai_model: 'fal_nano_banana', show_model: true, text_overlay: 'none',
+          }).then(() => setBulkCompleted((p) => p + 1))
+            .catch((err) => { console.error(`Bulk gen failed for ${productId}:`, err); setBulkCompleted((p) => p + 1); })
+        );
+      }
+    }
+    await Promise.allSettled(jobs);
+    setBulkGenerating(false);
+    toast.success(`Bulk generation complete!`);
+    fetchCreatives();
+  };
+
+  const toggleBulkProduct = (id) => {
+    setBulkSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleBulkAll = () => {
+    setBulkSelected((prev) => prev.size === products.length ? new Set() : new Set(products.map((p) => p.id)));
+  };
+
   const handleApprove = async (id) => {
     try { await approveAd(id, 'Team'); toast.success('Creative approved!'); } catch (e) { console.error(e); }
     setCreatives((prev) => prev.map((c) => c.id === id ? { ...c, status: 'approved' } : c));
@@ -106,7 +147,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
 
   const filteredProducts = products.filter((p) =>
     !productSearch || p.title.toLowerCase().includes(productSearch.toLowerCase())
-  ).slice(0, 20);
+  ).slice(0, mode === 'bulk' ? 200 : 20);
 
   const filteredCreatives = mode === 'branded'
     ? creatives.filter((c) => c.type?.startsWith('branded'))
@@ -127,6 +168,9 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
         </button>
         <button className={`studio-mode-btn${mode === 'product' ? ' studio-mode-btn--active' : ''}`} onClick={() => setMode('product')}>
           Product Creatives
+        </button>
+        <button className={`studio-mode-btn${mode === 'bulk' ? ' studio-mode-btn--active' : ''}`} onClick={() => { setMode('bulk'); setSelectedProduct(null); }}>
+          Bulk Generate
         </button>
       </div>
 
@@ -208,6 +252,81 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
           <div className="studio-selected-header">
             <span className="studio-selected-name">{selectedProduct.title}</span>
             <button className="studio-generate-btn studio-generate-btn--sm" onClick={() => setShowGeneratePanel(true)}>+ Generate</button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'bulk' && (
+        <div className="studio-branded">
+          <div className="studio-card">
+            <div className="studio-card-title gradient-heading">Bulk Generate</div>
+            <p style={{ color: 'var(--text4)', fontSize: 12, marginBottom: 16 }}>
+              Select products and generate multiple images at once. All run in parallel.
+            </p>
+
+            <div className="studio-row" style={{ marginBottom: 16 }}>
+              <div>
+                <div className="studio-field-label">Style</div>
+                <div className="studio-pills">
+                  {STYLES.map((s) => (
+                    <button key={s.key} className={`studio-pill${bulkStyle === s.key ? ' studio-pill--active' : ''}`} onClick={() => setBulkStyle(s.key)}>{s.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="studio-field-label">Images per product</div>
+                <div className="studio-pills">
+                  {[1, 2, 3, 4].map((n) => (
+                    <button key={n} className={`studio-pill studio-pill--sm${bulkCount === n ? ' studio-pill--active' : ''}`} onClick={() => setBulkCount(n)}>{n}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div className="studio-field-label" style={{ margin: 0 }}>Products ({bulkSelected.size}/{products.length})</div>
+              <button className="studio-pill studio-pill--sm" onClick={toggleBulkAll} style={{ cursor: 'pointer' }}>
+                {bulkSelected.size === products.length ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+
+            <input className="studio-search" type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products..." style={{ marginBottom: 8 }} />
+
+            <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 16 }}>
+              {filteredProducts.map((p) => (
+                <div key={p.id} onClick={() => toggleBulkProduct(p.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                  borderRadius: 8, cursor: 'pointer', transition: 'background 150ms',
+                  background: bulkSelected.has(p.id) ? 'var(--accent-primary-soft)' : 'transparent',
+                  border: `1px solid ${bulkSelected.has(p.id) ? 'rgba(139,92,246,0.2)' : 'transparent'}`,
+                }}>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4, flexShrink: 0,
+                    border: `2px solid ${bulkSelected.has(p.id) ? 'var(--accent-primary)' : 'var(--border-default)'}`,
+                    background: bulkSelected.has(p.id) ? 'var(--accent-primary)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 11,
+                  }}>{bulkSelected.has(p.id) ? '✓' : ''}</div>
+                  {p.image_url && <img src={p.image_url} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover' }} />}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button className="studio-generate-btn" onClick={handleBulkGenerate} disabled={bulkGenerating || bulkSelected.size === 0}>
+              {bulkGenerating
+                ? `Generating ${bulkCompleted}/${bulkTotal}...`
+                : `Generate ${bulkSelected.size * bulkCount} images (${bulkSelected.size} products × ${bulkCount})`
+              }
+            </button>
+
+            {bulkGenerating && (
+              <div style={{ marginTop: 10, height: 4, borderRadius: 2, background: 'var(--bg-surface)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', borderRadius: 2, background: 'var(--accent-primary)', transition: 'width 0.3s', width: `${bulkTotal > 0 ? (bulkCompleted / bulkTotal) * 100 : 0}%` }} />
+              </div>
+            )}
           </div>
         </div>
       )}
