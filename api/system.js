@@ -278,12 +278,26 @@ async function handler(req, res) {
         }
 
         const client = createShopifyClient(store.shopify_url, store.admin_token);
-        const [fullProduct, metafields] = await Promise.all([
-          client.getFullProduct(dbProduct.shopify_id),
-          client.getProductMetafields(dbProduct.shopify_id),
-        ]);
-
-        return res.status(200).json({ product: fullProduct, metafields });
+        try {
+          const [fullProduct, metafields] = await Promise.all([
+            client.getFullProduct(dbProduct.shopify_id),
+            client.getProductMetafields(dbProduct.shopify_id),
+          ]);
+          if (!fullProduct) throw new Error('Shopify returned no product');
+          return res.status(200).json({ product: fullProduct, metafields });
+        } catch (shopifyErr) {
+          console.error('[product_detail] Shopify fetch failed, returning DB data:', shopifyErr.message);
+          const imgs = JSON.parse(dbProduct.images || '[]');
+          return res.status(200).json({
+            product: {
+              id: dbProduct.shopify_id, title: dbProduct.title, body_html: dbProduct.description || '',
+              vendor: '', product_type: dbProduct.product_type || '', tags: dbProduct.tags || '',
+              status: 'active', variants: [], images: imgs.map((src, i) => ({ id: i, src, position: i + 1 })),
+            },
+            metafields: [],
+            db_only: true,
+          });
+        }
       }
 
       // ─── STORE DOCS (Supabase Storage) ───
