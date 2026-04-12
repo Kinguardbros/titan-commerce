@@ -60,7 +60,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
   const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
   const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
-  const approved = useMemo(() => creatives.filter((c) => c.status === 'approved' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
+  const approved = useMemo(() => creatives.filter((c) => (c.status === 'approved' || c.status === 'published') && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
 
   const handleApprove = async (id, comment) => {
     try { await approveAd(id, 'Team', comment); toast.success('Creative approved!'); } catch (e) { console.error(e); toast.error(`Approve failed: ${e.message}`); }
@@ -78,7 +78,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   };
 
   const totalPending = creatives.filter((c) => c.status === 'pending').length;
-  const totalApproved = creatives.filter((c) => c.status === 'approved').length;
+  const totalApproved = creatives.filter((c) => c.status === 'approved' || c.status === 'published').length;
 
   return (
     <div className="pw">
