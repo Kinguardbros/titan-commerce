@@ -197,6 +197,21 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
             </div>
 
             <div className="ce-actions">
+              {hasImage && (
+                <a className="ce-btn download" href={imageUrl} download={`creative-${creative.id}.${isVideo ? 'mp4' : 'png'}`} target="_blank" rel="noopener noreferrer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    fetch(imageUrl).then((r) => r.blob()).then((blob) => {
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `creative-${creative.id}.${isVideo ? 'mp4' : 'png'}`;
+                      a.click();
+                      URL.revokeObjectURL(a.href);
+                    }).catch(() => window.open(imageUrl, '_blank'));
+                  }}>
+                  Download
+                </a>
+              )}
               <button
                 className="ce-btn regenerate"
                 onClick={handleRegenerate}

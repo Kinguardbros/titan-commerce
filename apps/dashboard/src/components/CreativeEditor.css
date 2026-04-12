@@ -198,6 +198,11 @@
   border-color: rgba(201,168,76,.2);
 }
 .ce-btn.save:hover { background: rgba(201,168,76,.2); }
+.ce-btn.download {
+  background: var(--bg-surface); color: var(--text-secondary);
+  border-color: var(--border-default); text-decoration: none; text-align: center;
+}
+.ce-btn.download:hover { background: var(--bg-card-hover); color: var(--text-primary); }
 .ce-btn.regenerate {
   background: var(--azure-glow); color: var(--azure);
   border-color: rgba(92,143,212,.2);
