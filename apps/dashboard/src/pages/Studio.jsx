@@ -122,21 +122,27 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
     ) : '';
     const customPrompt = `${bodyHint}${framingHint}`.trim();
 
-    const jobs = [];
+    const allJobs = [];
     for (const productId of bulkSelected) {
       for (let i = 0; i < bulkCount; i++) {
-        jobs.push(
-          generateCreatives({
-            product_id: productId, store_id: storeId, style: bulkStyle,
-            ai_model: bulkModel, show_model: bulkSubject, text_overlay: 'none',
-            aspect_ratio: bulkRatio,
-            custom_prompt: customPrompt || undefined,
-          }).then(() => setBulkCompleted((p) => p + 1))
-            .catch((err) => { console.error(`Bulk gen failed for ${productId}:`, err); setBulkCompleted((p) => p + 1); })
-        );
+        allJobs.push({ productId });
       }
     }
-    await Promise.allSettled(jobs);
+
+    // Process in batches of 10 to avoid Vercel timeout
+    const BATCH_SIZE = 10;
+    for (let b = 0; b < allJobs.length; b += BATCH_SIZE) {
+      const batch = allJobs.slice(b, b + BATCH_SIZE);
+      await Promise.allSettled(batch.map((job) =>
+        generateCreatives({
+          product_id: job.productId, store_id: storeId, style: bulkStyle,
+          ai_model: bulkModel, show_model: bulkSubject, text_overlay: 'none',
+          aspect_ratio: bulkRatio,
+          custom_prompt: customPrompt || undefined,
+        }).then(() => setBulkCompleted((p) => p + 1))
+          .catch((err) => { console.error(`Bulk gen failed for ${job.productId}:`, err); setBulkCompleted((p) => p + 1); })
+      ));
+    }
     setBulkGenerating(false);
     toast.success(`Bulk generation complete!`);
     fetchCreatives();
