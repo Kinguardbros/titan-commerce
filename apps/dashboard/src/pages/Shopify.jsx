@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ShopifyDashboard from '../components/ShopifyDashboard';
+import ShopifyServices from '../components/ShopifyServices';
 import { getAllProducts, bulkUpdatePrices } from '../lib/api';
 import DocsBrowser from '../components/DocsBrowser';
 import BrandKnowledge from '../components/BrandKnowledge';
@@ -83,7 +84,16 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
 
       {/* Dashboard */}
       {subTab === 'dashboard' && (
-        <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
+        <>
+          <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
+          <div style={{ marginTop: 24 }}>
+            <div className="sh-title gradient-heading" style={{ fontSize: 11, marginBottom: 12 }}>Services</div>
+            <ShopifyServices onSwitchTab={(action) => {
+              if (action === 'pricing') setSubTab('pricing');
+              else if (action === 'knowledge') setSubTab('knowledge');
+            }} />
+          </div>
+        </>
       )}
 
       {/* Knowledge */}

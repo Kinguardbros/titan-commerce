@@ -4,7 +4,6 @@ import { approveProposal, rejectProposal, approveAllProposals, scanEvents } from
 import { useToast } from '../hooks/useToast.jsx';
 import ProposalCard from '../components/ProposalCard';
 import ApprovalQueue from '../components/ApprovalQueue';
-import ShopifyServices from '../components/ShopifyServices';
 import TerminalLog from '../components/TerminalLog';
 import MetaPanel from '../components/MetaPanel';
 import './Overview.css';
@@ -132,13 +131,6 @@ export default function Overview({ onNavigateToProduct, onNavigateToStudio, onNa
         <MetaPanel />
       </div>
 
-      <div className="ov-services-section">
-        <div className="ov-services-title gradient-heading">Services</div>
-        <ShopifyServices onSwitchTab={(action) => {
-          if (action === 'pricing') onNavigateToShopify?.();
-          else if (action === 'dashboard') onNavigateToShopify?.();
-        }} />
-      </div>
     </div>
   );
 }
