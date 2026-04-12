@@ -98,8 +98,22 @@ export default async function handler(req, res) {
       }
     }
 
-    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals across ${stores?.length || 0} stores` });
-    return res.status(200).json({ events: totalEvents, proposals: totalProposals });
+    // Auto-cleanup: delete pending creatives older than 2 days
+    let cleanedUp = 0;
+    try {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 2);
+      const { data: stale } = await supabase.from('creatives').select('id, storage_path')
+        .eq('status', 'pending').lt('created_at', cutoff.toISOString());
+      for (const c of stale || []) {
+        if (c.storage_path) await supabase.storage.from('creatives').remove([c.storage_path]);
+        await supabase.from('creatives').delete().eq('id', c.id);
+        cleanedUp++;
+      }
+    } catch (cleanErr) { console.error('[cron] Cleanup failed:', cleanErr.message); }
+
+    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned` });
+    return res.status(200).json({ events: totalEvents, proposals: totalProposals, cleaned: cleanedUp });
   } catch (err) {
     console.error('[cron/detect-events] Error:', err);
     return res.status(500).json({ error: 'Cron failed', details: err.message });

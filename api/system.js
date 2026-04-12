@@ -784,7 +784,7 @@ async function handler(req, res) {
 
       if (action === 'cleanup_stale') {
         const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 7);
+        cutoff.setDate(cutoff.getDate() - 2);
 
         const { data: stale } = await supabase
           .from('creatives')
@@ -813,7 +813,7 @@ async function handler(req, res) {
 
         await supabase.from('pipeline_log').insert({
           agent: 'CLEANUP', level: 'info',
-          message: `Cleaned ${deleted} stale pending creatives (older than 7 days)`,
+          message: `Cleaned ${deleted} stale pending creatives (older than 2 days)`,
         });
 
         return res.status(200).json({ deleted, total_checked: stale?.length || 0 });
