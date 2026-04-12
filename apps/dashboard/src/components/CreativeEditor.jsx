@@ -186,6 +186,11 @@ export default function CreativeEditor({ creative, open, onClose, onApprove, onR
               <div className="ce-detail-row">
                 <span>Status</span><span className={`pill ${creative.status}`}>{creative.status}</span>
               </div>
+              {creative.status === 'published' && (
+                <div className="ce-detail-row">
+                  <span>Published</span><span style={{ color: 'var(--accent-success)', fontSize: 11 }}>Pushed to Shopify</span>
+                </div>
+              )}
               <div className="ce-detail-row">
                 <span>Created</span><span>{new Date(creative.created_at).toLocaleDateString('en-US')}</span>
               </div>

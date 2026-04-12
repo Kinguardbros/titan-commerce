@@ -220,6 +220,8 @@ a:focus-visible,
 .pill.ended { background: rgba(82,82,91,.15); color: var(--text-muted); }
 .pill.approved { background: var(--accent-success-soft); color: var(--accent-success); }
 .pill.approved::before { content: '\2713 '; }
+.pill.published { background: var(--accent-success-soft); color: var(--accent-success); }
+.pill.published::before { content: '\2713 '; }
 .pill.rejected { background: var(--accent-danger-soft); color: var(--accent-danger); }
 .pill.rejected::before { content: '\2717 '; }
 .pill.pending::before { content: '\23F3 '; }
