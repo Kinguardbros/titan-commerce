@@ -45,6 +45,11 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [bulkSelected, setBulkSelected] = useState(new Set());
   const [bulkStyle, setBulkStyle] = useState('ad_creative');
   const [bulkCount, setBulkCount] = useState(2);
+  const [bulkModel, setBulkModel] = useState('fal_nano_banana');
+  const [bulkSubject, setBulkSubject] = useState(true);
+  const [bulkBodyType, setBulkBodyType] = useState('Auto');
+  const [bulkFraming, setBulkFraming] = useState('Full body');
+  const [bulkRatio, setBulkRatio] = useState('1:1');
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkCompleted, setBulkCompleted] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
@@ -109,13 +114,23 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
     setBulkTotal(total);
     toast.info(`Generating ${total} images across ${bulkSelected.size} products...`);
 
+    const bodyHint = bulkSubject && bulkBodyType !== 'Auto' ? `Model body type: ${bulkBodyType}. ` : '';
+    const framingHint = bulkSubject ? (
+      bulkFraming === 'Head crop' ? 'Framing: crop from chest up, do NOT show full head — cut off the top of the head above the eyes. Focus on the product, not the face. '
+      : bulkFraming === 'Cropped with head' ? 'Framing: crop from waist/hip up, show full head and face. Upper body portrait with the product clearly visible. '
+      : 'Framing: full body shot, show the model head to toe. '
+    ) : '';
+    const customPrompt = `${bodyHint}${framingHint}`.trim();
+
     const jobs = [];
     for (const productId of bulkSelected) {
       for (let i = 0; i < bulkCount; i++) {
         jobs.push(
           generateCreatives({
             product_id: productId, store_id: storeId, style: bulkStyle,
-            ai_model: 'fal_nano_banana', show_model: true, text_overlay: 'none',
+            ai_model: bulkModel, show_model: bulkSubject, text_overlay: 'none',
+            aspect_ratio: bulkRatio,
+            custom_prompt: customPrompt || undefined,
           }).then(() => setBulkCompleted((p) => p + 1))
             .catch((err) => { console.error(`Bulk gen failed for ${productId}:`, err); setBulkCompleted((p) => p + 1); })
         );
@@ -264,7 +279,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
               Select products and generate multiple images at once. All run in parallel.
             </p>
 
-            <div className="studio-row" style={{ marginBottom: 16 }}>
+            <div className="studio-row" style={{ marginBottom: 12 }}>
               <div>
                 <div className="studio-field-label">Style</div>
                 <div className="studio-pills">
@@ -282,6 +297,53 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
                 </div>
               </div>
             </div>
+
+            <div className="studio-row" style={{ marginBottom: 12 }}>
+              <div>
+                <div className="studio-field-label">AI Model</div>
+                <div className="studio-pills">
+                  {[['fal_nano_banana', 'Nano Banana'], ['fal_flux2_edit', 'FLUX.2'], ['fal_flux2_pro_edit', 'FLUX.2 Pro'], ['fal_ideogram_bg', 'Ideogram BG']].map(([k, l]) => (
+                    <button key={k} className={`studio-pill${bulkModel === k ? ' studio-pill--active' : ''}`} onClick={() => setBulkModel(k)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="studio-field-label">Subject</div>
+                <div className="studio-pills">
+                  <button className={`studio-pill${bulkSubject ? ' studio-pill--active' : ''}`} onClick={() => setBulkSubject(true)}>On Model</button>
+                  <button className={`studio-pill${!bulkSubject ? ' studio-pill--active' : ''}`} onClick={() => setBulkSubject(false)}>No Model</button>
+                </div>
+              </div>
+              <div>
+                <div className="studio-field-label">Aspect Ratio</div>
+                <div className="studio-pills">
+                  {['1:1', '4:5', '9:16', '16:9'].map((r) => (
+                    <button key={r} className={`studio-pill studio-pill--sm${bulkRatio === r ? ' studio-pill--active' : ''}`} onClick={() => setBulkRatio(r)}>{r}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {bulkSubject && (
+              <div className="studio-row" style={{ marginBottom: 12 }}>
+                <div>
+                  <div className="studio-field-label">Body Type</div>
+                  <div className="studio-pills">
+                    {['Auto', 'Slim', 'Athletic', 'Average', 'Curvy', 'Plus-size'].map((b) => (
+                      <button key={b} className={`studio-pill${bulkBodyType === b ? ' studio-pill--active' : ''}`} onClick={() => setBulkBodyType(b)}>{b}</button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="studio-field-label">Framing</div>
+                  <div className="studio-pills">
+                    {['Full body', 'Cropped with head', 'Head crop'].map((f) => (
+                      <button key={f} className={`studio-pill${bulkFraming === f ? ' studio-pill--active' : ''}`} onClick={() => setBulkFraming(f)}>{f}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div className="studio-field-label" style={{ margin: 0 }}>Products ({bulkSelected.size}/{products.length})</div>
