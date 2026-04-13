@@ -75,10 +75,10 @@ export function regenerateCreative(creativeId) {
   });
 }
 
-export function generateCreatives({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio, story_id, story_shot }) {
+export function generateCreatives({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio, story_id, story_shot, reference_url }) {
   return fetchJSON('/api/creatives/generate', {
     method: 'POST',
-    body: JSON.stringify({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio, story_id, story_shot }),
+    body: JSON.stringify({ product_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, store_id, audience, aspect_ratio, story_id, story_shot, reference_url }),
   });
 }
 

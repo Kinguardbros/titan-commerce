@@ -2,7 +2,7 @@
 // Each shot's buildPrompt(product, heroColor) returns a custom_prompt string for generateCreatives()
 
 // Consistency instruction appended to every shot (except material close-up)
-const MODEL_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: Use the EXACT SAME woman across ALL shots in this series — same face, same hair color and style, same skin tone, same body type, same age. She must be recognizable as the same person in every image. Do NOT change the model between shots.`;
+const MODEL_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: The FIRST reference image shows the EXACT model to use — match her face, hair color and style, skin tone, body type, and age PRECISELY. She must be recognizable as the same person. Do NOT change the model.`;
 
 export const STORY_SHOTS = [
   {

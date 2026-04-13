@@ -45,7 +45,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience, aspect_ratio = '1:1', story_id, story_shot } = req.body;
+  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience, aspect_ratio = '1:1', story_id, story_shot, reference_url } = req.body;
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
@@ -63,6 +63,9 @@ async function handler(req, res) {
     }
 
     let images = JSON.parse(product.images || '[]');
+    if (reference_url) {
+      images = [reference_url, ...images];
+    }
     // If store has a different shopify_url, re-map image URLs if needed
     if (storeShopifyUrl && product.product_url && !product.product_url.includes(storeShopifyUrl)) {
       // Images come from Shopify CDN, so they should still work — no remapping needed

@@ -101,15 +101,38 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
       const sceneCtx = scene !== 'Auto' ? `\nScene/Environment: ${scene}. Set the photo in this specific environment.` : '';
       const audienceCtx = audience !== 'auto' ? audience : undefined;
 
-      // Build all jobs with story_id + story_shot
-      const allJobs = [
-        ...shots.map(shot => ({
+      // 1. Hero shot FIRST (sequential) — becomes visual reference for all others
+      const heroShot = shots.find(s => s.key === 'hero');
+      const otherShots = shots.filter(s => s.key !== 'hero');
+      let heroUrl = null;
+
+      if (heroShot) {
+        setProgress({ current: 0, total, label: 'Hero Shot (anchor)...' });
+        try {
+          const result = await generateCreatives({
+            product_id: product.id, store_id: storeId, style: heroShot.suggestedStyle,
+            custom_prompt: heroShot.buildPrompt(product, heroColor) + sceneCtx,
+            show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
+            audience: audienceCtx, story_id: storyId, story_shot: 'hero',
+          });
+          heroUrl = result?.file_url || null;
+        } catch (err) {
+          console.error('[PhotoStory] Hero failed:', { error: err.message });
+          toast.error('Hero shot failed — continuing without reference');
+        }
+        completed++;
+      }
+
+      // 2. Remaining shots PARALLEL with hero as reference_url
+      const remainingJobs = [
+        ...otherShots.map(shot => ({
           label: shot.label,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
             custom_prompt: shot.buildPrompt(product, heroColor) + sceneCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: shot.key,
+            reference_url: heroUrl,
           }),
         })),
         ...[...variantColors].map(color => ({
@@ -119,15 +142,14 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             custom_prompt: buildColorVariantPrompt(product, color) + sceneCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: `color_${color.toLowerCase().replace(/\s+/g, '-')}`,
+            reference_url: heroUrl,
           }),
         })),
       ];
 
-      // Generate in parallel (max 5 concurrent)
-      setProgress({ current: 0, total, label: 'Generating all shots...' });
       const BATCH = 5;
-      for (let i = 0; i < allJobs.length; i += BATCH) {
-        const batch = allJobs.slice(i, i + BATCH);
+      for (let i = 0; i < remainingJobs.length; i += BATCH) {
+        const batch = remainingJobs.slice(i, i + BATCH);
         setProgress({ current: completed, total, label: batch.map(j => j.label).join(', ') });
         const results = await Promise.allSettled(batch.map(j => j.fn()));
         results.forEach((r, idx) => {
@@ -153,6 +175,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             ai_model: aiModel,
             aspect_ratio: aspectRatio,
             audience: audienceCtx,
+            reference_url: heroUrl,
           });
         } catch (err) {
           console.error('[PhotoStory] UGC failed:', { error: err.message });
