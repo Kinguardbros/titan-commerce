@@ -356,8 +356,14 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
       const as = (data.skills || []).find((s) => s.skill_type === "audience-personas");
       if (as?.content) {
         const parsed = [];
-        const rx = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
-        let m; while ((m = rx.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, "") });
+        // Format 1: "Name (Age) — Label"
+        const rx1 = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
+        let m; while ((m = rx1.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, "") });
+        // Format 2: "### Persona N: Name "Label"\n- **Age**: N"
+        if (!parsed.length) {
+          const rx2 = /###\s*Persona\s*\d+:\s*(\w+)\s*"([^"]+)"\s*\n[^]*?(?:\*\*Age\*\*|Age):\s*(\d+)/g;
+          while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
+        }
         if (parsed.length) setPersonas(parsed);
       }
     }).catch(() => {});
