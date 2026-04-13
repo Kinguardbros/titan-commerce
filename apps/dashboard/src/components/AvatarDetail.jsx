@@ -120,69 +120,43 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
   return (
     <div className="avd-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="avd-modal">
-        {/* Left toolbar */}
-        <div className="avd-toolbar">
-          <button onClick={handleGenerate} disabled={generating} title="Generate variants">
-            {generating ? '...' : 'Gen'}
-          </button>
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} title="Upload photo">
-            {uploading ? '...' : 'Upload'}
-          </button>
-          <button onClick={() => setShowEdit(p => !p)} title="Edit description">
-            Edit
-          </button>
-          <button onClick={handleDelete} title="Delete avatar" className="avd-tool--danger">
-            Del
-          </button>
-        </div>
-
-        {/* Main content */}
-        <div className="avd-main">
-          {/* Preview area — D&D zone */}
-          <div
-            className={`avd-preview ${dragging ? 'avd-preview--drag' : ''}`}
-            onDragEnter={(e) => { e.preventDefault(); dragCounter.current++; setDragging(true); }}
-            onDragLeave={(e) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current === 0) setDragging(false); }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-          >
-            {referenceUrl ? (
-              <img src={referenceUrl} alt={persona.name} />
-            ) : (
-              <div className="avd-placeholder">Drop a photo here or click Upload</div>
-            )}
-            <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleFileSelect} />
-          </div>
-
-          {/* Info */}
+        {/* Left panel — info + toolbar + variants */}
+        <div className="avd-left">
           <div className="avd-info">
             <div className="avd-info-name">{persona.name} &ldquo;{persona.label}&rdquo; &middot; {persona.age}</div>
             {showEdit ? (
-              <textarea
-                value={descText}
-                onChange={(e) => setDescText(e.target.value)}
-                className="avd-desc-edit"
-                rows={3}
-                placeholder="Describe this persona's look, style, and vibe..."
-              />
+              <textarea value={descText} onChange={(e) => setDescText(e.target.value)}
+                className="avd-desc-edit" rows={3} placeholder="Describe this persona's look, style, and vibe..." />
             ) : (
               <div className="avd-info-desc">{descText || persona.label}</div>
             )}
           </div>
 
-          {/* Variants */}
+          <div className="avd-toolbar">
+            <button onClick={handleGenerate} disabled={generating} title="Generate variants from persona description">
+              {generating ? '...' : '🎲 Generate'}
+            </button>
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} title="Upload your own photo">
+              {uploading ? '...' : '📁 Upload'}
+            </button>
+            <button onClick={() => setShowEdit(p => !p)} title="Edit description">
+              ✏️ Edit
+            </button>
+            <button onClick={handleDelete} title="Delete avatar" className="avd-tool--danger">
+              🗑 Delete
+            </button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={handleFileSelect} />
+
           {variants.length > 0 && (
             <div className="avd-variants">
-              <div className="avd-variants-label">Variants</div>
+              <div className="avd-variants-label">Variants — click to set as reference</div>
               <div className="avd-variants-grid">
                 {variants.map((v, i) => {
                   const url = v.url || v;
                   return (
-                    <div
-                      key={i}
-                      className={`avd-variant ${url === referenceUrl ? 'avd-variant--active' : ''}`}
-                      onClick={() => handleSetReference(url)}
-                    >
+                    <div key={i} className={`avd-variant ${url === referenceUrl ? 'avd-variant--active' : ''}`}
+                      onClick={() => handleSetReference(url)}>
                       <img src={url} alt={`v${i + 1}`} />
                       {url === referenceUrl && <div className="avd-variant-check">&#10003;</div>}
                     </div>
@@ -190,6 +164,20 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
                 })}
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Right — full photo preview (D&D zone) */}
+        <div className={`avd-preview ${dragging ? 'avd-preview--drag' : ''}`}
+          onDragEnter={(e) => { e.preventDefault(); dragCounter.current++; setDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current === 0) setDragging(false); }}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          {referenceUrl ? (
+            <img src={referenceUrl} alt={persona.name} />
+          ) : (
+            <div className="avd-placeholder">Drop a photo here<br/>or click Upload</div>
           )}
         </div>
 
