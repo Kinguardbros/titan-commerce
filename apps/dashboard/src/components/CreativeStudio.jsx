@@ -85,7 +85,7 @@ const STYLE_CATEGORIES = [
     styles: [],
   },
   {
-    id: "ad-creatives", label: "Ad creatives", icon: "✦",
+    id: "ad-creatives", label: "Images", icon: "✦",
     styles: [
       { id: "ad-creative", title: "Ad creative", desc: "Studio lighting, gold tones", icon: "✦" },
       { id: "lifestyle", title: "Lifestyle", desc: "Real setting, natural light", icon: "▣" },

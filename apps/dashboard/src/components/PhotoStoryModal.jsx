@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { generateCreatives, getProductDetail } from '../lib/api';
+const genStoryId = () => crypto.randomUUID();
 import { STORY_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
 import { useToast } from '../hooks/useToast.jsx';
 import './PhotoStoryModal.css';
@@ -74,9 +75,10 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
     setProgress({ current: 0, total, label: '' });
 
     try {
+      const storyId = genStoryId();
       const shots = STORY_SHOTS.filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
 
-      // Build all jobs
+      // Build all jobs with story_id + story_shot
       const allJobs = [
         ...shots.map(shot => ({
           label: shot.label,
@@ -84,6 +86,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
             custom_prompt: shot.buildPrompt(product, heroColor),
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
+            story_id: storyId, story_shot: shot.key,
           }),
         })),
         ...variantColors.map(color => ({
@@ -92,6 +95,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             product_id: product.id, store_id: storeId, style: 'product_shot',
             custom_prompt: buildColorVariantPrompt(product, color),
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
+            story_id: storyId, story_shot: `color_${color.toLowerCase().replace(/\s+/g, '-')}`,
           }),
         })),
       ];
