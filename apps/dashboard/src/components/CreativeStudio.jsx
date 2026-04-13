@@ -336,6 +336,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [selectedColor, setSelectedColor] = useState("All colors");
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState("auto");
+  const [useAudience, setUseAudience] = useState(true);
 
   useEffect(() => {
     const sid = storeId;
@@ -495,7 +496,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             show_model: subject === "On model",
             text_overlay: textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom",
             overlay_text: textMode === "Custom" ? customText : "",
-            audience: audience !== "auto" ? audience : undefined,
+            audience: useAudience && audience !== "auto" ? audience : undefined,
             aspect_ratio: imgRatio,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
@@ -506,7 +507,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, abMode, abStyle, selectedColor, audience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, abMode, abStyle, selectedColor, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -664,8 +665,41 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             )}
             {personas.length > 0 && subject === "On model" && (
               <div>
-                <SectionLabel style={{ marginTop: "0.75rem" }}>Audience</SectionLabel>
-                <Select value={audience} onChange={setAudience} options={["auto", ...personas.map((p) => p.name)]} renderOption={(opt) => opt === "auto" ? "Auto — best match" : `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || ""}`} />
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "0.75rem" }}>
+                  <button onClick={() => setUseAudience(!useAudience)} style={{
+                    width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                    background: useAudience ? NEON : "rgba(255,255,255,0.08)", position: "relative", transition: "background 0.2s",
+                  }}>
+                    <div style={{
+                      width: 16, height: 16, borderRadius: 8, background: "#fff",
+                      position: "absolute", top: 2, left: useAudience ? 18 : 2, transition: "left 0.2s",
+                    }} />
+                  </button>
+                  <SectionLabel style={{ margin: 0 }}>Audience targeting</SectionLabel>
+                  <div className="cs-audience-tip" style={{ position: "relative", display: "inline-flex" }}>
+                    <span style={{ width: 16, height: 16, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER_DIM}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: TEXT_MID, cursor: "help" }}>?</span>
+                    <div className="cs-audience-tooltip" style={{
+                      display: "none", position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+                      background: "#1a1a22", border: `1px solid ${BORDER_DEFAULT}`, borderRadius: 10, padding: "12px 14px",
+                      width: 260, zIndex: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
+                    }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", marginBottom: 6 }}>Audience Targeting</div>
+                      <div style={{ fontSize: 10, color: TEXT_MID, lineHeight: 1.5, marginBottom: 8 }}>
+                        When enabled, the AI model on the photo will match your target audience persona — age, body type, expression, and energy.
+                      </div>
+                      {personas.length > 0 && (
+                        <div style={{ fontSize: 9, color: TEXT_DIM, borderTop: `1px solid ${BORDER_DIM}`, paddingTop: 6 }}>
+                          {personas.map((p, i) => (
+                            <div key={i} style={{ marginBottom: 3 }}><span style={{ color: NEON_LIGHT }}>{p.name}</span> ({p.age}) — {p.label}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {useAudience && (
+                  <Select value={audience} onChange={setAudience} options={["auto", ...personas.map((p) => p.name)]} renderOption={(opt) => opt === "auto" ? "Auto — best match" : `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || ""}`} />
+                )}
               </div>
             )}
           </div>
@@ -943,6 +977,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           box-shadow: ${NEON_GLOW_SM};
         }
         ::placeholder { color: rgba(255,255,255,0.18); }
+        .cs-audience-tip:hover .cs-audience-tooltip { display: block !important; }
       `}</style>
     </div>
     </div>

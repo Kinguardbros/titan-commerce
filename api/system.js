@@ -1691,7 +1691,7 @@ Only include sections that have specific, actionable rules from the sources.` }]
         // Build skill content
         const palette = (analysis.color_palette || []).join(', ');
         const refList = uploadedUrls.map(u => `- ${u}`).join('\n');
-        const content = `# Custom Style: ${name}\n\n${description || ''}\n\n## VISUAL ANALYSIS\n- **Color palette:** ${palette}\n- **Lighting:** ${analysis.lighting || ''}\n- **Composition:** ${analysis.composition || ''}\n- **Model direction:** ${analysis.model_posing || ''}\n- **Setting:** ${analysis.setting || ''}\n- **Mood:** ${analysis.mood || ''}\n- **Camera:** ${analysis.camera_angle || ''}\n- **Unique:** ${analysis.distinguishing_features || ''}\n\n## PROMPT TEMPLATE\n${analysis.prompt_template || ''}\n\n## REFERENCE IMAGES\n${refList}`;
+        const content = `# Custom Style: ${name}\n\nREQUIRES: audience-personas skill\nREQUIRES: brand-voice skill\n\n${description || ''}\n\n## VISUAL ANALYSIS\n- **Color palette:** ${palette}\n- **Lighting:** ${analysis.lighting || ''}\n- **Composition:** ${analysis.composition || ''}\n- **Setting:** ${analysis.setting || ''}\n- **Mood:** ${analysis.mood || ''}\n- **Camera:** ${analysis.camera_angle || ''}\n- **Color grading:** ${analysis.color_grading || ''}\n- **Unique:** ${analysis.distinguishing_features || ''}\n\n## PROMPT TEMPLATE\n${analysis.prompt_template || ''}\n\n## REFERENCE IMAGES\n${refList}`;
 
         // Upsert into store_skills
         const skillType = `custom-style-${slug}`;
