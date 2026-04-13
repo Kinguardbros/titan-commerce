@@ -3,12 +3,20 @@
 .av-title { font-family: var(--heading); font-size: 20px; background: var(--gold-text); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .av-subtitle { font-family: var(--mono); font-size: 10px; color: var(--text4); margin-top: 2px; }
 .av-loading { font-family: var(--mono); font-size: 11px; color: var(--text4); padding: 40px 0; text-align: center; }
+.av-header-actions { display: flex; gap: 8px; align-items: center; }
 .av-create-btn {
   background: var(--gold); color: var(--void); border: none; border-radius: 8px;
   padding: 8px 18px; font-family: var(--mono); font-size: 11px; font-weight: 600;
   cursor: pointer; white-space: nowrap;
 }
 .av-create-btn:hover { background: #b8a050; }
+.av-import-btn {
+  background: var(--surface); color: var(--text2); border: 1px solid var(--edge);
+  border-radius: 8px; padding: 8px 14px; font-family: var(--mono); font-size: 11px;
+  cursor: pointer; white-space: nowrap; transition: all 0.2s;
+}
+.av-import-btn:hover { border-color: var(--gold); color: var(--text1); }
+.av-import-btn:disabled { opacity: 0.5; cursor: wait; }
 
 .av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
 .av-card {

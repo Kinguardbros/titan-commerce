@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getAvatars, getSkills, generateAvatar } from '../lib/api';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { getAvatars, getSkills, generateAvatar, uploadStoreDoc, generateSkills } from '../lib/api';
 import AvatarDetail from '../components/AvatarDetail';
 import AvatarBuilder from '../components/AvatarBuilder';
 import { useToast } from '../hooks/useToast.jsx';
@@ -12,6 +12,8 @@ export default function Avatars({ storeId, store }) {
   const [loading, setLoading] = useState(true);
   const [selectedPersona, setSelectedPersona] = useState(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
 
   // Fetch existing avatars + personas from audience-personas skill
   useEffect(() => {
@@ -50,8 +52,50 @@ export default function Avatars({ storeId, store }) {
     return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '' };
   });
 
-  const refresh = () => {
-    getAvatars(storeId).then(data => setAvatars(data || [])).catch(() => {});
+  const refresh = useCallback(() => {
+    Promise.all([
+      getAvatars(storeId),
+      getSkills(storeId),
+    ]).then(([avatarData, skillsData]) => {
+      setAvatars(avatarData || []);
+      const audienceSkill = (skillsData.skills || []).find(s => s.skill_type === 'audience-personas');
+      if (audienceSkill?.content) {
+        const parsed = [];
+        const rx1 = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
+        let m; while ((m = rx1.exec(audienceSkill.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, '') });
+        if (!parsed.length) {
+          const rx2 = /###\s*Persona\s*\d+:\s*(\w+)\s*"([^"]+)"\s*\n[^]*?(?:\*\*Age\*\*|Age):\s*(\d+)/g;
+          while ((m = rx2.exec(audienceSkill.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
+        }
+        if (parsed.length) setPersonas(parsed);
+      }
+    }).catch(() => {});
+  }, [storeId]);
+
+  const handleDocUpload = async (file) => {
+    const allowed = ['.pdf', '.docx', '.doc', '.md', '.txt'];
+    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    if (!allowed.includes(ext)) { toast.error('Supported: PDF, DOCX, MD, TXT'); return; }
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.includes(',') ? reader.result.split(',')[1] : reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const storeName = store?.name || 'Store';
+      await uploadStoreDoc(storeName, file.name, base64, storeId, true);
+      toast.info('Processing document...');
+      await generateSkills(storeId);
+      toast.success('Document imported — personas updated');
+      refresh();
+    } catch (err) {
+      console.error('[Avatars] Doc upload failed:', { error: err.message });
+      toast.error(`Import failed: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   if (loading) return <div className="av-loading">Loading avatars...</div>;
@@ -63,7 +107,13 @@ export default function Avatars({ storeId, store }) {
           <div className="av-title">Avatar Studio</div>
           <div className="av-subtitle">Manage model references for consistent product photos</div>
         </div>
-        <button className="av-create-btn" onClick={() => setShowBuilder(true)}>+ Create New</button>
+        <div className="av-header-actions">
+          <button className="av-import-btn" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? 'Importing...' : '📄 Import Doc'}
+          </button>
+          <button className="av-create-btn" onClick={() => setShowBuilder(true)}>+ Create New</button>
+        </div>
+        <input ref={fileRef} type="file" accept=".pdf,.docx,.doc,.md,.txt" hidden onChange={(e) => { if (e.target.files?.[0]) handleDocUpload(e.target.files[0]); e.target.value = ''; }} />
       </div>
 
       <div className="av-grid">
