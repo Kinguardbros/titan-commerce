@@ -152,7 +152,7 @@ export default function ApprovalQueue({ storeId }) {
 
       {/* Detail modal */}
       {editingCreative && (() => {
-        const all = [...pending, ...approved, ...rejected];
+        const all = creatives;
         const idx = all.findIndex(c => c.id === editingCreative.id);
         return (
           <CreativeDetailModal
