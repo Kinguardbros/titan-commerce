@@ -83,10 +83,21 @@ export function mapCreativeToModalData(creative) {
   };
 }
 
-export default function CreativeDetailModal({ data, onClose, onAction }) {
+export default function CreativeDetailModal({ data, onClose, onAction, onPrev, onNext }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [showNeg, setShowNeg] = useState(false);
   const status = STATUS_MAP[data.status] || STATUS_MAP.pending;
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'ArrowLeft' && onPrev) onPrev();
+      else if (e.key === 'ArrowRight' && onNext) onNext();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onPrev, onNext, onClose]);
 
   const configRows = [
     { label: 'Model', value: data.model },
@@ -117,6 +128,8 @@ export default function CreativeDetailModal({ data, onClose, onAction }) {
         <div className="cdm-image-pane">
           {!imgLoaded && <div className="cdm-spinner"><div className="cdm-spinner-ring" /></div>}
           <img src={data.imageUrl} alt={data.product} onLoad={() => setImgLoaded(true)} style={{ opacity: imgLoaded ? 1 : 0 }} />
+          {onPrev && <button className="cdm-nav cdm-nav--prev" onClick={onPrev} aria-label="Previous">‹</button>}
+          {onNext && <button className="cdm-nav cdm-nav--next" onClick={onNext} aria-label="Next">›</button>}
           <div className="cdm-image-badges">
             <div className="cdm-badge-pill">{data.aspectRatio}</div>
             <div className="cdm-badge-pill">{data.resolution}</div>

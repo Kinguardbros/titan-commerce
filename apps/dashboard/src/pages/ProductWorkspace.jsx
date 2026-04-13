@@ -192,23 +192,28 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
         <CreativeStudio product={product} storeId={storeId} creatives={creatives}
           onClose={() => setShowGenerate(false)} onGenerated={() => { setShowGenerate(false); fetchCreatives(); }} />
       )}
-      {editingCreative && (
-        <CreativeDetailModal
-          data={mapCreativeToModalData(editingCreative)}
-          onClose={() => setEditingCreative(null)}
-          onAction={(actionId) => {
-            const id = editingCreative.id;
-            switch (actionId) {
-              case 'approve': handleApprove(id); break;
-              case 'reject': handleReject(id); break;
-              case 'download': window.open(editingCreative.file_url, '_blank'); break;
-              case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
-              case 'convert-video': convertToVideo(id).then(() => { toast.success('Converting to video...'); setEditingCreative(null); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
-              default: break;
-            }
-          }}
-        />
-      )}
+      {editingCreative && (() => {
+        const idx = creatives.findIndex(c => c.id === editingCreative.id);
+        return (
+          <CreativeDetailModal
+            data={mapCreativeToModalData(editingCreative)}
+            onClose={() => setEditingCreative(null)}
+            onPrev={idx > 0 ? () => setEditingCreative(creatives[idx - 1]) : null}
+            onNext={idx < creatives.length - 1 ? () => setEditingCreative(creatives[idx + 1]) : null}
+            onAction={(actionId) => {
+              const id = editingCreative.id;
+              switch (actionId) {
+                case 'approve': handleApprove(id); break;
+                case 'reject': handleReject(id); break;
+                case 'download': window.open(editingCreative.file_url, '_blank'); break;
+                case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
+                case 'convert-video': convertToVideo(id).then(() => { toast.success('Converting to video...'); setEditingCreative(null); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
+                default: break;
+              }
+            }}
+          />
+        );
+      })()}
       {showOptimize && (
         <OptimizePanel product={product} onClose={() => setShowOptimize(false)} onApplied={() => { setShowOptimize(false); }} />
       )}

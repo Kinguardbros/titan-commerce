@@ -151,22 +151,28 @@ export default function ApprovalQueue({ storeId }) {
       )}
 
       {/* Detail modal */}
-      {editingCreative && (
-        <CreativeDetailModal
-          data={mapCreativeToModalData(editingCreative)}
-          onClose={() => setEditingCreative(null)}
-          onAction={(actionId) => {
-            const id = editingCreative.id;
-            switch (actionId) {
-              case 'approve': handleApprove(id); break;
-              case 'reject': handleReject(id); break;
-              case 'download': window.open(editingCreative.file_url, '_blank'); break;
-              case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
-              default: break;
-            }
-          }}
-        />
-      )}
+      {editingCreative && (() => {
+        const all = [...pending, ...approved, ...rejected];
+        const idx = all.findIndex(c => c.id === editingCreative.id);
+        return (
+          <CreativeDetailModal
+            data={mapCreativeToModalData(editingCreative)}
+            onClose={() => setEditingCreative(null)}
+            onPrev={idx > 0 ? () => setEditingCreative(all[idx - 1]) : null}
+            onNext={idx < all.length - 1 ? () => setEditingCreative(all[idx + 1]) : null}
+            onAction={(actionId) => {
+              const id = editingCreative.id;
+              switch (actionId) {
+                case 'approve': handleApprove(id); break;
+                case 'reject': handleReject(id); break;
+                case 'download': window.open(editingCreative.file_url, '_blank'); break;
+                case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
+                default: break;
+              }
+            }}
+          />
+        );
+      })()}
     </>
   );
 }

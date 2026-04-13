@@ -162,3 +162,19 @@
 }
 .cdm-dropdown-item:hover { background: #F5F4FA; }
 .cdm-dropdown-item-icon { font-size: 15px; width: 20px; text-align: center; color: #71717A; }
+
+/* Navigation arrows */
+.cdm-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; border-radius: 50%;
+  background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: #111; font-size: 22px; font-weight: 300;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+  z-index: 2;
+}
+.cdm-image-pane:hover .cdm-nav { opacity: 1; }
+.cdm-nav:hover { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.cdm-nav--prev { left: 12px; }
+.cdm-nav--next { right: 12px; }
