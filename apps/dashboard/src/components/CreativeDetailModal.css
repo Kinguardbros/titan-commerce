@@ -1,0 +1,164 @@
+/* ══ Creative Detail Modal — Trybe Light Design ══ */
+@keyframes cdm-fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cdm-slideUp { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cdm-spin { to { transform: rotate(360deg); } }
+
+.cdm-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; animation: cdm-fadeIn 0.25s ease;
+}
+.cdm-modal {
+  display: flex; width: 100%; max-width: 1020px; height: 88vh;
+  background: #FFFFFF; border-radius: 24px; overflow: hidden;
+  border: 1px solid rgba(0,0,0,0.07);
+  box-shadow: 0 24px 80px rgba(108,71,255,0.08), 0 8px 24px rgba(0,0,0,0.06);
+  animation: cdm-slideUp 0.3s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ─── Left: Image ─── */
+.cdm-image-pane {
+  flex: 0 0 48%; position: relative; background: #f0eff5;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.cdm-image-pane img {
+  width: 100%; height: 100%; object-fit: cover; transition: opacity 0.4s ease;
+}
+.cdm-spinner {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+}
+.cdm-spinner-ring {
+  width: 32px; height: 32px; border: 3px solid rgba(0,0,0,0.07);
+  border-top-color: #6C47FF; border-radius: 50%; animation: cdm-spin 0.8s linear infinite;
+}
+.cdm-image-badges { position: absolute; bottom: 16px; left: 16px; display: flex; gap: 6px; }
+.cdm-badge-pill {
+  padding: 5px 12px; border-radius: 100px; background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px); font-size: 12px; font-weight: 600;
+  color: #71717A; font-family: 'JetBrains Mono', monospace;
+}
+.cdm-status-badge {
+  position: absolute; top: 16px; left: 16px; padding: 5px 14px; border-radius: 100px;
+  backdrop-filter: blur(8px); font-size: 12px; font-weight: 600;
+  font-family: 'General Sans', sans-serif; display: flex; align-items: center; gap: 5px;
+}
+.cdm-ab-badge {
+  position: absolute; top: 16px; right: 16px; padding: 5px 14px; border-radius: 100px;
+  background: rgba(108,71,255,0.9); color: #fff; font-size: 12px; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ─── Right: Panel ─── */
+.cdm-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Fixed header */
+.cdm-header { padding: 24px 28px 0; flex-shrink: 0; }
+.cdm-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
+.cdm-close-btn {
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1.5px solid rgba(0,0,0,0.07); background: #FFFFFF;
+  color: #A1A1AA; cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.cdm-product-info { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.cdm-product-status {
+  padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 600;
+  font-family: 'General Sans', sans-serif;
+}
+.cdm-product-meta { font-size: 11px; color: #A1A1AA; font-family: 'JetBrains Mono', monospace; }
+.cdm-product-title {
+  font-size: 22px; font-weight: 700; color: #111111; margin: 0 0 16px;
+  line-height: 1.25; font-family: 'General Sans', sans-serif;
+}
+
+/* Scrollable body */
+.cdm-body { flex: 1; overflow-y: auto; padding: 0 28px; min-height: 0; }
+.cdm-body::-webkit-scrollbar { width: 4px; }
+.cdm-body::-webkit-scrollbar-track { background: transparent; }
+.cdm-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 4px; }
+
+.cdm-section-head {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #A1A1AA; font-family: 'JetBrains Mono', monospace; margin-bottom: 6px; margin-top: 20px;
+}
+.cdm-config-table { border-radius: 14px; border: 1.5px solid rgba(0,0,0,0.07); overflow: hidden; max-height: 220px; }
+.cdm-config-scroll { padding: 2px 16px; overflow-y: auto; max-height: 218px; }
+.cdm-detail-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; }
+.cdm-detail-label { font-size: 13px; color: #71717A; font-family: 'General Sans', sans-serif; }
+.cdm-detail-value {
+  font-size: 12px; font-weight: 500; color: #111111; font-family: 'General Sans', sans-serif;
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
+}
+.cdm-detail-value--mono { font-family: 'JetBrains Mono', monospace; }
+.cdm-divider { height: 1px; background: rgba(0,0,0,0.07); }
+
+/* Negative prompt */
+.cdm-neg-toggle {
+  display: flex; align-items: center; gap: 5px; background: transparent; border: none;
+  cursor: pointer; padding: 0; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace; margin: 12px 0 6px;
+}
+.cdm-neg-content {
+  padding: 10px 14px; border-radius: 12px; background: #F5F4FA;
+  font-size: 12px; color: #71717A; font-family: 'JetBrains Mono', monospace; line-height: 1.5;
+}
+
+/* Tags */
+.cdm-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.cdm-tag {
+  padding: 4px 12px; border-radius: 100px;
+  background: rgba(108,71,255,0.06); color: #6C47FF;
+  border: 1px solid rgba(108,71,255,0.2);
+  font-size: 12px; font-weight: 500; font-family: 'General Sans', sans-serif;
+}
+
+/* Fixed footer */
+.cdm-footer {
+  padding: 14px 28px 20px; flex-shrink: 0;
+  border-top: 1.5px solid rgba(0,0,0,0.07); background: #FFFFFF;
+}
+.cdm-footer-inner { display: flex; gap: 10px; align-items: center; }
+.cdm-footer-actions { display: flex; gap: 6px; flex: 1; }
+.cdm-btn-approve {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 0; border-radius: 12px; border: none;
+  background: #10B981; color: #fff; font-size: 14px; font-weight: 600;
+  font-family: 'General Sans', sans-serif; cursor: pointer;
+}
+.cdm-btn-reject {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 0; border-radius: 12px;
+  border: 1.5px solid rgba(239,68,68,0.2); background: rgba(239,68,68,0.08); color: #EF4444;
+  font-size: 14px; font-weight: 600; font-family: 'General Sans', sans-serif; cursor: pointer;
+}
+.cdm-footer-divider { width: 1px; height: 36px; background: rgba(0,0,0,0.07); flex-shrink: 0; }
+
+/* Dropdown button */
+.cdm-dropdown { position: relative; }
+.cdm-dropdown-btn {
+  display: flex; align-items: center; gap: 7px;
+  padding: 10px 16px; border-radius: 12px;
+  border: 1.5px solid rgba(0,0,0,0.07); background: #FFFFFF;
+  color: #71717A; font-size: 13px; font-weight: 600;
+  font-family: 'General Sans', sans-serif; cursor: pointer; white-space: nowrap;
+}
+.cdm-dropdown-arrow { font-size: 9px; margin-left: 2px; opacity: 0.4; transition: transform 0.2s; }
+.cdm-dropdown-menu {
+  position: absolute; min-width: 190px; background: #FFFFFF; border-radius: 14px;
+  border: 1.5px solid rgba(0,0,0,0.07);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06);
+  padding: 6px; z-index: 10; animation: cdm-fadeIn 0.15s ease;
+}
+.cdm-dropdown-menu--up { bottom: calc(100% + 6px); left: 0; }
+.cdm-dropdown-menu--down { top: calc(100% + 6px); right: 0; }
+.cdm-dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  border: none; background: transparent;
+  color: #111111; font-size: 13px; font-weight: 500;
+  font-family: 'General Sans', sans-serif; cursor: pointer; text-align: left;
+}
+.cdm-dropdown-item:hover { background: #F5F4FA; }
+.cdm-dropdown-item-icon { font-size: 15px; width: 20px; text-align: center; color: #71717A; }
