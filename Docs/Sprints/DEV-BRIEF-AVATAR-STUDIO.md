@@ -118,51 +118,102 @@ CREATE POLICY "auth_all_persona_avatars" ON persona_avatars FOR ALL TO authentic
 1. Nastaví vybranou URL jako `reference_url`
 2. Pokud URL je fal.ai (temporary) → stáhnout, uploadnout do Supabase Storage, použít trvalý URL
 
-### 3. Frontend — Avatar Studio UI (~250 řádků)
+### 3. Frontend — Avatar Studio jako SAMOSTATNÁ STRÁNKA
 
-Nový komponent `components/AvatarStudio.jsx` — modal nebo sekce ve Studiu.
+**NE modal, NE sekce v Studiu.** Avatar Studio je nový tab/stránka v navigaci (vedle Overview, Shopify, Studio, Products, Profit) NEBO sub-stránka přístupná z Studia.
+
+#### 3a. Avatar list page (`pages/Avatars.jsx` + CSS, ~200 řádků)
+
+Grid karet s avatary. Každá karta = jedna persona.
 
 ```
-┌─────────────────────────────────────────────┐
-│  Avatar Studio                         ✕    │
-│  Manage model references per persona        │
-│                                             │
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐    │
-│  │  [foto]  │  │  [foto]  │  │  [ ? ]  │    │
-│  │  Maria   │  │ Jennifer │  │  Diane  │    │
-│  │  42      │  │  35      │  │  55     │    │
-│  │ Hiding   │  │ Defeated │  │Invisible│    │
-│  │   Mom    │  │Researcher│  │  Woman  │    │
-│  │          │  │          │  │         │    │
-│  │[Generate]│  │[Generate]│  │[Generate│    │
-│  │[Upload ↑]│  │[Upload ↑]│  │[Upload ↑│    │
-│  └─────────┘  └─────────┘  └─────────┘    │
-│                                             │
-│  ── Po Generate: ────────────────────────   │
-│                                             │
-│  4 varianty:                                │
-│  [var1] [var2] [var3] [var4]               │
-│  Klik = vyber jako reference               │
-│                                             │
-│  ── NEBO: Drag & drop vlastní fotku ─────  │
-│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
-│  │  Drop photo here or click to browse  │  │
-│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
-│  → Nahraje jako avatar, rovnou nastaví     │
-│    jako reference pro vybranou personu      │
-│                                             │
-│  [+ Custom Avatar]  — popsat modelku textem │
-└─────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│  Avatar Studio                        [+ New Avatar]        │
+│  Manage your model references                               │
+│                                                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │              │  │              │  │              │      │
+│  │  [portrait]  │  │  [portrait]  │  │     [ ? ]    │      │
+│  │              │  │              │  │  placeholder  │      │
+│  │              │  │              │  │              │      │
+│  ├──────────────┤  ├──────────────┤  ├──────────────┤      │
+│  │ Maria, 42    │  │ Jennifer, 35 │  │ Diane, 55    │      │
+│  │ The Hiding   │  │ The Defeated │  │ The Invisible│      │
+│  │ Mom          │  │ Researcher   │  │ Woman        │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                                                             │
+│  Klik na kartu → otevře detail modal                       │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**D&D upload flow:**
-1. User přetáhne fotku na kartu persony NEBO na D&D zónu
-2. Frontend: `resizeAndEncode()` (max 1024px, JPEG 0.7 — pattern ze StyleBuilder)
-3. Volá `uploadAvatar(storeId, personaName, base64, mediaType)`
-4. Backend uloží do Storage, nastaví jako `reference_url`
-5. Karta se okamžitě aktualizuje s novou fotkou
+- Karty s preview fotkou (reference_url nebo placeholder)
+- Jméno + věk pod fotkou
+- Label (popis persony)
+- Klik → otevře detail modal
 
-**Per-card D&D (alternativa):** Každá persona karta může být samostatná drop zone — přetáhneš fotku přímo na Marii a ta se nastaví jako její avatar. Jednodušší UX než centrální D&D zóna.
+#### 3b. Avatar detail modal (`components/AvatarDetail.jsx` + CSS, ~250 řádků)
+
+Po kliknutí na kartu — fullscreen-ish modal s fotkou a toolbar.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                                                          ✕   │
+│  ┌──────┐  ┌────────────────────────────────────────────┐    │
+│  │      │  │                                            │    │
+│  │ TOOL │  │                                            │    │
+│  │ BAR  │  │           AVATAR FULL PREVIEW              │    │
+│  │      │  │                                            │    │
+│  │ ──── │  │         (reference fotka velká)            │    │
+│  │  🎲  │  │                                            │    │
+│  │ Gen  │  │                                            │    │
+│  │ ──── │  │                                            │    │
+│  │  📁  │  │                                            │    │
+│  │Upload│  │                                            │    │
+│  │ ──── │  │                                            │    │
+│  │  ✏️  │  │                                            │    │
+│  │ Edit │  │                                            │    │
+│  │ ──── │  │                                            │    │
+│  │  🗑  │  │                                            │    │
+│  │ Del  │  │                                            │    │
+│  │      │  │                                            │    │
+│  └──────┘  └────────────────────────────────────────────┘    │
+│                                                              │
+│  Maria "The Hiding Mom" · 42                                │
+│  Post-pregnancy apron belly, C-section pooch, avoiding       │
+│  family pool time. Core emotion: grief and avoidance.        │
+│                                                              │
+│  Variants: [v1] [v2] [v3] [v4]  ← dříve generované         │
+│  Active reference: v2 ✓                                      │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Toolbar (levá strana):**
+| Ikona | Akce | Popis |
+|-------|------|-------|
+| 🎲 Generate | Generuje 4 nové varianty z persona popisu | Výsledky se zobrazí dole jako thumbnaily |
+| 📁 Upload | D&D zóna nebo file browser | Nahraje vlastní fotku jako avatar |
+| ✏️ Edit | Editace popisu persony | Textarea s uložením |
+| 🗑 Delete | Smaže avatar | Confirmation dialog |
+
+**Hlavní oblast:**
+- Velký preview aktuální reference fotky
+- Pod ní: jméno, label, věk, popis
+- Variant thumbnaily dole — klik na variantu = nastaví jako novou referenci
+
+**D&D na hlavní oblast:**
+- Celá preview oblast je drop zone
+- Přetáhneš fotku → resize → upload → nastaví jako reference
+- Vizuální feedback při drag (border glow)
+
+#### 3c. Navigace
+
+Přidat do `App.jsx` jako nový tab nebo jako sub-navigaci ve Studiu:
+
+**Varianta A: Nový tab** — `TABS = ['Overview', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit']`
+
+**Varianta B: Sub-stránka Studia** — tlačítko "Avatar Studio" v Studio headeru → přepne na avatar view, "← Back to Studio" pro návrat
+
+Doporučuji **Varianta A** — je to samostatná feature, ne podmenu Studia.
 
 ### 4. Frontend — Persona picker s thumbnaily
 
@@ -214,10 +265,12 @@ Přidat importy a akce do GET_ACTIONS / POST_ACTIONS mapy.
 | Soubor | Typ | Řádků |
 |--------|-----|-------|
 | `sql/add-persona-avatars.sql` | Nový | ~15 |
-| `lib/actions/avatars.js` | Nový modul | ~150 |
+| `lib/actions/avatars.js` | Nový modul (5 akcí) | ~180 |
 | `api/system.js` | Update router | ~5 |
-| `components/AvatarStudio.jsx` + CSS | Nový | ~250 + ~80 |
-| `api/creatives/generate.js` | Auto-inject reference | ~10 |
+| `pages/Avatars.jsx` + CSS | Nový — avatar list page (grid karet) | ~200 + ~80 |
+| `components/AvatarDetail.jsx` + CSS | Nový — detail modal (fotka + toolbar) | ~250 + ~100 |
+| `App.jsx` | Nový tab "Avatars" v navigaci | ~5 |
+| `api/creatives/generate.js` | Auto-inject persona reference | ~10 |
 | `components/CreativeStudio.jsx` | Persona picker thumbnaily | ~20 |
 | `components/PhotoStoryModal.jsx` | Persona picker thumbnaily | ~15 |
 | `lib/api.js` | Nové API funkce (getAvatars, generateAvatar, uploadAvatar, setAvatarReference, deleteAvatar) | ~30 |
@@ -227,15 +280,16 @@ Přidat importy a akce do GET_ACTIONS / POST_ACTIONS mapy.
 ## Pořadí práce
 
 1. **SQL migrace** — `persona_avatars` tabulka
-2. **`lib/actions/avatars.js`** — backend akce
+2. **`lib/actions/avatars.js`** — backend 5 akcí (persona_avatars, generate_avatar, upload_avatar, set_avatar_reference, delete_avatar)
 3. **`api/system.js`** — router update
-4. **`lib/api.js`** — API funkce (getAvatars, generateAvatar, setAvatarReference)
-5. **`AvatarStudio.jsx` + CSS** — UI pro generování a správu
-6. **`api/creatives/generate.js`** — auto-inject persona reference
-7. **`CreativeStudio.jsx`** — persona picker s thumbnaily
-8. **`PhotoStoryModal.jsx`** — persona picker s thumbnaily
-9. **Integrace do Studia** — tlačítko "Avatar Studio" nebo sekce
-10. **Test** — vygenerovat avatar pro Marii → generovat kreativu s audience Maria → ověřit konzistenci
+4. **`lib/api.js`** — API funkce
+5. **`pages/Avatars.jsx` + CSS** — avatar list page (grid karet, nový tab)
+6. **`components/AvatarDetail.jsx` + CSS** — detail modal (fotka + left toolbar + varianty)
+7. **`App.jsx`** — přidat "Avatars" tab do navigace
+8. **`api/creatives/generate.js`** — auto-inject persona reference
+9. **`CreativeStudio.jsx`** — persona picker s thumbnaily
+10. **`PhotoStoryModal.jsx`** — persona picker s thumbnaily
+11. **Test** — upload fotku pro Marii → generovat kreativu s audience Maria → ověřit konzistenci
 
 ---
 
