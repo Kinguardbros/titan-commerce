@@ -99,7 +99,11 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
 
       // Build scene + audience context to append to each prompt
       const sceneCtx = scene !== 'Auto' ? `\nScene/Environment: ${scene}. Set the photo in this specific environment.` : '';
-      const audienceCtx = audience !== 'auto' ? audience : undefined;
+      const selectedPersona = audience !== 'auto' ? personas.find(p => p.name === audience) : null;
+      const audienceCtx = selectedPersona ? selectedPersona.name : undefined;
+      const ageCtx = selectedPersona
+        ? `\nIMPORTANT: The model MUST be a real ${selectedPersona.age}-year-old woman. She clearly looks ${selectedPersona.age} years old — visible smile lines, age-appropriate skin, NOT a young model. ${parseInt(selectedPersona.age) > 45 ? 'Crow\'s feet, mature skin texture.' : 'Natural expression lines.'}`
+        : '\nThe model must be a real woman age 30-55, NOT a young fashion model.';
 
       // 1. Hero shot FIRST (sequential) — becomes visual reference for all others
       const heroShot = shots.find(s => s.key === 'hero');
@@ -111,7 +115,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
         try {
           const result = await generateCreatives({
             product_id: product.id, store_id: storeId, style: heroShot.suggestedStyle,
-            custom_prompt: heroShot.buildPrompt(product, heroColor) + sceneCtx,
+            custom_prompt: heroShot.buildPrompt(product, heroColor) + sceneCtx + ageCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: 'hero',
           });
@@ -129,7 +133,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
           label: shot.label,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
-            custom_prompt: shot.buildPrompt(product, heroColor) + sceneCtx,
+            custom_prompt: shot.buildPrompt(product, heroColor) + sceneCtx + ageCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: shot.key,
             reference_url: heroUrl,
@@ -139,7 +143,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
           label: `Color: ${color}`,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: 'product_shot',
-            custom_prompt: buildColorVariantPrompt(product, color) + sceneCtx,
+            custom_prompt: buildColorVariantPrompt(product, color) + sceneCtx + ageCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: `color_${color.toLowerCase().replace(/\s+/g, '-')}`,
             reference_url: heroUrl,
@@ -169,7 +173,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             product_id: product.id,
             store_id: storeId,
             style: 'review_ugc',
-            custom_prompt: buildUGCPrompt(product, heroColor) + sceneCtx,
+            custom_prompt: buildUGCPrompt(product, heroColor) + sceneCtx + ageCtx,
             show_model: true,
             text_overlay: 'none',
             ai_model: aiModel,
