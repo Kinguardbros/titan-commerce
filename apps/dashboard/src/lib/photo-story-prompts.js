@@ -98,16 +98,15 @@ This shot proves the product is high quality. Every stitch must look intentional
     label: 'Before / After',
     order: 8,
     defaultOn: false,
-    suggestedStyle: 'product_shot',
-    cost: 0.28, // 2 images
-    buildPrompt: (p, color) => `AFTER panel of a before/after comparison. Clean white seamless studio backdrop. Flat even lighting.
+    suggestedStyle: 'static_split',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Split-screen before/after comparison in ONE single image. Clean white seamless studio backdrop. Flat even lighting. Same model in both halves.
 
-Full body shot from head to mid-thigh. Upright confident posture, shoulders back, slight warm smile, direct eye contact with camera.
+LEFT HALF — BEFORE: Woman wearing a generic plain black one-piece swimsuit (no branding, basic). Visible fit problems: waistband rolling down, fabric bunching at hips, slight muffin-top effect. Posture: shoulders slightly forward, stomach relaxed, subtle discomfort. NOT exaggerated or mocking.
 
-Wearing ${p.title} in ${color}.
-Swimsuit sitting perfectly: waistband completely flat with zero rolling, no bunching at hips, fabric smooth across stomach and thighs, straps straight not pulling. Body looks supported and shaped, NOT squeezed. Natural skin texture visible. No excessive smoothing.
+RIGHT HALF — AFTER: Same woman, same framing, same backdrop. Upright confident posture, shoulders back, slight warm smile. Wearing ${p.title} in ${color}. Swimsuit sitting perfectly: waistband completely flat, no bunching, fabric smooth across stomach and thighs, body supported and shaped NOT squeezed. Natural skin texture visible.
 
-NO text, NO labels, NO arrows in image.`,
+A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing. NO text, NO labels, NO arrows — just the two images side by side.`,
   },
   {
     key: 'feature_callout',
