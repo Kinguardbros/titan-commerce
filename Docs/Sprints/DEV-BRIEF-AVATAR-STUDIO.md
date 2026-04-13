@@ -93,6 +93,7 @@ CREATE POLICY "auth_all_persona_avatars" ON persona_avatars FOR ALL TO authentic
 |------|--------|-------|
 | `persona_avatars` | GET | Seznam avatarů pro store (s reference_url) |
 | `generate_avatar` | POST | Generuje 4 varianty z persona popisu → vrátí URLs |
+| `upload_avatar` | POST | D&D upload vlastní fotky → uloží do Storage → nastaví jako reference |
 | `set_avatar_reference` | POST | Nastaví vybranou variantu jako reference_url |
 | `delete_avatar` | POST | Smaže avatar |
 
@@ -103,9 +104,19 @@ CREATE POLICY "auth_all_persona_avatars" ON persona_avatars FOR ALL TO authentic
 4. Uloží URLs do `persona_avatars.variants` JSONB
 5. Vrátí URLs pro výběr
 
+**`upload_avatar` flow (D&D vlastní fotky):**
+1. Přijme base64 image + `store_id` + `persona_name`
+2. Resize na max 1024px (pokud větší)
+3. Upload do Supabase Storage: `{storeName}/Avatars/{persona_name}.jpg`
+4. Získat public URL
+5. Upsert do `persona_avatars`: nastaví `reference_url` = public URL
+6. Přidat URL do `variants` JSONB array (zachovat historii)
+7. Pipeline log: `AVATAR`, `"Uploaded custom avatar for {persona_name}"`
+8. Vrátit: `{ reference_url, persona_name }`
+
 **`set_avatar_reference` flow:**
 1. Nastaví vybranou URL jako `reference_url`
-2. Uloží do Supabase Storage pro persistence (fal.ai URLs expirují)
+2. Pokud URL je fal.ai (temporary) → stáhnout, uploadnout do Supabase Storage, použít trvalý URL
 
 ### 3. Frontend — Avatar Studio UI (~250 řádků)
 
@@ -124,6 +135,7 @@ Nový komponent `components/AvatarStudio.jsx` — modal nebo sekce ve Studiu.
 │  │   Mom    │  │Researcher│  │  Woman  │    │
 │  │          │  │          │  │         │    │
 │  │[Generate]│  │[Generate]│  │[Generate│    │
+│  │[Upload ↑]│  │[Upload ↑]│  │[Upload ↑│    │
 │  └─────────┘  └─────────┘  └─────────┘    │
 │                                             │
 │  ── Po Generate: ────────────────────────   │
@@ -132,9 +144,25 @@ Nový komponent `components/AvatarStudio.jsx` — modal nebo sekce ve Studiu.
 │  [var1] [var2] [var3] [var4]               │
 │  Klik = vyber jako reference               │
 │                                             │
+│  ── NEBO: Drag & drop vlastní fotku ─────  │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
+│  │  Drop photo here or click to browse  │  │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
+│  → Nahraje jako avatar, rovnou nastaví     │
+│    jako reference pro vybranou personu      │
+│                                             │
 │  [+ Custom Avatar]  — popsat modelku textem │
 └─────────────────────────────────────────────┘
 ```
+
+**D&D upload flow:**
+1. User přetáhne fotku na kartu persony NEBO na D&D zónu
+2. Frontend: `resizeAndEncode()` (max 1024px, JPEG 0.7 — pattern ze StyleBuilder)
+3. Volá `uploadAvatar(storeId, personaName, base64, mediaType)`
+4. Backend uloží do Storage, nastaví jako `reference_url`
+5. Karta se okamžitě aktualizuje s novou fotkou
+
+**Per-card D&D (alternativa):** Každá persona karta může být samostatná drop zone — přetáhneš fotku přímo na Marii a ta se nastaví jako její avatar. Jednodušší UX než centrální D&D zóna.
 
 ### 4. Frontend — Persona picker s thumbnaily
 
@@ -192,7 +220,7 @@ Přidat importy a akce do GET_ACTIONS / POST_ACTIONS mapy.
 | `api/creatives/generate.js` | Auto-inject reference | ~10 |
 | `components/CreativeStudio.jsx` | Persona picker thumbnaily | ~20 |
 | `components/PhotoStoryModal.jsx` | Persona picker thumbnaily | ~15 |
-| `lib/api.js` | Nové API funkce | ~20 |
+| `lib/api.js` | Nové API funkce (getAvatars, generateAvatar, uploadAvatar, setAvatarReference, deleteAvatar) | ~30 |
 
 ---
 
@@ -219,6 +247,10 @@ Přidat importy a akce do GET_ACTIONS / POST_ACTIONS mapy.
 - [ ] Persona picker (Studio, GeneratePanel, PhotoStory) ukazuje thumbnail
 - [ ] Generování s audience = automaticky injektuje persona reference_url
 - [ ] Custom Avatar: user popíše modelku → generuje varianty
+- [ ] **D&D Upload:** přetáhnutí vlastní fotky na persona kartu → uloží do Storage → nastaví jako reference
+- [ ] **D&D Upload:** funguje i klik na "Upload" tlačítko (file browser fallback)
+- [ ] Uploadnuté fotky resize na max 1024px před odesláním
+- [ ] Fotky uložené v Supabase Storage (`{storeName}/Avatars/{persona}.jpg`) — ne fal.ai temporary URLs
 - [ ] Konzistence: Maria vypadá stejně na různých produktech
 - [ ] `npm run build` + `npm test` projde
 - [ ] CLAUDE.md aktualizovaný
