@@ -465,7 +465,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(true); setCompleted(0);
     toast.info("Generating...");
 
-    const backendStyle = STYLE_MAP[imgStyle] || "ad_creative";
+    const backendStyle = imgStyle.startsWith('cs_') ? imgStyle : (STYLE_MAP[imgStyle] || "ad_creative");
     const backendModel = MODEL_MAP[imgModel] || "fal_nano_banana";
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
@@ -482,7 +482,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
     const jobs = [];
     for (const sId of stylesToGen) {
-      const bs = STYLE_MAP[sId] || "ad_creative";
+      const bs = sId.startsWith('cs_') ? sId : (STYLE_MAP[sId] || "ad_creative");
       for (let i = 0; i < imgCount; i++) {
         jobs.push(
           generateCreatives({
