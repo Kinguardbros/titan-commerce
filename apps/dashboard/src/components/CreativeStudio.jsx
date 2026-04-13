@@ -72,22 +72,26 @@ const SCENES = ["Auto", "Studio", "Beach", "Park", "Café", "Street", "Home inte
 
 const STYLE_CATEGORIES = [
   {
-    id: "custom", label: "Custom", icon: "✦",
+    id: "product-photos", label: "Product photos", icon: "◉",
     styles: [
-      { id: "ad-creative", title: "Ad creative", desc: "Studio lighting, gold tones", icon: "✦" },
       { id: "product-shot", title: "Product shot", desc: "Clean white bg, detail focus", icon: "◉" },
       { id: "beach-photo", title: "Beach photo", desc: "Warm golden, ocean bokeh", icon: "◐" },
-      { id: "lifestyle", title: "Lifestyle", desc: "Real setting, natural light", icon: "▣" },
-      { id: "review-ugc", title: "Review / UGC", desc: "Mirror selfie, authentic", icon: "◫" },
+      { id: "clean-minimal", title: "Clean minimal", desc: "White bg, Apple-style", icon: "□" },
+      { id: "flat-lay", title: "Flat lay", desc: "Top-down arrangement, props", icon: "▤" },
     ],
   },
   {
-    id: "static", label: "Static templates", icon: "▦",
+    id: "custom", label: "Custom scenes", icon: "✦",
+    styles: [],
+  },
+  {
+    id: "ad-creatives", label: "Ad creatives", icon: "✦",
     styles: [
-      { id: "clean-minimal", title: "Clean minimal", desc: "White bg, Apple-style", icon: "□" },
+      { id: "ad-creative", title: "Ad creative", desc: "Studio lighting, gold tones", icon: "✦" },
+      { id: "lifestyle", title: "Lifestyle", desc: "Real setting, natural light", icon: "▣" },
+      { id: "review-ugc", title: "Review / UGC", desc: "Mirror selfie, authentic", icon: "◫" },
       { id: "split-screen", title: "Split screen", desc: "Model left + product right", icon: "▥" },
       { id: "urgency-sale", title: "Urgency / sale", desc: "Bold gradient, flash energy", icon: "◆" },
-      { id: "flat-lay", title: "Flat lay", desc: "Top-down arrangement, props", icon: "▤" },
     ],
   },
   {
