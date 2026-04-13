@@ -116,3 +116,15 @@
   text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;
 }
 .sb-attr-val { font-family: var(--body); font-size: 11px; color: var(--text2); line-height: 1.4; }
+
+/* Describe tab */
+.sb-describe-area { display: flex; flex-direction: column; gap: 8px; }
+.sb-textarea--describe {
+  min-height: 180px; font-size: 12px; font-family: var(--body); color: var(--text1);
+  line-height: 1.6; padding: 14px 16px; white-space: pre-wrap;
+}
+.sb-textarea--describe::placeholder { color: var(--text4); font-size: 11px; line-height: 1.6; }
+.sb-describe-hint {
+  font-family: var(--mono); font-size: 9px; color: var(--text4); line-height: 1.4;
+  padding: 8px 0;
+}

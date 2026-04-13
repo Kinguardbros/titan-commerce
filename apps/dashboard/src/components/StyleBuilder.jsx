@@ -196,12 +196,13 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
               <div className="sb-describe-area">
                 <label className="sb-label">Describe your style</label>
                 <textarea
-                  className="sb-textarea"
+                  className="sb-textarea sb-textarea--describe"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Minimalist studio, white background, soft shadows, model standing relaxed, warm golden light from the left..."
+                  rows={8}
+                  placeholder={"Describe the visual style you want to create. Be specific about:\n\n• Lighting — studio, natural, golden hour, dramatic...\n• Setting — white background, beach, street, café...\n• Mood — calm, energetic, luxurious, casual...\n• Model direction — posing, expression, body language...\n• Colors — warm tones, muted, high contrast...\n• Camera — close-up, full body, overhead..."}
                 />
+                <div className="sb-describe-hint">AI will generate a complete style definition with color palette, prompt template, and visual attributes.</div>
               </div>
             )}
 
