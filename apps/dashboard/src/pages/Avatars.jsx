@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAvatars, getSkills } from '../lib/api';
 import AvatarDetail from '../components/AvatarDetail';
+import AvatarBuilder from '../components/AvatarBuilder';
 import { useToast } from '../hooks/useToast.jsx';
 import './Avatars.css';
 
@@ -10,6 +11,7 @@ export default function Avatars({ storeId, store }) {
   const [personas, setPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPersona, setSelectedPersona] = useState(null);
+  const [showBuilder, setShowBuilder] = useState(false);
 
   // Fetch existing avatars + personas from audience-personas skill
   useEffect(() => {
@@ -61,6 +63,7 @@ export default function Avatars({ storeId, store }) {
           <div className="av-title">Avatar Studio</div>
           <div className="av-subtitle">Manage model references for consistent product photos</div>
         </div>
+        <button className="av-create-btn" onClick={() => setShowBuilder(true)}>+ Create New</button>
       </div>
 
       <div className="av-grid">
@@ -89,6 +92,9 @@ export default function Avatars({ storeId, store }) {
           onClose={() => setSelectedPersona(null)}
           onUpdated={() => { refresh(); }}
         />
+      )}
+      {showBuilder && (
+        <AvatarBuilder storeId={storeId} onClose={() => setShowBuilder(false)} onCreated={() => { setShowBuilder(false); refresh(); }} />
       )}
     </div>
   );

@@ -40,7 +40,8 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const result = await generateAvatar(storeId, persona.name, descText || persona.label);
+      const fullDesc = descText || persona.description || persona.label;
+      const result = await generateAvatar(storeId, persona.name, fullDesc);
       const newVariants = (result.variants || []).map(url => (typeof url === 'string' ? { url } : url));
       setVariants(prev => [...prev, ...newVariants]);
       toast.success(`Generated ${newVariants.length} variant(s)`);
