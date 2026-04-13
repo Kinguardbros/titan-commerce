@@ -3,15 +3,26 @@ import { analyzeStyle, createCustomStyle, scrapeStyle, describeStyle } from '../
 import { useToast } from '../hooks/useToast.jsx';
 import './StyleBuilder.css';
 
-const fileToBase64 = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => {
-    const result = reader.result;
-    const base64 = result.includes(',') ? result.split(',')[1] : result;
+const MAX_SIZE = 1024;
+const resizeAndEncode = (file) => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.onload = () => {
+    let { width, height } = img;
+    if (width > MAX_SIZE || height > MAX_SIZE) {
+      const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    const base64 = dataUrl.split(',')[1];
     resolve(base64);
   };
-  reader.onerror = reject;
-  reader.readAsDataURL(file);
+  img.onerror = reject;
+  img.src = URL.createObjectURL(file);
 });
 
 export default function StyleBuilder({ storeId, storeName, onClose, onCreated }) {
@@ -36,8 +47,8 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
     const valid = Array.from(files).filter(f => allowed.includes(f.type)).slice(0, 8 - images.length);
     const newImages = [];
     for (const f of valid) {
-      const base64 = await fileToBase64(f);
-      newImages.push({ base64, media_type: f.type, preview_url: URL.createObjectURL(f), filename: f.name });
+      const base64 = await resizeAndEncode(f);
+      newImages.push({ base64, media_type: 'image/jpeg', preview_url: URL.createObjectURL(f), filename: f.name });
     }
     setImages(prev => [...prev, ...newImages].slice(0, 8));
   }, [images.length]);
