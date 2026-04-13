@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getPendingCreatives, approveAd, rejectAd, updateCreative } from '../lib/api';
 import supabase from '../lib/supabase';
 import { useToast } from '../hooks/useToast.jsx';
-import CreativeEditor from './CreativeEditor';
+import CreativeDetailModal, { mapCreativeToModalData } from './CreativeDetailModal';
 import './ApprovalQueue.css';
 
 export default function ApprovalQueue({ storeId }) {
@@ -150,19 +150,23 @@ export default function ApprovalQueue({ storeId }) {
         </div>
       )}
 
-      {/* Editor modal */}
-      <CreativeEditor
-        creative={editingCreative}
-        open={!!editingCreative}
-        onClose={() => setEditingCreative(null)}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onSave={handleSave}
-        onRegenerate={(id, updated) => {
-          setCreatives((prev) => prev.map((c) => (c.id === id ? { ...c, ...updated } : c)));
-          setEditingCreative((prev) => prev && prev.id === id ? { ...prev, ...updated } : prev);
-        }}
-      />
+      {/* Detail modal */}
+      {editingCreative && (
+        <CreativeDetailModal
+          data={mapCreativeToModalData(editingCreative)}
+          onClose={() => setEditingCreative(null)}
+          onAction={(actionId) => {
+            const id = editingCreative.id;
+            switch (actionId) {
+              case 'approve': handleApprove(id); break;
+              case 'reject': handleReject(id); break;
+              case 'download': window.open(editingCreative.file_url, '_blank'); break;
+              case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
+              default: break;
+            }
+          }}
+        />
+      )}
     </>
   );
 }
