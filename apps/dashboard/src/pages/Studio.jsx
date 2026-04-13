@@ -1,11 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives } from '../lib/api';
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives, getCustomStyles } from '../lib/api';
 import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import { approveAd, rejectAd, updateCreative } from '../lib/api';
 import supabase from '../lib/supabase';
 import { useToast } from '../hooks/useToast.jsx';
 import './Studio.css';
+
+const StyleBuilder = lazy(() => import('../components/StyleBuilder'));
 
 const STYLE_OPTIONS = [
   { key: 'all', label: 'All styles' },
@@ -75,6 +77,18 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkCompleted, setBulkCompleted] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
+
+  // Custom styles
+  const [customStyles, setCustomStyles] = useState([]);
+  const [showStyleBuilder, setShowStyleBuilder] = useState(false);
+  useEffect(() => {
+    if (!storeId) return;
+    getCustomStyles(storeId).then(setCustomStyles).catch(() => {});
+  }, [storeId]);
+  const allStyleOptions = useMemo(() => [
+    ...STYLE_OPTIONS,
+    ...customStyles.map(cs => ({ key: cs.style_key, label: cs.name })),
+  ], [customStyles]);
 
   // Fetch all creatives for store
   const fetchCreatives = useCallback(async () => {
@@ -270,9 +284,10 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
 
         {/* Style pills */}
         <div className="studio-filter-pills">
-          {STYLE_OPTIONS.map((s) => (
+          {allStyleOptions.map((s) => (
             <button key={s.key} className={`studio-fpill${filterStyle === s.key ? ' studio-fpill--active' : ''}`} onClick={() => setFilterStyle(s.key)}>{s.label}</button>
           ))}
+          <button className="studio-fpill studio-fpill--add" onClick={() => setShowStyleBuilder(true)}>+ Custom Style</button>
         </div>
 
         {/* Status pills */}
@@ -442,6 +457,21 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
         onReject={handleReject}
         onSave={handleSave}
       />
+
+      {showStyleBuilder && (
+        <Suspense fallback={null}>
+          <StyleBuilder
+            storeId={storeId}
+            storeName={store?.name}
+            onClose={() => setShowStyleBuilder(false)}
+            onCreated={() => {
+              setShowStyleBuilder(false);
+              toast.success('Custom style created!');
+              getCustomStyles(storeId).then(setCustomStyles).catch(() => {});
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

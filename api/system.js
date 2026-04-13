@@ -1739,6 +1739,29 @@ Only include sections that have specific, actionable rules from the sources.` }]
         return res.status(200).json({ deleted: true });
       }
 
+      if (action === 'describe_style') {
+        const { store_id, description } = req.body;
+        if (!store_id || !description) return res.status(400).json({ error: 'store_id and description required' });
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: `Based on this style description, create a complete visual style definition for fashion product photography.\n\nDescription: ${description}\n\nReturn ONLY valid JSON:\n{\n  "style_name_suggestion": "short descriptive name (2-4 words)",\n  "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n  "lighting": "specific lighting setup",\n  "composition": "camera framing and composition rules",\n  "model_posing": "model pose, expression, body language",\n  "setting": "background and environment details",\n  "mood": "emotional feel and energy",\n  "camera_angle": "camera position and distance",\n  "distinguishing_features": "what makes this style unique",\n  "prompt_template": "A complete image generation prompt using {product_name} and {price} placeholders. Be very specific — 8-15 sentences covering lighting, colors, composition, setting, model direction, mood."\n}`,
+          }],
+        });
+
+        let text = response.content[0].text.trim();
+        if (text.startsWith('```')) text = text.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+        const analysis = JSON.parse(text);
+
+        return res.status(200).json({ analysis });
+      }
+
       if (action === 'scrape_style') {
         const { url, store_id } = req.body;
         if (!url || !store_id) return res.status(400).json({ error: 'url and store_id required' });

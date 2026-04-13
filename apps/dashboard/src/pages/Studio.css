@@ -33,6 +33,8 @@
 }
 .studio-fpill:hover { color: var(--text-secondary); }
 .studio-fpill--active { color: var(--accent-primary); background: var(--accent-primary-soft); border-color: rgba(139,92,246,.15); }
+.studio-fpill--add { color: var(--gold); border-color: rgba(201,168,76,.2); border-style: dashed; }
+.studio-fpill--add:hover { background: var(--gold-glow); border-color: var(--gold); }
 
 /* Product dropdown */
 .studio-filter-dropdown {

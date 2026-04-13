@@ -138,6 +138,7 @@ Key patterns:
 | `apps/dashboard/src/components/Breadcrumbs.jsx` | Navigation breadcrumbs |
 | `apps/dashboard/src/components/Skeleton.jsx` | Skeleton loaders (SkeletonGrid, SkeletonKPI, SkeletonRow, SkeletonChart) |
 | `apps/dashboard/src/components/Tooltip.jsx` | Info tooltip component |
+| `apps/dashboard/src/components/StyleBuilder.jsx` | Custom Style Builder modal: drag & drop photos or scrape URL → Claude Vision analysis → create reusable style |
 | **Hooks** | |
 | `apps/dashboard/src/hooks/useActiveStore.jsx` | StoreContext + StoreProvider, localStorage persistence |
 | `apps/dashboard/src/hooks/useToast.jsx` | Toast provider with success/error/info types |
@@ -151,7 +152,7 @@ Key patterns:
 | `apps/dashboard/src/lib/supabase.js` | Supabase client for realtime subscriptions |
 | **Libs (backend)** | |
 | `lib/claude.js` | Claude API wrapper + dynamic per-store brand system prompt from `store_skills` + `optimizeProduct()` |
-| `lib/higgsfield.js` | Higgsfield image/video generation + styled prompts (7 styles) + per-store brand context + feedback learning |
+| `lib/higgsfield.js` | Higgsfield image/video generation + styled prompts (8 built-in styles + custom `cs_` styles from DB) + per-store brand context + feedback learning |
 | `lib/shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) |
 | `lib/meta-api.js` | Meta Marketing API: read-only (insights, campaigns, active ads) |
 | `lib/supabase.js` | Supabase server-side client (service role) |
@@ -162,7 +163,7 @@ Key patterns:
 | `lib/event-detector.js` | Shared event detection logic: `detectEventsForStore()` — used by cron + scan_events |
 | `lib/fal.js` | fal.ai image generation API (FLUX.2, Ideogram v3) — alternative to Higgsfield |
 | **API Endpoints** | |
-| `api/system.js` | Consolidated mega-handler (~1600 lines, 15+ actions): stores_list, pipeline_log, kpi, profit_summary (per-store, shipping, returns, per-gateway fees), proposals, events, scan_events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale, import_confirm |
+| `api/system.js` | Consolidated mega-handler (~1800 lines, 20+ actions): stores_list, pipeline_log, kpi, profit_summary, proposals, events, scan_events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale, import_confirm, analyze_style, create_custom_style, custom_styles, delete_custom_style, scrape_style |
 | `api/auth/login.js` | Password authentication → session token |
 | `api/creatives/generate.js` | Generate image creative via Higgsfield |
 | `api/creatives/regenerate.js` | Regenerate image or video creative |
@@ -174,6 +175,10 @@ Key patterns:
 | `api/products/list.js` | Paginated products with creative counts (page, limit params) |
 | `api/products/sync.js` | Sync products from Shopify |
 | `api/cron/detect-events.js` | Event detection cron (every 6h): scans for actionable events → creates proposals |
+| **Agents** | |
+| `agents/style-analyzer.md` | STYLE_ANALYZER: Claude Vision visual style extraction from reference photos → custom styles |
+| `agents/scraper.md` | SCRAPER: URL scraping → structured ad briefs for FORGE |
+| `agents/forge.md` | FORGE: Ad creative generation from briefs |
 | **Product Knowledge** | |
 | `.claude/skills/elara.md` | Elara bikini: personas, hooks, visual direction |
 | `.claude/skills/mathilda.md` | Mathilda pants: personas, hooks, visual direction |
@@ -271,9 +276,12 @@ Optimize → saves to DB (status: pending) → appears in Overview
 ### Creative Generation (Image + Video)
 - Image: Higgsfield Nano Banana (text2image) with manual polling (SDK's withPolling broken)
 - Video: DOP Turbo (image2video) — requires source image
-- 7 style variants: ad_creative, product_shot, lifestyle, review_ugc, static_clean, static_split, static_urgency
+- 8 built-in style variants + unlimited custom styles (`cs_` prefix, loaded from `store_skills` DB)
 - Per-store brand context from `stores.brand_config` JSONB
 - Feedback learning from approved/rejected creatives
+
+### Custom Style Builder
+Upload 3-8 reference photos (or scrape competitor URL) → Claude Vision analyzes visual style collectively → generates prompt template. Saved as `store_skills` with `skill_type='custom-style-{slug}'` + `metadata` JSONB (reference_images, color_palette, style_key). Reference images stored in Supabase Storage `{storeName}/Styles/{slug}/`. In `higgsfield.js`, custom styles use early return before `STYLE_PROMPTS` lookup — same post-processing as built-in styles. **`lib/higgsfield.js` existing prompt logic is SACRED — only surgical additions for `cs_` prefix allowed.**
 
 ### Shopify API
 - REST API v2024-01 (not GraphQL)
@@ -355,7 +363,7 @@ Dashboard → Password gate (Login.jsx)
 | 🟡 MED | Meta Ads integration — awaiting credentials | When ready |
 | 🟡 MED | Product docs drag & drop upload (Supabase Storage) | Future |
 | 🟡 MED | Product Optimizer — auto-detect unoptimized imports | Future |
-| 🟡 MED | system.js is ~1600 lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
+| 🟡 MED | system.js is ~1800 lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
 | 🟢 LOW | PUBLISHER agent (auto-publish to Meta) | Future |
 | 🟢 LOW | LOOPER agent (performance scoring feedback loop) | Future |
 | 🟢 LOW | TikTok/Pinterest API integration (replace manual adspend) | Future |

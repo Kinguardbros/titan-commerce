@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { generateCreatives, convertToVideo, getSkills, getProductDetail } from "../lib/api";
+import { generateCreatives, convertToVideo, getSkills, getProductDetail, getCustomStyles, createCustomStyle } from "../lib/api";
 import { useToast } from "../hooks/useToast.jsx";
+import StyleBuilder from "./StyleBuilder";
 
 // Map V2 style IDs → backend style keys
 const STYLE_MAP = {
@@ -279,66 +280,7 @@ function CategorySection({ category, selectedStyle, onSelectStyle, favorites, on
   );
 }
 
-function StyleBuilderModal({ onClose, onSave }) {
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [icon, setIcon] = useState("✦");
-  const [prompt, setPrompt] = useState("");
-  const overlayRef = useRef(null);
-  const canSave = name.trim().length > 0;
-  const inputStyle = {
-    width: "100%", padding: "10px 14px", border: `1.5px solid ${BORDER_DEFAULT}`,
-    borderRadius: 10, background: BG_SURFACE, color: "#fff",
-    fontSize: 13, fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box",
-  };
-  return (
-    <div ref={overlayRef} onClick={(e) => e.target === overlayRef.current && onClose()} style={{
-      position: "fixed", inset: 0, zIndex: 1000,
-      background: "rgba(0,0,0,0.75)", backdropFilter: "blur(12px)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 20, animation: "fadeIn 0.2s ease",
-    }}>
-      <div style={{ width: "100%", maxWidth: 440, background: "#131318", borderRadius: 16, border: `1px solid ${BORDER_DIM}`, padding: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>New style</div>
-            <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 2 }}>Create a reusable generation preset</div>
-          </div>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: TEXT_MID, cursor: "pointer", fontSize: 18, padding: 4 }}>✕</button>
-        </div>
-        <SectionLabel style={{ marginTop: 0 }}>Icon</SectionLabel>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-          {ICON_OPTIONS.map((ic) => (
-            <button key={ic} onClick={() => setIcon(ic)} style={{
-              width: 34, height: 34, borderRadius: 8,
-              border: `1.5px solid ${icon === ic ? NEON_BORDER : BORDER_DIM}`,
-              background: icon === ic ? NEON_DIM : "transparent",
-              color: icon === ic ? NEON_LIGHT : TEXT_MID,
-              fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: icon === ic ? NEON_GLOW_SM : "none",
-            }}>{ic}</button>
-          ))}
-        </div>
-        <SectionLabel>Name</SectionLabel>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Studio portrait" style={inputStyle} />
-        <SectionLabel>Description</SectionLabel>
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Soft lighting, blurred background" style={inputStyle} />
-        <SectionLabel>Prompt template</SectionLabel>
-        <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Base prompt prepended to instructions..."
-          style={{ ...inputStyle, minHeight: 72, resize: "vertical" }} />
-        <div style={{ display: "flex", gap: 10, marginTop: "1.25rem" }}>
-          <button onClick={onClose} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: `1.5px solid ${BORDER_DEFAULT}`, background: "transparent", color: TEXT_MID, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
-          <button onClick={() => { if (canSave) onSave({ id: "custom-" + Date.now(), title: name.trim(), desc: desc.trim() || "Custom style", icon, prompt: prompt.trim() }); }} style={{
-            flex: 1, padding: "12px 0", borderRadius: 12, border: "none",
-            background: canSave ? `linear-gradient(135deg, ${NEON} 0%, #c48a18 100%)` : "rgba(255,255,255,0.04)",
-            color: canSave ? BG_DEEP : TEXT_MID, fontSize: 14, fontWeight: 600, cursor: canSave ? "pointer" : "default",
-            fontFamily: "'DM Sans', sans-serif", boxShadow: canSave ? NEON_GLOW_SM : "none",
-          }}>Save style</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// StyleBuilderModal removed — replaced by StyleBuilder.jsx component
 
 // ─── A/B VARIANT PANEL ───
 
@@ -451,10 +393,19 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   });
   const [collapsedCats, setCollapsedCats] = useState(new Set());
   const [showBuilder, setShowBuilder] = useState(false);
-  const [customStyles, setCustomStyles] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('cs_custom_styles') || '[]'); } catch { return []; }
-  });
+  const [customStyles, setCustomStyles] = useState([]);
   const [showFavsOnly, setShowFavsOnly] = useState(false);
+
+  // Load custom styles from backend
+  useEffect(() => {
+    if (!storeId) return;
+    getCustomStyles(storeId).then(data => {
+      setCustomStyles((data || []).map(cs => ({
+        id: cs.style_key, title: cs.name, desc: cs.color_palette?.slice(0, 3).join(', ') || 'Custom',
+        thumb: cs.reference_images?.[0] || null,
+      })));
+    }).catch(() => {});
+  }, [storeId]);
 
   const toggleFav = useCallback((id) => {
     setFavorites((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); localStorage.setItem('cs_favorites', JSON.stringify([...n])); return n; });
@@ -462,10 +413,16 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const toggleCat = useCallback((catId) => {
     setCollapsedCats((p) => { const n = new Set(p); n.has(catId) ? n.delete(catId) : n.add(catId); return n; });
   }, []);
-  const handleSaveCustomStyle = useCallback((style) => {
-    setCustomStyles((p) => { const n = [...p, style]; localStorage.setItem('cs_custom_styles', JSON.stringify(n)); return n; });
-    setImgStyle(style.id); setShowBuilder(false);
-  }, []);
+  const handleSaveCustomStyle = useCallback(async (style) => {
+    try {
+      const result = await createCustomStyle(storeId, style.title || style.id, style.desc || '', style.analysis || {}, style.referenceImages || []);
+      setCustomStyles(prev => [...prev, { id: result.style_key, title: style.title || style.id, desc: style.desc || '' }]);
+      setImgStyle(result.style_key);
+    } catch (err) {
+      console.error('[CreativeStudio] Save custom style failed:', { error: err.message });
+    }
+    setShowBuilder(false);
+  }, [storeId]);
 
   const allStyles = useMemo(() => {
     const all = [];
@@ -957,7 +914,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
         ))}
       </div>
 
-      {showBuilder && <StyleBuilderModal onClose={() => setShowBuilder(false)} onSave={handleSaveCustomStyle} />}
+      {showBuilder && <StyleBuilder storeId={storeId} onClose={() => setShowBuilder(false)} onCreated={(styleKey) => handleSaveCustomStyle({ id: styleKey, title: styleKey })} />}
 
       <style>{`
         @keyframes fadeIn {

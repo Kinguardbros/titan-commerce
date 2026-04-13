@@ -396,6 +396,13 @@ export function deleteCustomStyle(storeId, styleKey) {
   });
 }
 
+export function describeStyle(storeId, description) {
+  return fetchJSON('/api/system?action=describe_style', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, description }),
+  });
+}
+
 export function scrapeStyle(url, storeId) {
   return fetchJSON('/api/system?action=scrape_style', {
     method: 'POST',

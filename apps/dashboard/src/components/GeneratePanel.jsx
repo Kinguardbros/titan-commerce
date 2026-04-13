@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { generateCreatives, convertToVideo, getSkills, getProductDetail } from '../lib/api';
+import { generateCreatives, convertToVideo, getSkills, getProductDetail, getCustomStyles } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './GeneratePanel.css';
 
@@ -78,6 +78,29 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
       }
     }).catch(() => {});
   }, [storeId, product?.store_id]);
+
+  // Load custom styles from backend
+  const [customStyles, setCustomStyles] = useState([]);
+  useEffect(() => {
+    const sid = storeId || product?.store_id;
+    if (!sid) return;
+    getCustomStyles(sid).then(data => setCustomStyles(data || [])).catch(() => {});
+  }, [storeId, product?.store_id]);
+
+  const allStyles = useMemo(() => [
+    ...STYLES,
+    ...customStyles.map(cs => ({
+      key: cs.style_key,
+      label: cs.name,
+      desc: `Custom style — ${cs.color_palette?.slice(0, 3).join(', ') || 'reference-based'}`,
+      group: 'Custom Styles',
+    })),
+  ], [customStyles]);
+
+  const stylesWithModel = useMemo(() => [
+    ...STYLES_WITH_MODEL,
+    ...customStyles.map(cs => cs.style_key),
+  ], [customStyles]);
 
   const isVideo = mode === 'video';
   const sourceImages = creatives.filter((c) => c.format === 'image' && (c.status === 'approved' || c.status === 'pending') && c.file_url);
@@ -189,11 +212,11 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
         {showStyleOptions && (
           <>
             <div className="gp-section">Style</div>
-            {['Custom', 'Static Templates'].map((group) => (
+            {['Custom', 'Static Templates', ...(customStyles.length ? ['Custom Styles'] : [])].map((group) => (
               <div key={group}>
                 <div className="gp-group-label">{group}</div>
                 <div className="gp-styles">
-                  {STYLES.filter((s) => s.group === group).map((s) => (
+                  {allStyles.filter((s) => s.group === group).map((s) => (
                     <div
                       key={s.key}
                       className={`gp-style${style === s.key ? ' gp-style--active' : ''}`}
@@ -235,7 +258,7 @@ export default function GeneratePanel({ product, mode = 'image', defaultStyle, c
             </div>
 
             {/* Audience picker — only for styles with model */}
-            {STYLES_WITH_MODEL.includes(style) && personas.length > 0 && (
+            {stylesWithModel.includes(style) && personas.length > 0 && (
               <>
                 <div className="gp-section">Audience</div>
                 <select className="gp-audience-select" value={audience} onChange={(e) => setAudience(e.target.value)} disabled={generating}>

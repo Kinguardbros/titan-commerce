@@ -6,17 +6,59 @@
 
 ---
 
+## Stav implementace (2026-04-13)
+
+Většina Custom Style Builderu je **už implementovaná**. Zbývají 3 věci:
+
+### HOTOVO (neměnit, jen ověřit):
+- [x] SQL migration (`sql/add-custom-style-metadata.sql`)
+- [x] Agent spec (`agents/style-analyzer.md`)
+- [x] Backend: `analyze_style`, `create_custom_style`, `custom_styles`, `delete_custom_style`, `scrape_style` (v `api/system.js`)
+- [x] `lib/higgsfield.js` — `cs_` prefix handler (ř. 342 + 423)
+- [x] `StyleBuilder.jsx` (223 ř.) — tab "From Photos" + "From URL" + preview panel
+- [x] `GeneratePanel.jsx` — custom styles v STYLES array
+- [x] `Studio.jsx` — "+ Custom Style" button, modal, filter bar
+- [x] `CreativeStudio.jsx` — localStorage → `getCustomStyles()` API
+- [x] `lib/api.js` — `analyzeStyle`, `createCustomStyle`, `getCustomStyles`, `deleteCustomStyle`, `scrapeStyle`
+
+### ZBÝVÁ UDĚLAT (tvůj task):
+
+**1. Backend: `describe_style` akce** v `api/system.js` (~30 řádků)
+- Viz sekce 3e níže — Claude (text, ne Vision) generuje style definition z volného popisu
+
+**2. Frontend: `describeStyle()` API funkce** v `lib/api.js` (~7 řádků)
+- Viz sekce 9 níže — už je v briefu popsaná, jen nebyla implementovaná
+
+**3. Frontend: "From Description" tab** v `StyleBuilder.jsx`
+- Aktuálně má 2 taby: "Upload Photos" + "From URL"
+- Přidat 3. tab: **"From Description"** — textarea + "Generate Style" button
+- Po generování zobrazí stejný preview panel jako ostatní taby
+- Viz sekce 5 níže (Tab "From Description" mockup)
+
+### Pořadí:
+1. Přidej `describe_style` akci do `api/system.js`
+2. Přidej `describeStyle()` do `lib/api.js`
+3. Přidej "From Description" tab do `StyleBuilder.jsx`
+4. Ověř build + všechny 3 taby fungují
+5. Ověř regression: existující 8 stylů, Mathilda/Elara speciální prompty
+
+---
+
 ## Kontext
 
 Uživatel chce vytvářet nové kreativní styly z referenčních fotek. Dnes existuje 8 pevných stylů (ad_creative, lifestyle, beach_photo...). Nový feature umožní:
 
-1. Drag & drop referenční fotky (3-8 ks) NEBO paste URL konkurenta
-2. Claude Vision analyzuje vizuální styl (lighting, composition, colors, posing, mood)
+1. **Z fotek:** Drag & drop referenční fotky (3-8 ks) → Claude Vision analyzuje vizuální styl
+2. **Z popisu:** Uživatel popíše scénu/styl volným textem → Claude vygeneruje style definition
 3. Vytvoří se nový "custom style" s prompt template
 4. Style se objeví ve Studiu vedle existujících 8 stylů
 5. Uživatel generuje kreativy pomocí custom stylu
 
 **Nejedná se o nový produkt/brand** — jde o vizuální styl/scénu pro fotky (jako je dnes "Beach Photo" nebo "Clean Minimal").
+
+### UI — kde to žije
+
+Tlačítko "+" v **CreativeStudio style pickeru** (stávající `showBuilder` state na ř. 453). Otevře modal se 2 taby: "From Photos" a "From Description". Stávající `StyleBuilderModal` (ř. 282-341) se NAHRADÍ novým `StyleBuilder.jsx`.
 
 ---
 
@@ -85,9 +127,9 @@ Obsah:
 
 ---
 
-### 3. Backend — 5 nových akcí v `api/system.js`
+### 3. Backend — 6 nových akcí v `api/system.js`
 
-Všechny akce přidat na konec GET/POST bloků v `handler()`. Celkem ~170 řádků.
+Všechny akce přidat na konec GET/POST bloků v `handler()`. Celkem ~200 řádků.
 
 #### 3a. `analyze_style` (POST)
 
@@ -235,7 +277,51 @@ return data.map(s => ({
 4. Smazat reference images z Storage: `{storeName}/Styles/{slug}/`
 5. Pipeline log: agent `STYLE_GEN`, level `info`
 
-#### 3e. `scrape_style` (POST)
+#### 3e. `describe_style` (POST) — pro "From Description" tab
+
+**Input:**
+```json
+{
+  "store_id": "uuid",
+  "description": "Minimalist studio, white background, soft shadows, model standing relaxed, warm golden light"
+}
+```
+
+**Logika:**
+1. Odeslat popis do Claude (NE Vision — text only):
+
+```js
+const response = await anthropic.messages.create({
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 2000,
+  messages: [{
+    role: 'user',
+    content: `Based on this style description, create a complete visual style definition for fashion product photography.
+
+Description: ${description}
+
+Return ONLY valid JSON:
+{
+  "style_name_suggestion": "short descriptive name (2-4 words)",
+  "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],
+  "lighting": "specific lighting setup",
+  "composition": "camera framing and composition rules",
+  "model_posing": "model pose, expression, body language",
+  "setting": "background and environment details",
+  "mood": "emotional feel and energy",
+  "camera_angle": "camera position and distance",
+  "distinguishing_features": "what makes this style unique",
+  "prompt_template": "A complete image generation prompt using {product_name} and {price} placeholders. Be very specific — 8-15 sentences covering lighting, colors, composition, setting, model direction, mood."
+}`
+  }]
+});
+```
+
+2. Parsovat JSON, vrátit klientovi ve stejném formátu jako `analyze_style`
+
+**Output:** Stejný JSON jako `analyze_style` → frontend zobrazí stejný preview panel
+
+#### 3f. `scrape_style` (POST) — pro budoucí URL scraping
 
 **Input:** `{ url, store_id }`
 
@@ -245,6 +331,8 @@ return data.map(s => ({
 3. Fetch každou URL, převést na base64
 4. Zavolat stejnou Claude Vision analýzu jako `analyze_style`
 5. Vrátit: `{ analysis, images: [{ url, base64, media_type }] }`
+
+**Poznámka:** Tento endpoint není v první verzi UI, ale backend je připravený pro budoucí "From URL" tab.
 
 ---
 
@@ -308,42 +396,81 @@ if (style.startsWith('cs_') && storeId) {
 
 ### 5. Frontend — `components/StyleBuilder.jsx` (NOVÝ, ~250 řádků) + `StyleBuilder.css`
 
-Modal komponent se dvěma taby.
+Nový modal se 2 taby. Nahrazuje stávající `StyleBuilderModal` v CreativeStudio.jsx (ř. 282-341).
 
-#### Tab 1: Upload Photos
+#### Tab "From Photos"
+```
+┌─────────────────────────────────────────────┐
+│  New style                              ✕   │
+│  ┌──────────────┐  ┌────────────────────┐   │
+│  │ From Photos  │  │ From Description   │   │
+│  └──────────────┘  └────────────────────┘   │
+│                                             │
+│  ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │
+│  │  Drop 3-8 reference photos here      │  │
+│  │        or click to browse             │  │
+│  └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │
+│  [ref1] [ref2] [ref3] [×]     thumbnaily   │
+│  [Analyze Style]     disabled < 3 fotek     │
+│                                             │
+│  ── Po analýze: ──────────────────────────  │
+│  Name: [Minimal Studio     ]  editovatelný  │
+│  ■ #f5f0e8  ■ #d4a853  ■ #1a1a1a  palette  │
+│  Lighting | Setting | Mood | Posing | Camera│
+│  Prompt template: [editovatelný textarea]   │
+│  [Cancel]              [Create Style]       │
+└─────────────────────────────────────────────┘
+```
+
 - Drag & drop zóna (pattern z DocsBrowser.jsx: `onDragOver`, `onDrop`, `handleDragEnter/Leave`)
 - Accepts: `image/png, image/jpeg, image/webp`
 - `fileToBase64()` pro každý soubor
-- Thumbnaily nahraných obrázků (grid, max 8)
-- Odstranění jednotlivých fotek (X button)
-- "Analyze Style" button (disabled pokud < 3 fotek)
+- Thumbnaily s remove button (× na každém)
+- "Analyze Style" → volá `analyzeStyle(storeId, images)` → zobrazí preview
 
-#### Tab 2: From URL
-- Input field pro URL
-- "Scrape Images" button → volá `scrapeStyle(url, storeId)`
-- Zobrazí scraped obrázky s checkboxy (select/deselect)
-- "Analyze Style" button
+#### Tab "From Description"
+```
+┌─────────────────────────────────────────────┐
+│  Describe your style:                       │
+│  ┌─────────────────────────────────────┐    │
+│  │ Minimalist studio, white background,│    │
+│  │ soft shadows, model standing relaxed│    │
+│  └─────────────────────────────────────┘    │
+│  [Generate Style]                           │
+│                                             │
+│  ── Stejný preview jako "From Photos" ──   │
+│  Name, palette, atributy, prompt template   │
+│  vše editovatelné                           │
+│  [Cancel]              [Create Style]       │
+└─────────────────────────────────────────────┘
+```
 
-#### Po analýze — Preview Panel
-- **Name:** text input (pre-filled z `analysis.style_name_suggestion`)
-- **Description:** textarea (auto-generated summary, editovatelný)
-- **Color palette:** inline swatche (kruhové boxy s hex barvami)
-- **Atributy:** read-only grid: Lighting, Composition, Posing, Setting, Mood, Camera
-- **Prompt template:** textarea (editovatelný, pre-filled z `analysis.prompt_template`)
-- **Reference images:** thumbnail strip
-- **"Create Style"** button → volá `createCustomStyle()` → `onCreated(styleKey)` callback
-- **"Cancel"** button
+- Textarea pro volný popis stylu
+- "Generate Style" → volá `describeStyle(storeId, description)` → Claude vygeneruje stejný JSON jako `analyze_style`
+- Zobrazí stejný preview panel (name, palette, atributy, prompt template)
+
+#### Po analýze/generování — Preview Panel (sdílený pro oba taby)
+- **Name:** text input (pre-filled z AI suggestion, editovatelný)
+- **Color palette:** inline swatche
+- **Atributy:** Lighting, Composition, Posing, Setting, Mood, Camera (read-only)
+- **Prompt template:** textarea (editovatelný, pre-filled z AI)
+- **"Create Style"** → volá `createCustomStyle()` → `onCreated(styleKey)` callback
+- **"Cancel"**
+
+#### Implementačně
+- Smazat stávající `StyleBuilderModal` v CreativeStudio.jsx (ř. 282-341)
+- Nahradit renderem na ř. 960: `{showBuilder && <StyleBuilder onClose={...} onSave={...} storeId={storeId} />}`
+- `handleSaveCustomStyle` (ř. 465-468): místo localStorage → `createCustomStyle()` API
+- `customStyles` init (ř. 454-456): místo localStorage → `getCustomStyles(storeId)` v useEffect
 
 #### State:
 ```js
-const [tab, setTab] = useState('upload');
-const [images, setImages] = useState([]);          // { base64, media_type, preview_url, filename }
-const [url, setUrl] = useState('');
-const [scrapedImages, setScrapedImages] = useState([]);
+const [tab, setTab] = useState('photos');        // 'photos' | 'describe'
+const [images, setImages] = useState([]);         // { base64, media_type, preview_url, filename }
+const [description, setDescription] = useState('');
 const [analyzing, setAnalyzing] = useState(false);
-const [analysis, setAnalysis] = useState(null);
+const [analysis, setAnalysis] = useState(null);   // JSON z Claude
 const [styleName, setStyleName] = useState('');
-const [styleDesc, setStyleDesc] = useState('');
 const [promptTemplate, setPromptTemplate] = useState('');
 const [creating, setCreating] = useState(false);
 ```
@@ -451,6 +578,13 @@ export function deleteCustomStyle(storeId, styleKey) {
   });
 }
 
+export function describeStyle(storeId, description) {
+  return fetchJSON('/api/system?action=describe_style', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, description }),
+  });
+}
+
 export function scrapeStyle(url, storeId) {
   return fetchJSON('/api/system?action=scrape_style', {
     method: 'POST',
@@ -465,8 +599,8 @@ export function scrapeStyle(url, storeId) {
 
 1. **SQL migration** — `ALTER TABLE store_skills ADD COLUMN IF NOT EXISTS metadata JSONB` (5 min)
 2. **`agents/style-analyzer.md`** — nový agent spec (30 min)
-3. **`lib/api.js`** — 5 nových API funkcí (15 min)
-4. **`api/system.js`** — backend akce: `analyze_style`, `create_custom_style`, `custom_styles`, `delete_custom_style`, `scrape_style` (1 den)
+3. **`lib/api.js`** — 6 nových API funkcí (15 min)
+4. **`api/system.js`** — backend akce: `analyze_style`, `describe_style`, `create_custom_style`, `custom_styles`, `delete_custom_style`, `scrape_style` (1 den)
 5. **`lib/higgsfield.js`** — custom style loader, **UKÁZAT DIFF VLASTNÍKOVI** (1-2 hod)
 6. **`StyleBuilder.jsx` + CSS** — nový komponent (1 den)
 7. **`GeneratePanel.jsx`** — custom styles integrace (2-3 hod)
@@ -478,16 +612,17 @@ export function scrapeStyle(url, storeId) {
 
 ## Definition of Done
 
-- [ ] Upload 5 referenčních fotek → Claude Vision vrátí analýzu s prompt template
-- [ ] Uživatel pojmenuje styl a vidí preview (palette, atributy, prompt)
+- [ ] **Tab "From Photos":** Upload 5 referenčních fotek → Claude Vision vrátí analýzu s prompt template
+- [ ] **Tab "From Description":** Napsat "minimal studio, soft light" → Claude vrátí stejný JSON (name, palette, prompt)
+- [ ] Uživatel pojmenuje styl a vidí preview (palette, atributy, prompt) — editovatelné
 - [ ] Custom style se uloží do `store_skills` s `skill_type='custom-style-{slug}'`
-- [ ] Reference images se uloží do Supabase Storage `{storeName}/Styles/{slug}/`
+- [ ] Reference images se uloží do Supabase Storage `{storeName}/Styles/{slug}/` (jen pro foto tab)
+- [ ] Custom style se objeví v CreativeStudio style pickeru pod "Custom" kategorií
 - [ ] Custom style se objeví v GeneratePanel vedle existujících 8 stylů
 - [ ] Custom style se objeví ve Studio STYLE_OPTIONS filtru
 - [ ] Generování kreativy s custom stylem produkuje vizuálně odpovídající výstup
 - [ ] **Existujících 8 stylů funguje BEZE ZMĚNY** (regression test)
 - [ ] Mathilda + Elara speciální prompty fungují beze změny
-- [ ] Scrape URL → analyze style flow funguje
 - [ ] Smazání custom stylu odstraní skill + reference images
 - [ ] Custom styles jsou per-store (Isola nevidí Elegance House styles)
 - [ ] `npm run build` projde
