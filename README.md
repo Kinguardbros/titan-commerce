@@ -1,88 +1,98 @@
-# Elegance House — Ad Pipeline
+# Titan Commerce
 
-Automated ad creative pipeline for [shop-elegancehouse.com](https://shop-elegancehouse.com). Generates, publishes, and optimizes Meta ad creatives using AI.
+Multi-store SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives, optimizes product listings, tracks Shopify analytics and profit, manages branded content.
 
-## Pipeline
+## Stores
 
-```
-SCRAPER → FORGE → PUBLISHER → LOOPER → (back to FORGE)
-```
+| Store | Market | Currency |
+|-------|--------|----------|
+| **Elegance House** | Women's fashion, EU | EUR |
+| **Isola** | Swimwear, US | USD |
+| **Eleganz Haus** | Fashion, DE | EUR |
 
-| Agent | Role |
-|-------|------|
-| **SCRAPER** | Scrapes product pages, extracts copy hooks and briefs |
-| **FORGE** | Generates ad creatives via Higgsfield AI |
-| **PUBLISHER** | Pushes approved creatives to Meta Ads |
-| **LOOPER** | Scores live ads, feeds winners back to FORGE |
+## Tech Stack
+
+- **Frontend:** React 19 + Vite
+- **Backend:** Vercel Serverless Functions
+- **Database:** Supabase (PostgreSQL + Auth + Storage + Realtime)
+- **AI Images/Video:** Higgsfield (Nano Banana, DOP Turbo) + fal.ai
+- **AI Text:** Anthropic Claude API (product optimization)
+- **E-commerce:** Shopify Admin REST API (v2024-01)
+- **Ads:** Meta Marketing API (v21.0)
+- **Design System:** Nextbyte Dark Luxe
 
 ## Quickstart
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/danielnecas/elegancehouse-ads.git
-cd elegancehouse-ads
+# Install
 npm install --legacy-peer-deps
 cd apps/dashboard && npm install && cd ../..
 
-# 2. Set up environment
+# Environment
 cp .env.example .env.local
-# Fill in your Supabase, Meta, and Higgsfield credentials
+# Fill in Supabase, Shopify, Anthropic, Higgsfield credentials
 
-# 3. Create database
-# Copy sql/schema.sql and run in Supabase SQL Editor
+# Database
+# Run sql/schema.sql + migration files in Supabase SQL Editor
 
-# 4. Run locally
-npm run dev
+# Run locally
+npm run dev          # Frontend (Vite, localhost:5173)
+vercel dev           # Full stack (API + frontend)
 
-# 5. Deploy
-npx vercel --prod
+# Build
+cd apps/dashboard && npm run build
+
+# Tests
+npm test             # Vitest
 ```
 
 ## Project Structure
 
 ```
-elegancehouse-ads/
-├── apps/dashboard/        # React + Vite dashboard (War Room)
-│   └── src/
-│       ├── components/    # KPIRow, AdGrid, AdCard, DetailPanel, etc.
-│       ├── pages/         # Overview (main page)
-│       ├── hooks/         # useAds, useKPIs
-│       └── lib/           # Supabase client, API helpers, mock data
-├── api/                   # Vercel serverless functions
-│   ├── ads/               # list, approve, pause
-│   ├── kpi/               # summary
-│   └── pipeline/          # log
-├── lib/                   # Shared server-side logic
-│   └── supabase.js        # Server Supabase client
-├── agents/                # Agent specifications (MD)
-├── sql/                   # Database schema
-├── vercel.json            # Vercel config + cron
-└── package.json
+titan-commerce/
+├── CLAUDE.md                  # Project source of truth (architecture, conventions, schema)
+├── apps/dashboard/src/        # React frontend
+│   ├── pages/                 # Overview, Shopify, Studio, Products, Profit, Login
+│   ├── components/            # UI components (25+)
+│   ├── hooks/                 # Data hooks (useProfit, useProposals, useActiveStore, ...)
+│   └── lib/                   # API client, Supabase realtime
+├── api/                       # Vercel serverless endpoints (12 routes)
+│   ├── system.js              # Consolidated mega-handler (37 actions)
+│   ├── creatives/             # Generate, regenerate, convert-to-video, list
+│   ├── products/              # List, sync
+│   ├── shopify/               # Analytics overview
+│   └── cron/                  # Event detection (every 6h)
+├── lib/                       # Shared backend logic
+│   ├── claude.js              # AI product optimization
+│   ├── higgsfield.js          # AI image/video generation
+│   ├── shopify-admin.js       # Shopify API client factory
+│   └── ...                    # Auth, rate-limit, scraper, meta-api
+├── agents/                    # Pipeline agent specs (SCRAPER, FORGE, PUBLISHER, LOOPER)
+├── sql/                       # Database migrations (19 files)
+├── Docs/                      # Documentation
+│   ├── Sprints/               # Sprint plans + developer briefs
+│   ├── Briefs/                # Task specifications (light theme, UX, ...)
+│   ├── Architecture/          # Platform review, AD pipeline PRD
+│   └── Stores/                # Per-store materials (brand, products, creative, logos)
+└── skills/nextbyte-design/    # Design system specification + tokens
 ```
 
-## Environment Variables
+## Documentation
 
-See `.env.example` for all required variables. Key services:
+| Document | Purpose |
+|----------|---------|
+| **CLAUDE.md** | Complete project reference — architecture, key files, database schema, env vars, coding conventions, app flow |
+| **Docs/Sprints/** | Active sprint plans and developer briefs |
+| **Docs/Architecture/** | Platform review, ad pipeline PRD |
+| **Docs/Briefs/** | Task specifications (light theme redesign, UX/responsive, manager prompt) |
+| **Docs/Stores/** | Per-store brand materials, product research, logos, creative playbooks |
+| **agents/** | Pipeline agent specifications (Scraper, Forge, Publisher, Looper) |
 
-- **Supabase** — Database, auth, storage
-- **Higgsfield** — AI image/video generation
-- **Meta Marketing API** — Ad publishing and insights
+## Key Features
 
-## Dashboard
-
-The War Room dashboard at `elegancehouse-ads.vercel.app` shows:
-
-- KPI cards (spend, revenue, impressions, conversions, active ads)
-- Ad grid with real-time agent status
-- Approval queue for pending creatives
-- 7-day performance chart
-- Agent terminal log
-- Detail panel with recommendations
-
-## Tech Stack
-
-- **Frontend:** React + Vite
-- **Backend:** Vercel Serverless Functions
-- **Database:** Supabase (PostgreSQL)
-- **AI Generation:** Higgsfield (Nano Banana Pro)
-- **Ad Platform:** Meta Marketing API
+- **AI Creative Generation** — 7+ styles (ad_creative, lifestyle, UGC, beach, ...), per-product prompt specialization, brand knowledge injection
+- **Product Import Pipeline** — Scrape competitor URL > preview > create in Shopify > AI optimize > auto-generate creatives
+- **Product Optimizer** — Claude AI rewrites listings with per-store brand voice, approval workflow before Shopify push
+- **Profit Dashboard** — Revenue, COGS, shipping, returns, per-gateway transaction fees, adspend, profit
+- **Event Detection** — Automated proposals (product needs creatives, revenue declining, winner detected)
+- **Multi-Store** — Complete data isolation via `store_id`, store switcher, per-store Shopify credentials

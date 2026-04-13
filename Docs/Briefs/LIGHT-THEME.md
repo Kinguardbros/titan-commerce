@@ -1,582 +1,219 @@
-# Developer Brief: Sprint 10 — Size Chart Tool + Full Product Editor
+# Developer Brief: Light Theme Redesign
 
 ## Project: Titan Commerce Limited
-**Design:** `skills/nextbyte-design/SKILL.md`
+**Scope:** CSS-only theme migration (dark → light)
+**Risk:** Low — all colors are in CSS variables, no component logic changes
 
 ---
 
-## SCOPE
+## CIL
 
-Dva velke cile:
-1. **Size Chart Tool** — vložit text nebo fotku → zapíše do Shopify metafield `custom.size_chart_text`
-2. **Full Product Editor** — kompletní Shopify product management v Titan Commerce (title, description, cena, varianty, tagy, SEO, metafields, images)
-
-Rozdeleno na 3 faze v tomto sprintu.
+Prepnout dashboard z ultra-tmaveho dark theme (#07070c) na svetly, ciste profesionalni light theme. Zadne zmeny v komponentach, pouze CSS variables + drobne upravy kde jsou hardcoded barvy.
 
 ---
 
-## Faze 1: Size Chart Tool
-
-### Metafield spec
-```
-Namespace: custom
-Key: size_chart_text
-Type: Multi-line text
-Format: CSV-style — carkou oddelene hodnoty, radky oddelene novym radkem
-
-Priklad obsahu:
-Size, US, Bust (in), Waist (in), Hips (in), Bust (cm), Waist (cm), Hips (cm)
-S, 4–6, 34–35, 27–28, 37–38, 86–89, 69–71, 94–97
-M, 8–10, 36–37, 29–30, 39–40, 91–94, 74–76, 99–102
-L, 12–14, 38–40, 31–33, 41–43, 97–102, 79–84, 104–109
-```
-
-### Kde v UI
-V **ProductWorkspace** — nova sekce "Size Chart" pod kreativy:
+## AKTUALNI STAV
 
 ```
-ProductWorkspace
-├─ [+ Image] [▶ Video] [✨ Optimize] [Open in Studio →]
-├─ Creatives (images / videos)
-└─ SIZE CHART ──────────────────────────────────────────
-   │
-   │ ┌─ Current Size Chart ──────────────────────────┐
-   │ │ Size │ US   │ Bust │ Waist │ Hips │ ...       │
-   │ │ S    │ 4-6  │ 34-35│ 27-28 │ 37-38│           │
-   │ │ M    │ 8-10 │ 36-37│ 29-30 │ 39-40│           │
-   │ │ L    │ 12-14│ 38-40│ 31-33 │ 41-43│           │
-   │ └──────────────────────────────────────────────┘
-   │
-   │ [Edit Size Chart]  [Import from Image 📷]
-   │
+Background:   #07070c (skoro cerna)
+Cards:        #14141e (tmave fialova)
+Text:         #f1f1f4 (bila)
+Accent:       #8b5cf6 (violet)
+Secondary:    #f59e0b (gold/amber)
+Borders:      rgba(255,255,255,0.06-0.08)
 ```
 
-### Dva zpusoby vstupu
-
-**A) Textovy/tabulkovy editor:**
-Klik [Edit Size Chart] → modal:
-
-```
-┌─ EDIT SIZE CHART ─────────────────────────────────────┐
-│                                                        │
-│ Headers (carkou oddelene):                             │
-│ [Size, US, Bust (in), Waist (in), Hips (in)]    [+ Col]│
-│                                                        │
-│ ┌──────┬──────┬──────┬──────┬──────┐                  │
-│ │ Size │ US   │ Bust │ Waist│ Hips │                  │
-│ ├──────┼──────┼──────┼──────┼──────┤                  │
-│ │ [S ] │ [4-6]│[34-35]│[27-28]│[37-38]│ [🗑]          │
-│ │ [M ] │[8-10]│[36-37]│[29-30]│[39-40]│ [🗑]          │
-│ │ [L ] │[12-14]│[38-40]│[31-33]│[41-43]│ [🗑]          │
-│ └──────┴──────┴──────┴──────┴──────┘                  │
-│ [+ Add Row]                                            │
-│                                                        │
-│ Preview:                                               │
-│ Size, US, Bust (in), Waist (in), Hips (in)            │
-│ S, 4–6, 34–35, 27–28, 37–38                           │
-│ M, 8–10, 36–37, 29–30, 39–40                          │
-│ L, 12–14, 38–40, 31–33, 41–43                         │
-│                                                        │
-│              [Save to Shopify]  [Cancel]               │
-└────────────────────────────────────────────────────────┘
-```
-
-**B) Import z fotky (AI vision):**
-Klik [Import from Image 📷] → upload fotku size chartu → Claude Vision ji precte → automaticky vyplni tabulku → uzivatel zkontroluje → save.
-
-```js
-// Backend: poslat fotku na Claude Vision API
-const response = await anthropic.messages.create({
-  model: 'claude-sonnet-4-20250514',
-  max_tokens: 1000,
-  messages: [{
-    role: 'user',
-    content: [
-      { type: 'image', source: { type: 'url', url: imageUrl } },
-      { type: 'text', text: 'Extract the size chart from this image. Return ONLY CSV format: first line is headers separated by commas, each following line is one size row separated by commas. Example:\nSize, US, Bust (in), Waist (in)\nS, 4-6, 34-35, 27-28' }
-    ]
-  }]
-});
-// Parse CSV response → fill table
-```
-
-### Backend
-
-**`api/system.js` — nova akce `save_size_chart`:**
-```json
-POST { "action": "save_size_chart", "store_id": "uuid", "product_id": "uuid", "size_chart_text": "Size, US, Bust...\nS, 4-6..." }
-```
-
-Flow:
-1. Nacist store → overit admin_token
-2. Nacist product → ziskat shopify_id
-3. Zapsat metafield pres Shopify Admin API:
-```js
-// Nova funkce v lib/shopify-admin.js:
-async updateMetafield(productShopifyId, namespace, key, value, type = 'multi_line_text_field') {
-  return rest(`products/${productShopifyId}/metafields.json`, 'POST', {
-    metafield: { namespace, key, value, type }
-  });
-}
-```
-4. Pipeline log: `agent: 'SIZE_CHART', message: 'Updated size chart for {title}'`
-5. Toast: "Size chart saved to Shopify!"
-
-**`api/system.js` — nova akce `read_size_chart`:**
-```json
-GET { "action": "read_size_chart", "store_id": "uuid", "product_id": "uuid" }
-```
-Nacte metafield `custom.size_chart_text` z Shopify a vrati text.
-
-**`api/system.js` — nova akce `parse_size_chart_image`:**
-```json
-POST { "action": "parse_size_chart_image", "image_url": "https://..." }
-```
-Posle fotku na Claude Vision → vrati CSV text.
-
-### Frontend
-
-**`components/SizeChartEditor.jsx`** + CSS — NOVY
-
-Vlastnosti:
-- Zobrazeni aktualni size chart jako tabulka (parsovany z CSV textu)
-- [Edit] → modal s tabulkovym editorem (input per bunka)
-- [+ Add Row] / [🗑 Delete Row] / [+ Add Column]
-- Headers jako prvni radek
-- Live preview CSV textu pod tabulkou
-- [Import from Image 📷] → file upload → Claude Vision → auto-fill tabulky
-- [Save to Shopify] → POST save_size_chart → toast
-- Loading state behem save a image parse
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `components/SizeChartEditor.jsx` + CSS | **NOVY** |
-| `pages/ProductWorkspace.jsx` | Edit — pridat Size Chart sekci |
-| `api/system.js` | Edit — pridat save_size_chart, read_size_chart, parse_size_chart_image |
-| `lib/shopify-admin.js` | Edit — pridat updateMetafield(), getMetafield() |
-| `lib/api.js` | Edit — pridat saveSizeChart(), readSizeChart(), parseSizeChartImage() |
+Design system: "Nextbyte Dark Luxe" — Michroma (headings), Plus Jakarta Sans (body), Space Mono (mono)
 
 ---
 
-## Faze 2: Product Detail View (Read all Shopify fields)
+## CILOVY STAV — "Titan Light"
 
-### Ucel
-Zobrazit VSECHNA data o produktu v ProductWorkspace — ne jen title/price/images co mame ted. Clovek vidi kompletni stav produktu bez nutnosti otvirat Shopify admin.
+### Barvy (`:root` v App.css)
 
-### Co nacist z Shopify Admin API
-```js
-// Nova funkce v lib/shopify-admin.js:
-async getFullProduct(shopifyProductId) {
-  const data = await rest(`products/${shopifyProductId}.json?fields=id,title,body_html,vendor,product_type,tags,status,variants,options,images,metafields`);
-  return data?.product;
+```css
+:root {
+  /* Backgrounds */
+  --bg-app: #f5f5f7;              /* svetle sede (Apple-style) */
+  --bg-surface: #ffffff;           /* cisty bily */
+  --bg-surface-hover: #f0f0f3;    /* jemne hover */
+  --bg-card: #ffffff;              /* bily card */
+  --bg-card-hover: #fafafa;       /* jemny hover */
+  --bg-card-elevated: #ffffff;     /* elevated = bily + shadow */
+  --bg-overlay: rgba(0,0,0,0.3);  /* tmavsi overlay */
+  --bg-input: #f5f5f7;            /* input bg */
+
+  /* Accents — ZACHOVAT */
+  --accent-primary: #7c3aed;       /* o trochu tmavsi violet pro kontrast na bilem */
+  --accent-primary-hover: #6d28d9;
+  --accent-primary-soft: rgba(124,58,237,0.08);
+  --accent-secondary: #d97706;     /* tmavsi gold pro kontrast */
+  --accent-secondary-soft: rgba(217,119,6,0.08);
+  --accent-tertiary: #ca8a04;      /* tmavsi gold */
+  --accent-success: #16a34a;       /* tmavsi green */
+  --accent-success-soft: rgba(22,163,74,0.08);
+  --accent-danger: #dc2626;        /* tmavsi red */
+  --accent-danger-soft: rgba(220,38,38,0.08);
+
+  /* Gradients */
+  --gradient-heading: linear-gradient(135deg, #7c3aed 0%, #d97706 100%);
+
+  /* Text */
+  --text-primary: #1a1a2e;         /* tmavy text */
+  --text-secondary: #6b7280;       /* grey-500 */
+  --text-muted: #9ca3af;           /* grey-400 */
+
+  /* Borders */
+  --border-subtle: rgba(0,0,0,0.06);
+  --border-default: rgba(0,0,0,0.10);
+  --border-hover: rgba(124,58,237,0.25);
+
+  /* Shadows — dulezite pro hloubku na bilem pozadi */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-dropdown: 0 8px 24px rgba(0,0,0,0.12);
+
+  /* Typography — ZACHOVAT */
+  --font-display: 'Michroma', sans-serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
 }
 ```
 
-### Data ktera zobrazit v ProductWorkspace
+### Legacy aliases — updatovat:
 
+```css
+  --void: var(--bg-app);
+  --abyss: var(--bg-surface);
+  --deep: var(--bg-card);
+  --surface: var(--bg-surface);
+  --raised: var(--bg-card-hover);
+  --edge: var(--border-subtle);
+  --edge2: var(--border-default);
+  --text: var(--text-primary);
+  --text2: var(--text-secondary);
+  --text3: var(--text-secondary);
+  --text4: var(--text-muted);
+  --gold: var(--accent-tertiary);
+  --gold2: #b8860b;                 /* tmavsi gold variant */
+  --gold-glow: var(--accent-secondary-soft);
+  --emerald: var(--accent-success);
+  --emerald-glow: var(--accent-success-soft);
+  --coral: var(--accent-danger);
+  --coral-glow: var(--accent-danger-soft);
+  --azure: #2563eb;                 /* tmavsi blue */
+  --azure-glow: rgba(37,99,235,.08);
+  --violet: var(--accent-primary);
+  --violet-glow: var(--accent-primary-soft);
+  --amber: var(--accent-secondary);
+  --amber-glow: var(--accent-secondary-soft);
+  --teal: #0d9488;                  /* tmavsi teal */
 ```
-PRODUCT DETAIL ─────────────────────────────────────────
-
-┌─ BASIC INFO ──────────────────────────────────────────┐
-│ Title:        Bella | High-Waist Comfort Pants         │
-│ Status:       ACTIVE  ●                                │
-│ Vendor:       Elegance House                           │
-│ Type:         Pants                                    │
-│ Tags:         pants, high-waist, comfort-fit           │
-│ Handle:       bella-high-waist-comfort-pants            │
-│ Shopify ID:   8234567890                               │
-└────────────────────────────────────────────────────────┘
-
-┌─ DESCRIPTION ─────────────────────────────────────────┐
-│ <rendered HTML description>                            │
-└────────────────────────────────────────────────────────┘
-
-┌─ VARIANTS ────────────────────────────────────────────┐
-│ Option 1: Size    Option 2: Color                      │
-│                                                        │
-│ Variant          │ Price │ SKU     │ Inventory │ Status│
-│ S / Black        │ €129  │ BEL-SB  │ 24       │ ●     │
-│ M / Black        │ €129  │ BEL-MB  │ 18       │ ●     │
-│ L / Black        │ €129  │ BEL-LB  │ 7        │ ⚠     │
-│ S / Navy         │ €129  │ BEL-SN  │ 31       │ ●     │
-│ M / Navy         │ €129  │ BEL-MN  │ 22       │ ●     │
-└────────────────────────────────────────────────────────┘
-
-┌─ IMAGES ──────────────────────────────────────────────┐
-│ [img1] [img2] [img3] [img4] [img5]                    │
-│ 5 images                                               │
-└────────────────────────────────────────────────────────┘
-
-┌─ SEO ─────────────────────────────────────────────────┐
-│ Meta Title:       Bella High-Waist Comfort Pants | EH  │
-│ Meta Description: Discover our figure-flattering...     │
-│ URL Handle:       /products/bella-high-waist-comfort    │
-└────────────────────────────────────────────────────────┘
-
-┌─ METAFIELDS ──────────────────────────────────────────┐
-│ custom.size_chart_text: Size, US, Bust...              │
-│ (+ dalsi metafields pokud existuji)                    │
-└────────────────────────────────────────────────────────┘
-```
-
-### Backend
-
-**`api/system.js` — nova akce `product_detail`:**
-```json
-GET { "action": "product_detail", "store_id": "uuid", "product_id": "uuid" }
-```
-1. Nacist product z Supabase (ziskat shopify_id)
-2. Zavolat `getFullProduct(shopifyId)` na Shopify Admin API
-3. Nacist metafields: `GET /admin/api/2024-01/products/{id}/metafields.json`
-4. Vratit vse v jednom response
-
-### Frontend
-
-**Rozsirit `ProductWorkspace.jsx`** o sekce:
-- Basic Info (read-only — zatim)
-- Description (rendered HTML)
-- Variants tabulka
-- Images gallery
-- SEO info
-- Metafields list
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `lib/shopify-admin.js` | Edit — pridat getFullProduct(), getProductMetafields() |
-| `api/system.js` | Edit — pridat product_detail akce |
-| `lib/api.js` | Edit — pridat getProductDetail() |
-| `pages/ProductWorkspace.jsx` + CSS | Edit — pridat detail sekce |
 
 ---
 
-## Faze 3: Product Editor (Write all fields)
+## SOUBORY K UPRAVE
 
-### Ucel
-Editovat vsechna pole produktu primo z Titan Commerce → zapsat do Shopify. Kompletni nahrada Shopify admin pro product management.
+### 1. HLAVNI — App.css (jediny NUTNY soubor)
 
-### Co jde editovat
+Zmenit `:root` variables dle tabulky nahore. 90% vizualni zmeny bude tady.
 
-| Pole | Edit UI | Shopify API |
-|------|---------|-------------|
-| Title | Input text | `product.title` |
-| Description | Rich text editor (nebo textarea s HTML) | `product.body_html` |
-| Price | Input number per variant | `variant.price` |
-| Compare at price | Input number per variant | `variant.compare_at_price` |
-| Vendor | Input text | `product.vendor` |
-| Product type | Input text / select | `product.product_type` |
-| Tags | Tag input (chips) | `product.tags` (comma separated) |
-| Status | Select: Active / Draft / Archived | `product.status` |
-| SKU | Input per variant | `variant.sku` |
-| SEO Title | Input (max 60 chars) | `product.metafields_global_title_tag` |
-| SEO Description | Textarea (max 155 chars) | `product.metafields_global_description_tag` |
-| Images | Reorder / delete / add (URL) | `product.images` |
-| Metafields | Key-value editor | `/products/{id}/metafields` |
+Dalsi veci v App.css:
+- `body` — `overflow-x: hidden` zustat, barvy se pretahnou z variables
+- `.header` — pridat `box-shadow: var(--shadow-card)` misto `border-bottom` (lip vypada na bilem)
+- `.nav button.active` — zachovat `background: var(--accent-primary); color: #fff`
+- `.logo-mark` — zachovat violet bg + white text
+- Scrollbar: `.scrollbar-thumb` zmenit na `rgba(0,0,0,0.15)` hover `rgba(0,0,0,0.25)`
+- Focus states: zachovat violet outline, zmenit `box-shadow` na `rgba(124,58,237,0.15)`
 
-### UI v ProductWorkspace
+### 2. HLEDEJ HARDCODED BARVY — grep a opravit
 
-Kazda sekce ma [Edit] tlacitko. Klik → inline edit mode (inputy misto textu). [Save] → zapise do Shopify. [Cancel] → vrati readonly.
-
-```
-┌─ BASIC INFO ────────────────────── [Edit] ────────────┐
-│ Title: [Bella | High-Waist Comfort Pants      ]  ← input│
-│ Vendor: [Elegance House                       ]       │
-│ Type: [Pants                                  ]       │
-│ Tags: [pants ×] [high-waist ×] [comfort ×] [+ Add]   │
-│ Status: [Active ▾]                                     │
-│                                                        │
-│                    [Save Changes] [Cancel]              │
-└────────────────────────────────────────────────────────┘
+Prikaz pro nalezeni vsech hardcoded dark-theme barev:
+```bash
+grep -rn '#07070c\|#0e0e15\|#14141e\|#1a1a26\|#1c1c28\|rgba(255,255,255' apps/dashboard/src/ --include="*.css" --include="*.jsx"
 ```
 
-### Backend
+Typicke problemy:
+- `background: #0e0e15` → zmenit na `var(--bg-surface)`
+- `color: #fff` na textu → zmenit na `var(--text-primary)` (nebude vzdy bily)
+- `rgba(255,255,255,0.06)` na borderech → `rgba(0,0,0,0.06)`
+- `inset 0 1px 0 rgba(255,255,255,0.03)` → odstranit (white inset glow neni videt na bilem)
 
-Reuse existujici `updateProduct()` v `lib/shopify-admin.js` — uz umi title, description, vendor, product_type, tags, SEO.
+### 3. KREATIVNI STUDIO — CreativeStudio.jsx (inline styles!)
 
-Pridat:
-```js
-// Variant update (cena, SKU, compare_at_price):
-async updateVariant(variantId, updates) // uz existuje
+**POZOR:** CreativeStudio.jsx ma 900+ radku s inline styles a vlastni barvy (Neon Gold theme). Tyto konstanty navrchu souboru:
 
-// Product status:
-async updateProductStatus(productId, status) {
-  return rest(`products/${productId}.json`, 'PUT', { product: { status } });
-}
-
-// Image reorder/delete:
-async updateProductImages(productId, images) {
-  return rest(`products/${productId}.json`, 'PUT', { product: { images } });
-}
-
-// Metafield create/update (uz bude z Faze 1):
-async updateMetafield(productId, namespace, key, value, type)
+```javascript
+const BG_DEEP = "#0c0c10";        // → "#ffffff"
+const BG_CARD = "rgba(255,255,255,0.02)";  // → "rgba(0,0,0,0.02)"
+const BG_SURFACE = "rgba(255,255,255,0.025)"; // → "rgba(0,0,0,0.03)"
+const BORDER_DIM = "rgba(255,255,255,0.05)";  // → "rgba(0,0,0,0.06)"
+const BORDER_DEFAULT = "rgba(255,255,255,0.07)"; // → "rgba(0,0,0,0.10)"
+const TEXT_DIM = "rgba(255,255,255,0.25)";    // → "rgba(0,0,0,0.25)"
+const TEXT_MID = "rgba(255,255,255,0.45)";    // → "rgba(0,0,0,0.50)"
+const TEXT_BRIGHT = "rgba(255,255,255,0.7)";  // → "rgba(0,0,0,0.70)"
 ```
 
-**`api/system.js` — nova akce `update_product_full`:**
-```json
-POST {
-  "action": "update_product_full",
-  "store_id": "uuid",
-  "product_id": "uuid",
-  "updates": {
-    "title": "...",
-    "body_html": "...",
-    "vendor": "...",
-    "product_type": "...",
-    "tags": "...",
-    "status": "active",
-    "seo_title": "...",
-    "seo_description": "...",
-    "variants": [{ "id": 123, "price": "129.00", "sku": "BEL-SB" }],
-    "metafields": [{ "namespace": "custom", "key": "size_chart_text", "value": "..." }]
-  }
-}
-```
+NEON/CYAN konstanty (gold accent) muzou zustat — zlata na bilem pozadi funguje dobre. Ale:
+- `color: "#fff"` v inline styles → `"#1a1a2e"` nebo `var(--text-primary)` (inline styles neumoznuji CSS variables primo — bud zustat na hex hodnotach, nebo prepsat na CSS tridy)
 
-### DULEZITE: Approval workflow
-Product edit je PRIMO — ne pres approval queue. Uzivatel edituje a klika Save → zapise do Shopify hned. Toto je vedomejsi rozhodnuti nez Optimizer (kde AI navrhuje).
+### 4. LOGIN STRANKU — Login.css
+- Dark pozadi → svetle
+- Login card → bily s shadow
 
-Ale: logovat VSECHNY zmeny do pipeline_log s before/after hodnotami pro audit trail.
+### 5. MODAL OVERLAYS — CreativeEditor.css, OptimizePanel.css, ImportModal.css, GeneratePanel.css
+- `.ce-overlay` / `.op-overlay` — `background: rgba(0,0,0,0.3)` (misto tmave)
+- `.ce-modal` / `.op-modal` — `background: #fff; border: 1px solid rgba(0,0,0,0.10)`
 
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `api/system.js` | Edit — pridat update_product_full akce |
-| `lib/shopify-admin.js` | Edit — pridat updateProductStatus(), updateProductImages() |
-| `lib/api.js` | Edit — pridat updateProductFull() |
-| `pages/ProductWorkspace.jsx` + CSS | Edit — pridat inline edit mode pro vsechny sekce |
-| `components/TagInput.jsx` + CSS | **NOVY** — tag chips input (pridat/odebrat tagy) |
-| `components/VariantEditor.jsx` + CSS | **NOVY** — editovatelna variants tabulka |
-| `components/ImageManager.jsx` + CSS | **NOVY** — image gallery s reorder/delete/add |
-| `components/MetafieldEditor.jsx` + CSS | **NOVY** — key-value metafield editor |
+### 6. TOAST — Toast.css
+- Toast bg: tmave toasty na svetlem pozadi vypadaji dobre. Nechat tmave NEBO zmenit na bile s border.
 
 ---
 
----
+## CO NEZMENOVAT
 
-## URGENTNI: Shopify OAuth Flow — Connect button pro story bez admin tokenu
-
-### Problem
-Isola (a budouci nove story) nemaji admin_token protoze Shopify zrusil legacy custom apps. Token se musi ziskat pres OAuth flow. Ted Shopify tab ukazuje "Admin API not connected" BEZ tlacitka na pripojeni.
-
-### DB zmena — pridat OAuth credentials do stores
-
-```sql
-ALTER TABLE stores ADD COLUMN IF NOT EXISTS client_id TEXT;
-ALTER TABLE stores ADD COLUMN IF NOT EXISTS client_secret TEXT;
-
--- Set credentials in Supabase SQL Editor (NOT in code):
--- UPDATE stores SET client_id = '<client_id>', client_secret = '<secret>'
--- WHERE slug = 'isola';
-```
-
-### Endpoint 1: `api/auth/shopify-connect.js` — NOVY
-
-Inicializuje OAuth flow. Frontend na nej redirectne uzivatele.
-
-```
-GET /api/auth/shopify-connect?store_id=uuid
-```
-
-Flow:
-1. Nacist store z DB (client_id, shopify_url)
-2. Vygenerovat random `state` nonce (CSRF ochrana) — ulozit do cookie nebo query
-3. Redirect uzivatele na:
-```
-https://{shopify_url}/admin/oauth/authorize
-  ?client_id={client_id}
-  &scope=read_all_orders,read_analytics,read_products,write_products,read_customers,read_inventory,read_orders,write_metaobjects,write_metaobject_definitions,read_metaobjects,read_metaobject_definitions,write_discounts,read_discounts,read_reports
-  &redirect_uri=https://titan-commerce.vercel.app/api/auth/shopify-callback
-  &state={nonce}
-```
-
-**POZOR:** Tento endpoint NESMI pouzivat `withAuth()` — je to redirect, ne API call. Ale state nonce musi byt overitelny.
-
-### Endpoint 2: `api/auth/shopify-callback.js` — NOVY
-
-Shopify redirectne sem po autorizaci. Vymeni code za permanent token.
-
-```
-GET /api/auth/shopify-callback?code=AUTH_CODE&shop=swimwear-brand.myshopify.com&state=NONCE&hmac=SIGNATURE
-```
-
-Flow:
-1. **Overit HMAC** — Shopify podepisuje callback. MUSI se overit:
-```js
-import crypto from 'crypto';
-
-function verifyHmac(query, secret) {
-  const { hmac, ...params } = query;
-  const message = Object.keys(params).sort()
-    .map(k => `${k}=${params[k]}`).join('&');
-  const digest = crypto.createHmac('sha256', secret)
-    .update(message).digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(digest), Buffer.from(hmac));
-}
-```
-
-2. **Overit state** — musi matchovat co jsme poslali v connect endpointu (CSRF)
-
-3. **Vymenit code za token:**
-```js
-const tokenResponse = await fetch(`https://${shop}/admin/oauth/access_token`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    client_id: store.client_id,
-    client_secret: store.client_secret,
-    code: query.code,
-  }),
-});
-const { access_token } = await tokenResponse.json();
-// access_token = "shpat_xxxx..." — PERMANENT, no refresh needed
-```
-
-4. **Ulozit token do DB:**
-```js
-await supabase.from('stores')
-  .update({ admin_token: access_token })
-  .eq('shopify_url', shop);
-```
-
-5. **Pipeline log:**
-```js
-await supabase.from('pipeline_log').insert({
-  agent: 'AUTH', message: `Shopify Admin connected for ${shop}`, level: 'info'
-});
-```
-
-6. **Redirect zpet do dashboardu:**
-```js
-res.redirect('/?connected=true');
-// Frontend detekuje ?connected=true → toast "Shopify Admin connected!"
-```
-
-### Frontend — Connect button
-
-Vsude kde se ukazuje "Admin API not connected" pridat tlacitko:
-
-```jsx
-// V ShopifyDashboard, ShopifyPricing, nebo kdekoli je "not connected" placeholder:
-{!store.admin_token && store.client_id && (
-  <a href={`/api/auth/shopify-connect?store_id=${store.id}`} className="connect-btn">
-    Connect Shopify Admin →
-  </a>
-)}
-```
-
-**DULEZITE:** Je to `<a href>` (ne fetch) — protoze to je redirect na Shopify, ne API call.
-
-Pokud store nema ani `client_id` → zobrazit "Contact admin to set up Shopify connection".
-
-### Frontend — detekce uspesneho pripojeni
-
-V `App.jsx` nebo `useActiveStore`:
-```js
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('connected') === 'true') {
-    toast.success('Shopify Admin connected!');
-    window.history.replaceState({}, '', '/'); // vycistit URL
-    // Refresh stores data
-    refreshStores();
-  }
-}, []);
-```
-
-### Shopify Dev Dashboard nastaveni (MUSI UDELAT UZIVATEL)
-
-V Isola Dashboard app v Dev Dashboard:
-1. Configuration → **App URL:** `https://titan-commerce.vercel.app`
-2. Configuration → **Allowed redirection URL(s):** pridat `https://titan-commerce.vercel.app/api/auth/shopify-callback`
-
-BEZ TOHO callback neprojde — Shopify odmitne redirect na nepovoleny URL.
-
-### Bezpecnost
-- HMAC verifikace na callback (Shopify podepisuje)
-- State nonce pro CSRF ochranu
-- Token je PERMANENT — nepotrebuje refresh
-- Token se uklada jen do DB (nikdy v kodu, nikdy v env vars)
-- client_secret se drzi v DB (ne v kodu)
-
-### Soubory
-| Soubor | Akce |
-|--------|------|
-| `api/auth/shopify-connect.js` | **NOVY** — OAuth initiation redirect |
-| `api/auth/shopify-callback.js` | **NOVY** — OAuth callback, token exchange |
-| `sql/add-oauth-columns.sql` | **NOVY** — client_id, client_secret columns |
-| `components/ShopifyDashboard.jsx` | Edit — pridat Connect button |
-| `components/ShopifyPanel.jsx` | Edit — pridat Connect button |
-| `apps/dashboard/src/App.jsx` | Edit — detekce ?connected=true |
-| `lib/api.js` | Mozna — pokud potrebujes API call misto redirect |
-
-### Testovani
-1. Prepni na Isola v store switcher
-2. Shopify tab → vidis "Admin API not connected" + **[Connect Shopify Admin →]** button
-3. Klikni → redirect na Shopify → "Isola Dashboard wants access" → Approve
-4. Redirect zpet do Titan Commerce → toast "Shopify Admin connected!"
-5. Shopify tab ted ukazuje data (revenue, orders, products...)
-6. V DB: `stores.admin_token` pro Isola je naplneny (`shpat_...`)
-7. Size Chart, Pricing, Product Editor — vsechno funguje pro Isola
+1. **Fonty** — Michroma, Plus Jakarta Sans, Space Mono zustavaji
+2. **Layout** — zadne zmeny v paddingu, gridu, spacingu
+3. **Komponenty** — zadne zmeny v JSX/logice
+4. **Accent barvy** — violet + gold zustavaji, jen tmavsi varianta pro kontrast na bilem
+5. **Ikony a statusy** — barevne kody pro approved/rejected/pending zustavaji (jen soft bg tmavsi)
 
 ---
 
-## Poradi prace — DELEJ V TOMTO PORADI
+## POSTUP
 
-### Krok 0: OAuth Flow (URGENTNI — bez toho Isola nema admin pristup)
-DB migrace (client_id, client_secret). Vytvorit `api/auth/shopify-connect.js` + `api/auth/shopify-callback.js`. Pridat Connect button do UI. **Uzivatel musi nastavit redirect URL v Shopify Dev Dashboard** (viz sekce vyse). Otestovat: klik Connect → Shopify autorizace → token ulozen → Isola ma admin pristup.
-
-### Krok 1: Size Chart backend (Faze 1)
-Pridat `updateMetafield()`, `getMetafield()` do shopify-admin.js. Pridat `save_size_chart`, `read_size_chart`, `parse_size_chart_image` akce do system.js. Otestovat: zapise size chart do Shopify metafield.
-
-### Krok 2: Size Chart frontend (Faze 1)
-SizeChartEditor komponenta + integrace do ProductWorkspace. Otestovat: edit tabulku → save → overit v Shopify admin.
-
-### Krok 3: Image parse (Faze 1)
-Claude Vision integrace pro parse fotky size chartu. Otestovat: upload fotku → AI vyplni tabulku.
-
-### Krok 4: Product Detail read (Faze 2)
-`getFullProduct()` + `getProductMetafields()` v backend. ProductWorkspace zobrazuje vsechny sekce read-only. Otestovat: otevre produkt → vidi varianty, images, SEO, metafields.
-
-### Krok 5: Product Editor write (Faze 3)
-Inline edit mode v ProductWorkspace. TagInput, VariantEditor, ImageManager, MetafieldEditor komponenty. Otestovat: edit title → Save → overit v Shopify.
-
-### Krok 6: E2E test
-1. Otevre produkt → vidi kompletni detail (varianty, images, SEO, metafields, size chart)
-2. Edit Size Chart → tabulkovy editor → Save → overit na store frontendu
-3. Import Size Chart z fotky → AI parsuje → vyplni tabulku → Save
-4. Edit title → Save → overit v Shopify admin
-5. Edit cenu varianty → Save → overit
-6. Pridat/odebrat tag → Save → overit
-7. Zmenit status Draft/Active → Save → overit
-8. Edit SEO title/description → Save → overit
-9. Pipeline log ukazuje vsechny zmeny s before/after
+1. **Zacit v App.css** — zmenit `:root` variables + legacy aliases
+2. **Testovat** — otevrit kazdy tab, zkontrolovat ze neni neviditelny text/border
+3. **Grep hardcoded** — najit a opravit hardcoded dark barvy v CSS souborech
+4. **CreativeStudio.jsx** — updatovat inline konstanty
+5. **Login.css** — svetly login
+6. **Modaly** — overlay + modal bg
+7. **Fine-tune** — shadows, hover states, scrollbar
 
 ---
 
-## Verifikace
+## VERIFIKACE
 
-### Size Chart
-- Read: otevre produkt → sekce Size Chart zobrazuje aktualni tabulku z metafield
-- Write: edit → Save → metafield `custom.size_chart_text` updatovany v Shopify
-- Image parse: upload fotku → Claude Vision → tabulka se vyplni → Save
-- Prazdny produkt: ukazuje "No size chart" s [Add Size Chart] CTA
-- Funguje jen pro story s admin_token
+1. Otevrit kazdy tab (Overview, Shopify, Studio, Products, Profit) — zadny bily text na bilem pozadi
+2. Otevrit ProductWorkspace → Creative Studio modal — citelny text, viditelne borders
+3. Login page — citelna, profesionalni
+4. Store switcher dropdown — viditelny
+5. Toasty — citelne
+6. Optimalizace panel — citelny
+7. Import modal — citelny
+8. Mobile responsive — zkontrolovat ze shadows/borders funguji na mensi obrazovce
+9. Scrollbar — viditelny na svetlem pozadi
 
-### Product Detail
-- Vsechny sekce zobrazuji realna Shopify data
-- Varianty: tabulka s Size, Color, Price, SKU, Inventory
-- Images: gallery s thumbnaily
-- SEO: meta title + description
-- Metafields: vsechny custom metafields
+---
 
-### Product Editor
-- Kazda sekce ma [Edit] / [Save] / [Cancel]
-- Save zapise do Shopify OKAMZITE (ne pres approval)
-- Pipeline log: kazda zmena logovana s before/after
-- Toast: "Product updated!" / "Failed: {details}"
-- Varianty: edit ceny, SKU pro kazdy variant zvlast
-- Tags: chip input s [×] pro delete a [+ Add]
-- Status: dropdown Active/Draft/Archived
-- Store izolace: edit jen pro aktivni store
+## Copy-paste prompt pro druhy chat
+
+```
+Precti si Docs/Briefs/LIGHT-THEME.md a CLAUDE.md. Ukolem je zmenit barevne schema dashboardu z dark theme na light theme. 
+
+Zacni v App.css — zmen :root CSS variables dle briefu. Pak grep vsechny hardcoded tmave barvy (#07070c, #0e0e15, #14141e, rgba(255,255,255,...)) a oprav je. 
+
+DULEZITE: CreativeStudio.jsx ma inline styles s vlastnimi konstantami (BG_DEEP, BG_CARD, TEXT_DIM atd.) — updatuj je take.
+
+Postup: App.css variables → grep hardcoded → CreativeStudio.jsx konstanty → Login.css → modaly → test.
+```
