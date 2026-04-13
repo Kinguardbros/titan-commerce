@@ -167,17 +167,12 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
           )}
         </div>
 
-        {/* Right — full photo preview (D&D zone) */}
-        <div className={`avd-preview ${dragging ? 'avd-preview--drag' : ''}`}
-          onDragEnter={(e) => { e.preventDefault(); dragCounter.current++; setDragging(true); }}
-          onDragLeave={(e) => { e.preventDefault(); dragCounter.current--; if (dragCounter.current === 0) setDragging(false); }}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleDrop}
-        >
+        {/* Right — full photo preview */}
+        <div className="avd-preview">
           {referenceUrl ? (
             <img src={referenceUrl} alt={persona.name} />
           ) : (
-            <div className="avd-placeholder">Drop a photo here<br/>or click Upload</div>
+            <div className="avd-placeholder">No photo yet — click Generate or Upload</div>
           )}
         </div>
 
