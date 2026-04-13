@@ -26,7 +26,7 @@ const resizeAndEncode = (file) => new Promise((resolve, reject) => {
   img.src = URL.createObjectURL(file);
 });
 
-export default function StyleBuilder({ storeId, storeName, onClose, onCreated }) {
+export default function StyleBuilder({ storeId, onClose, onCreated }) {
   const toast = useToast();
   const dragCounter = useRef(0);
   const [tab, setTab] = useState('upload');
@@ -245,7 +245,7 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
               </div>
             </div>
             <div className="sb-attrs">
-              {['lighting', 'composition', 'model_posing', 'setting', 'mood', 'camera_angle'].map(k => (
+              {['lighting', 'setting', 'mood', 'composition', 'camera_angle', 'color_grading'].map(k => (
                 <div key={k} className="sb-attr">
                   <span className="sb-attr-key">{k.replace('_', ' ')}</span>
                   <span className="sb-attr-val">{analysis[k]}</span>
