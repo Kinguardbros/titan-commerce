@@ -1,0 +1,157 @@
+// Photo Story prompt templates — extracted from ISOLA-MASTER-PROMPT-SYSTEM.md
+// Each shot's buildPrompt(product, heroColor) returns a custom_prompt string for generateCreatives()
+
+export const STORY_SHOTS = [
+  {
+    key: 'hero',
+    label: 'Hero Shot',
+    order: 1,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Three-quarter angle full body shot. Model positioned at 30-degree angle to camera, facing slightly left. Weight on right hip, creating natural S-curve silhouette. Arms relaxed at sides, fingers slightly apart — not stiff, not touching swimsuit. Model fills approximately 70% of vertical frame. Head to just below knees visible.
+
+Swimsuit: ${p.title} in ${color}.
+${p.description ? `Product details: ${p.description}` : ''}
+Fabric sitting smoothly on body with zero bunching, zero rolling at waistband.
+
+This is the ANCHOR image. All subsequent images must match this lighting exactly.`,
+  },
+  {
+    key: 'lifestyle',
+    label: 'Lifestyle',
+    order: 3,
+    defaultOn: true,
+    suggestedStyle: 'lifestyle',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Full body shot, slightly wider framing. Model walking slowly toward camera at slight angle, one foot ahead of other, natural stride. Arms swinging gently or one hand lightly touching hair. Genuine relaxed smile, looking slightly past camera. Wind catching hair slightly.
+
+Swimsuit: ${p.title} in ${color}.
+Full product visible from neckline to mid-thigh. Fabric moving naturally with body motion — no stiff frozen look. Waistband staying in place during movement.
+
+Environment more visible — background fills 40% of frame. Shot feels candid and natural, as if photographer captured a genuine moment.`,
+  },
+  {
+    key: 'detail',
+    label: 'Detail / Focus',
+    order: 4,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Tightly cropped shot. Frame from just below bust to mid-thigh ONLY. No face visible. Model standing straight, slight left hip tilt. Both hands relaxed at sides, not touching swimsuit.
+
+Swimsuit: ${p.title} in ${color}.
+
+CRITICAL FOCUS AREA: Wide ruched high-waist panel sitting smoothly across the stomach with no rolling or folding, waistband edge invisible under fabric. Tummy control band lying completely flat with no digging.
+
+Fabric texture sharp and highly detailed — weave pattern visible. Skin texture natural and visible. No excessive retouching on stomach area — show real fit on real body. Warm side light from left creates subtle shadow defining the waist shaping effect.`,
+  },
+  {
+    key: 'back',
+    label: 'Back View',
+    order: 5,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Three-quarter back view. Model facing away from camera at roughly 160-degree angle, looking over right shoulder toward camera with slight smile. Natural standing pose, weight evenly distributed.
+
+Full body from shoulders to just below knees.
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Back coverage — show how bottom sits on glutes without riding up, how waistband sits at back without rolling, how top straps lie flat at back. Fabric smooth, no bunching at lower back. Natural body shape visible.
+
+Same warm left-side lighting. Background soft bokeh.`,
+  },
+  {
+    key: 'profile',
+    label: 'Side Profile',
+    order: 6,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Full side profile shot. Model facing camera-left, standing straight with slight natural arch in lower back. Arms relaxed at sides or one hand lightly on hip. Chin slightly lifted.
+
+Full body from head to knees.
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Silhouette — the shaping effect of the high-waist panel visible in profile. Show how the waistband creates a smooth line from ribcage to hip. Natural bust profile, supported but not pushed up unnaturally.
+
+Warm left-side lighting creates definition along the body's edge. Background soft, model is a clean silhouette against bokeh.`,
+  },
+  {
+    key: 'material',
+    label: 'Material Close-up',
+    order: 7,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Extreme close-up. Frame shows approximately 15×15cm area of fabric ON the model's body (stomach area or hip area). Skin visible at edges of fabric.
+
+FOCUS: Fabric weave texture at macro level. Individual threads visible. Elastic waistband edge — clean finish, no fraying. Stitching line — even, consistent spacing. Fabric lying flat against skin without pilling or snagging.
+
+Swimsuit: ${p.title} in ${color}.
+
+Warm directional light from left creating texture shadows in fabric weave. Shallow depth of field — center of fabric tack sharp, edges gently soft.
+
+This shot proves the product is high quality. Every stitch must look intentional.`,
+  },
+  {
+    key: 'before_after',
+    label: 'Before / After',
+    order: 8,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.28, // 2 images
+    buildPrompt: (p, color) => `AFTER panel of a before/after comparison. Clean white seamless studio backdrop. Flat even lighting.
+
+Full body shot from head to mid-thigh. Upright confident posture, shoulders back, slight warm smile, direct eye contact with camera.
+
+Wearing ${p.title} in ${color}.
+Swimsuit sitting perfectly: waistband completely flat with zero rolling, no bunching at hips, fabric smooth across stomach and thighs, straps straight not pulling. Body looks supported and shaped, NOT squeezed. Natural skin texture visible. No excessive smoothing.
+
+NO text, NO labels, NO arrows in image.`,
+  },
+  {
+    key: 'feature_callout',
+    label: 'Feature Callout',
+    order: 2,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Front-facing full body shot. Model standing straight, arms slightly away from body (not covering any part of the swimsuit). Neutral confident expression, direct eye contact with camera. Model fills approximately 75% of vertical frame. Head to mid-shin visible.
+
+Swimsuit: ${p.title} in ${color}.
+Every construction detail must be clearly visible and unobstructed: straps, neckline/bust construction, waistband, side details, overall fit and silhouette.
+
+Clean, neutral studio-style background (warm beige or light gray). Even flat lighting from both sides — minimal shadows so all product details are equally visible.
+
+Leave clear space on both sides of the model for callout labels in post-production.`,
+  },
+];
+
+export function buildColorVariantPrompt(product, color) {
+  return `Three-quarter angle full body shot. IDENTICAL POSE to Hero Shot — 30-degree angle to left, weight on right hip, relaxed arms. Model fills 70% of frame.
+
+Swimsuit: ${product.title} in ${color}.
+
+Fabric smooth and sitting correctly on body. Same lighting as Hero Shot. Background identical framing.
+This image MUST look like it was shot in the same session as the Hero image.`;
+}
+
+export function buildUGCPrompt(product, color) {
+  return `STYLE OVERRIDE — this image intentionally breaks the polished look:
+
+Shot on iPhone 15 Pro. Slightly warm color cast. Natural daylight, not styled. Minor lens flare acceptable. Composition slightly off-center (intentional).
+
+Casual relaxed expression — mid-laugh or looking away from camera. Hair messy/natural (wind, water). No professional makeup. Visible tan lines acceptable.
+
+Location: REAL environment — backyard pool with visible deck furniture, OR busy public beach with other people slightly blurred in background, OR hotel balcony.
+
+Candid three-quarter shot. Model not perfectly posed — caught mid-moment. Phone-quality depth of field.
+
+Swimsuit: ${product.title} in ${color}.
+Product visible and recognizable but this is NOT a fashion photo.
+This is "my friend took this pic of me on vacation" energy.
+
+NO studio lighting. NO perfect skin. NO fashion posing.`;
+}
+
+export const DEFAULT_COST_PER_IMAGE = 0.14;

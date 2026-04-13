@@ -13,6 +13,8 @@
 .pw-action-btn:hover { border-color: var(--gold); color: var(--gold); }
 .pw-action-btn--video { color: var(--violet); }
 .pw-action-btn--video:hover { border-color: var(--violet); }
+.pw-action-btn--story { color: var(--accent-primary); background: var(--accent-primary-soft); border-color: rgba(139,92,246,.15); }
+.pw-action-btn--story:hover { background: rgba(139,92,246,.2); }
 .pw-action-btn--optimize { color: var(--gold); background: var(--gold-glow); border-color: rgba(201,168,76,.2); }
 .pw-action-btn--optimize:hover { background: rgba(201,168,76,.2); }
 .pw-action-btn--muted { color: var(--text4); }

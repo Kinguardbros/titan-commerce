@@ -5,6 +5,7 @@ import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
 import OptimizePanel from '../components/OptimizePanel';
+import PhotoStoryModal from '../components/PhotoStoryModal';
 import { approveAd, rejectAd, updateCreative, convertToVideo } from '../lib/api';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
@@ -33,6 +34,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   const [generateMode, setGenerateMode] = useState('image');
   const [editingCreative, setEditingCreative] = useState(null);
   const [showOptimize, setShowOptimize] = useState(false);
+  const [showPhotoStory, setShowPhotoStory] = useState(false);
 
   const fetchCreatives = useCallback(async () => {
     try {
@@ -92,6 +94,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
         <div className="pw-topbar-actions">
           <button className="pw-action-btn" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
           <button className="pw-action-btn pw-action-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+          <button className="pw-action-btn pw-action-btn--story" onClick={() => setShowPhotoStory(true)}>Photo Story</button>
           <button className="pw-action-btn pw-action-btn--optimize" onClick={() => setShowOptimize(true)}>Optimize</button>
           {onNavigateToStudio && (
             <button className="pw-action-btn pw-action-btn--muted" onClick={() => onNavigateToStudio(product.id)}>Studio</button>
@@ -208,6 +211,12 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
       )}
       {showOptimize && (
         <OptimizePanel product={product} onClose={() => setShowOptimize(false)} onApplied={() => { setShowOptimize(false); }} />
+      )}
+      {showPhotoStory && (
+        <PhotoStoryModal product={product} storeId={storeId}
+          onClose={() => setShowPhotoStory(false)}
+          onCompleted={() => { setShowPhotoStory(false); fetchCreatives(); }}
+        />
       )}
     </div>
   );
