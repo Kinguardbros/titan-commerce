@@ -45,10 +45,22 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  const { product_id, store_id, style = 'ad_creative', ai_model = 'fal_nano_banana', custom_prompt = '', show_model = true, text_overlay = 'none', overlay_text = '', audience, aspect_ratio = '1:1', story_id, story_shot, reference_url } = req.body;
+  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, story_id, story_shot, reference_url } = req.body;
+  style = style || 'ad_creative'; ai_model = ai_model || 'fal_nano_banana'; custom_prompt = custom_prompt || ''; show_model = show_model !== false; text_overlay = text_overlay || 'none'; overlay_text = overlay_text || ''; aspect_ratio = aspect_ratio || '1:1';
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
+  }
+
+  // Auto-inject persona reference if audience selected and no explicit reference
+  if (audience && !reference_url && store_id) {
+    try {
+      const { data: avatar } = await supabase.from('persona_avatars')
+        .select('reference_url')
+        .eq('store_id', store_id).eq('persona_name', audience).eq('is_active', true)
+        .single();
+      if (avatar?.reference_url) reference_url = avatar.reference_url;
+    } catch (e) { /* no avatar for this persona — continue without reference */ }
   }
 
   try {

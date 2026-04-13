@@ -11,8 +11,9 @@ const Products = lazy(() => import('./pages/Products'));
 const ProductWorkspace = lazy(() => import('./pages/ProductWorkspace'));
 const Studio = lazy(() => import('./pages/Studio'));
 const Profit = lazy(() => import('./pages/Profit'));
+const Avatars = lazy(() => import('./pages/Avatars'));
 
-const TABS = ['Overview', 'Shopify', 'Studio', 'Products', 'Profit'];
+const TABS = ['Overview', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
 
 function isTokenValid() {
   const token = localStorage.getItem('auth_token');
@@ -161,6 +162,7 @@ function AppContent() {
             {activeTab === 'Overview' && <Overview onNavigateToProduct={handleNavigateToProduct} onNavigateToStudio={handleNavigateToStudio} onNavigateToShopify={() => { setActiveTab('Shopify'); setTimeout(() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' }), 300); }} storeId={storeId} />}
             {activeTab === 'Shopify' && <Shopify onNavigateToProduct={handleNavigateToProduct} storeId={storeId} store={activeStore} />}
             {activeTab === 'Studio' && <Studio storeId={storeId} store={activeStore} initialProductId={studioProductId} onNavigateToProduct={handleNavigateToProduct} />}
+            {activeTab === 'Avatars' && <Avatars storeId={storeId} store={activeStore} />}
             {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
             {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
             {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}

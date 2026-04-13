@@ -70,7 +70,7 @@ Key patterns:
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
-- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`
+- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js`: generate 20/hr, video 10/hr, optimize 30/hr
 - Vercel 12-route limit: consolidated endpoints in `api/system.js` mega-handler with `?action=X` pattern
@@ -177,8 +177,9 @@ Key patterns:
 | `lib/actions/docs.js` | `store_docs`, `store_docs_download`, `upload_store_doc`, `process_single_file`, `process_inbox` |
 | `lib/actions/custom-styles.js` | `custom_styles`, `analyze/create/delete/describe_style`, `scrape_style` |
 | `lib/actions/pricing.js` | `update_cogs`, `manual_adspend` |
+| `lib/actions/avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
 | **API Endpoints** | |
-| `api/system.js` | Thin router (~91 lines) — delegates 45 actions to 13 modules in `lib/actions/` |
+| `api/system.js` | Thin router (~91 lines) — delegates 45 actions to 14 modules in `lib/actions/` |
 | `api/auth/login.js` | Password authentication → session token |
 | `api/creatives/generate.js` | Generate image creative via Higgsfield |
 | `api/creatives/regenerate.js` | Regenerate image or video creative |

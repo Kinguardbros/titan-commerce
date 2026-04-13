@@ -14,6 +14,7 @@ import { store_docs, store_docs_download, upload_store_doc, process_single_file,
 import { custom_styles, analyze_style, create_custom_style, delete_custom_style, describe_style, scrape_style } from '../lib/actions/custom-styles.js';
 import { update_creative, generate_branded, push_creative_to_shopify, cleanup_stale } from '../lib/actions/creatives.js';
 import { update_cogs, manual_adspend } from '../lib/actions/pricing.js';
+import { persona_avatars, generate_avatar, upload_avatar, set_avatar_reference, delete_avatar } from '../lib/actions/avatars.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -31,6 +32,7 @@ const GET_ACTIONS = {
   meta_overview,
   refresh_size_charts,
   custom_styles,
+  persona_avatars,
 };
 
 const POST_ACTIONS = {
@@ -64,6 +66,10 @@ const POST_ACTIONS = {
   delete_custom_style,
   describe_style,
   scrape_style,
+  generate_avatar,
+  upload_avatar,
+  set_avatar_reference,
+  delete_avatar,
 };
 
 async function handler(req, res) {

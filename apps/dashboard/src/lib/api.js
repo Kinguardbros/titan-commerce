@@ -413,3 +413,36 @@ export function scrapeStyle(url, storeId) {
 export function refreshSizeCharts(storeId) {
   return fetchJSON(`/api/system?action=refresh_size_charts&store_id=${storeId}`);
 }
+
+// Avatars
+export function getAvatars(storeId) {
+  return fetchJSON(`/api/system?action=persona_avatars&store_id=${storeId}`);
+}
+
+export function generateAvatar(storeId, personaName, description) {
+  return fetchJSON('/api/system?action=generate_avatar', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, persona_name: personaName, description }),
+  });
+}
+
+export function uploadAvatar(storeId, personaName, base64, mediaType) {
+  return fetchJSON('/api/system?action=upload_avatar', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, persona_name: personaName, base64, media_type: mediaType }),
+  });
+}
+
+export function setAvatarReference(storeId, personaName, url) {
+  return fetchJSON('/api/system?action=set_avatar_reference', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, persona_name: personaName, url }),
+  });
+}
+
+export function deleteAvatar(storeId, personaName) {
+  return fetchJSON('/api/system?action=delete_avatar', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, persona_name: personaName }),
+  });
+}
