@@ -111,7 +111,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             audience: audienceCtx, story_id: storyId, story_shot: shot.key,
           }),
         })),
-        ...variantColors.map(color => ({
+        ...[...variantColors].map(color => ({
           label: `Color: ${color}`,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: 'product_shot',
