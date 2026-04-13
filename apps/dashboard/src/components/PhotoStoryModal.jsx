@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { generateCreatives, getProductDetail } from '../lib/api';
+import { generateCreatives, getProductDetail, getSkills } from '../lib/api';
 const genStoryId = () => crypto.randomUUID();
 import { STORY_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
 import { useToast } from '../hooks/useToast.jsx';
@@ -12,6 +12,7 @@ const AI_MODELS = [
 ];
 
 const ASPECT_RATIOS = ['1:1', '4:5', '9:16'];
+const SCENES = ['Auto', 'Studio', 'Beach', 'Park', 'Café', 'Street', 'Home interior', 'Rooftop', 'Garden', 'Poolside', 'Hotel'];
 
 export default function PhotoStoryModal({ product, storeId, onClose, onCompleted }) {
   const toast = useToast();
@@ -22,6 +23,9 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [includeUGC, setIncludeUGC] = useState(false);
   const [aiModel, setAiModel] = useState('fal_nano_banana');
   const [aspectRatio, setAspectRatio] = useState('4:5');
+  const [scene, setScene] = useState('Auto');
+  const [personas, setPersonas] = useState([]);
+  const [audience, setAudience] = useState('auto');
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
 
@@ -41,6 +45,20 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
       const arr = [...colorSet];
       setColors(arr);
       if (arr.length > 0) setHeroColor(arr[0]);
+    }).catch(() => {});
+    // Load audience personas
+    getSkills(sid).then(data => {
+      const as = (data.skills || []).find(s => s.skill_type === 'audience-personas');
+      if (as?.content) {
+        const parsed = [];
+        const rx1 = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
+        let m; while ((m = rx1.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, '') });
+        if (!parsed.length) {
+          const rx2 = /###\s*Persona\s*\d+:\s*(\w+)\s*"([^"]+)"\s*\n[^]*?(?:\*\*Age\*\*|Age):\s*(\d+)/g;
+          while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
+        }
+        if (parsed.length) setPersonas(parsed);
+      }
     }).catch(() => {});
   }, [storeId, product?.id, product?.store_id]);
 
@@ -78,24 +96,28 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
       const storyId = genStoryId();
       const shots = STORY_SHOTS.filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
 
+      // Build scene + audience context to append to each prompt
+      const sceneCtx = scene !== 'Auto' ? `\nScene/Environment: ${scene}. Set the photo in this specific environment.` : '';
+      const audienceCtx = audience !== 'auto' ? audience : undefined;
+
       // Build all jobs with story_id + story_shot
       const allJobs = [
         ...shots.map(shot => ({
           label: shot.label,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
-            custom_prompt: shot.buildPrompt(product, heroColor),
+            custom_prompt: shot.buildPrompt(product, heroColor) + sceneCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
-            story_id: storyId, story_shot: shot.key,
+            audience: audienceCtx, story_id: storyId, story_shot: shot.key,
           }),
         })),
         ...variantColors.map(color => ({
           label: `Color: ${color}`,
           fn: () => generateCreatives({
             product_id: product.id, store_id: storeId, style: 'product_shot',
-            custom_prompt: buildColorVariantPrompt(product, color),
+            custom_prompt: buildColorVariantPrompt(product, color) + sceneCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
-            story_id: storyId, story_shot: `color_${color.toLowerCase().replace(/\s+/g, '-')}`,
+            audience: audienceCtx, story_id: storyId, story_shot: `color_${color.toLowerCase().replace(/\s+/g, '-')}`,
           }),
         })),
       ];
@@ -124,11 +146,12 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
             product_id: product.id,
             store_id: storeId,
             style: 'review_ugc',
-            custom_prompt: buildUGCPrompt(product, heroColor),
+            custom_prompt: buildUGCPrompt(product, heroColor) + sceneCtx,
             show_model: true,
             text_overlay: 'none',
             ai_model: aiModel,
             aspect_ratio: aspectRatio,
+            audience: audienceCtx,
           });
         } catch (err) {
           console.error('[PhotoStory] UGC failed:', { error: err.message });
@@ -213,6 +236,25 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
                 </div>
               </div>
             )}
+
+            {/* Audience + Scene */}
+            <div className="ps-row">
+              {personas.length > 0 && (
+                <div className="ps-section ps-section--half">
+                  <label className="ps-label">Audience</label>
+                  <select className="ps-select" value={audience} onChange={e => setAudience(e.target.value)}>
+                    <option value="auto">Auto — best match</option>
+                    {personas.map(p => <option key={p.name} value={p.name}>{p.name} ({p.age}) — {p.label}</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="ps-section ps-section--half">
+                <label className="ps-label">Scene / Environment</label>
+                <select className="ps-select" value={scene} onChange={e => setScene(e.target.value)}>
+                  {SCENES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
 
             {/* Model + Aspect ratio */}
             <div className="ps-row">
