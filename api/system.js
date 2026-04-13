@@ -1314,6 +1314,8 @@ Only include sections that have specific, actionable rules from the sources.` }]
         const result = await client.updateMetafield(product.shopify_id, 'custom', 'size_chart_text', size_chart_text);
         if (!result) return res.status(500).json({ error: 'Failed to save metafield to Shopify' });
 
+        await supabase.from('products').update({ has_size_chart: true }).eq('id', product_id);
+
         await supabase.from('pipeline_log').insert({
           store_id, agent: 'SIZE_CHART',
           message: `Updated size chart for "${product.title}"`,

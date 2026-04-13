@@ -266,7 +266,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                   </div>
                   <div className="product-card-body">
                     <div className="product-card-title">{p.title}</div>
-                    <div className="product-card-meta">{p.price && <span className="product-card-price">${p.price}</span>}</div>
+                    <div className="product-card-meta">
+                      {p.price && <span className="product-card-price">${p.price}</span>}
+                      {!p.has_size_chart && <span style={{ color: 'var(--accent-secondary)', fontSize: 10, marginLeft: 6 }} title="Missing size chart">⚠ Size</span>}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -276,7 +279,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           {viewMode === 'list' && (
             <div className="products-table-wrap">
               <table className="products-table">
-                <thead><tr><th></th><th>Product</th><th>Price</th><th>Creatives</th><th>COGS</th><th></th></tr></thead>
+                <thead><tr><th></th><th>Product</th><th>Price</th><th>Creatives</th><th>Size</th><th>COGS</th><th></th></tr></thead>
                 <tbody>
                   {filtered.map((p) => (
                     <tr key={p.id} onClick={() => onSelectProduct(p)}>
@@ -284,6 +287,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                       <td className="products-table-name">{p.title}{isNew(p) && <span className="pill" style={{ marginLeft: 6, background: 'var(--accent-primary-soft)', color: 'var(--accent-primary)', fontSize: 9, padding: '2px 6px' }}>New</span>}</td>
                       <td>${p.price || '—'}</td>
                       <td>{p.creative_count > 0 ? <span style={{ color: 'var(--accent-success)' }}>{p.creative_count}</span> : <span style={{ color: 'var(--accent-danger)' }}>0 ⚠</span>}</td>
+                      <td>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠</span>}</td>
                       <td>{p.cogs ? `$${p.cogs}` : '—'}</td>
                       <td><button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button></td>
                     </tr>
@@ -306,6 +310,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                   </div>
                   <div className="products-card-stats">
                     <span>{p.creative_count || 0} 🎨</span>
+                    <span>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓ Size</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠ Size</span>}</span>
                   </div>
                   <div className="products-card-actions">
                     <button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button>
