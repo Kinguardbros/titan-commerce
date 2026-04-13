@@ -31,8 +31,14 @@ function AppContent() {
   const [clock, setClock] = useState('');
   const [showStorePicker, setShowStorePicker] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('titan-theme') || 'dark');
 
   const storeId = activeStore?.id;
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('titan-theme', theme);
+  }, [theme]);
 
   useEffect(() => {
     const tick = () => {
@@ -108,6 +114,15 @@ function AppContent() {
             )}
           </div>
         )}
+
+        {/* Theme toggle */}
+        <button
+          className="theme-toggle"
+          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
 
         {/* Hamburger button — mobile only */}
         <button
