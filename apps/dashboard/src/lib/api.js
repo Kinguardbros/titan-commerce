@@ -222,8 +222,10 @@ export function getPendingOptimizations(storeId) {
 }
 
 // Profit
-export function getProfitSummary(days = 7) {
-  return fetchJSON(`/api/system?action=profit_summary&days=${days}`);
+export function getProfitSummary(days = 7, storeId = null) {
+  let url = `/api/system?action=profit_summary&days=${days}`;
+  if (storeId) url += `&store_id=${storeId}`;
+  return fetchJSON(url);
 }
 
 export function updateCogs(productId, cogs) {
@@ -366,4 +368,37 @@ export function getStoreDocDownloadUrl(storeName, filePath) {
   // Fallback to API proxy
   const token = localStorage.getItem('auth_token');
   return `/api/system?action=store_docs_download&store_name=${encodeURIComponent(storeName)}&file_path=${encodeURIComponent(filePath)}${token ? `&token=${token}` : ''}`;
+}
+
+// Custom Styles
+export function analyzeStyle(storeId, images = [], urls = []) {
+  return fetchJSON('/api/system?action=analyze_style', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, images, urls }),
+  });
+}
+
+export function createCustomStyle(storeId, name, description, analysis, referenceImages = []) {
+  return fetchJSON('/api/system?action=create_custom_style', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, name, description, analysis, reference_images: referenceImages }),
+  });
+}
+
+export function getCustomStyles(storeId) {
+  return fetchJSON(`/api/system?action=custom_styles&store_id=${storeId}`);
+}
+
+export function deleteCustomStyle(storeId, styleKey) {
+  return fetchJSON('/api/system?action=delete_custom_style', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, style_key: styleKey }),
+  });
+}
+
+export function scrapeStyle(url, storeId) {
+  return fetchJSON('/api/system?action=scrape_style', {
+    method: 'POST',
+    body: JSON.stringify({ url, store_id: storeId }),
+  });
 }

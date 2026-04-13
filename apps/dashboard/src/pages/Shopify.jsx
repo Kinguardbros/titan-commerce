@@ -15,7 +15,7 @@ const SUB_TABS = [
 
 export default function Shopify({ onNavigateToProduct, storeId, store }) {
   const toast = useToast();
-  const hasAdmin = !!store?.admin_token;
+  const hasAdmin = !!(store?.has_admin || store?.admin_token);
   const [subTab, setSubTab] = useState('dashboard');
 
   // Pricing state

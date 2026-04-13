@@ -32,7 +32,7 @@ export default function ProductDetail({ product, storeId, store }) {
   const [seoDesc, setSeoDesc] = useState('');
   const [mf, setMf] = useState([]);
 
-  const hasAdmin = !!store?.admin_token;
+  const hasAdmin = !!(store?.has_admin || store?.admin_token);
   const initialRef = useRef(null);
 
   const fetchDetail = useCallback(async () => {

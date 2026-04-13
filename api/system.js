@@ -6,6 +6,7 @@ import { withAuth } from '../lib/auth.js';
 import { rateLimit } from '../lib/rate-limit.js';
 import { getAllStores, getStore } from '../lib/store-context.js';
 import { scrapeProduct, scrapeCollectionUrls } from '../lib/scraper-utils.js';
+import { detectEventsForStore } from '../lib/event-detector.js';
 import { isConnected as isMetaConnected, getAccountInsights, getCampaigns, getActiveAdsCount } from '../lib/meta-api.js';
 import { extractText, classifyDocument, extractInsights, identifyProduct } from '../lib/doc-processor.js';
 const DOCS_BUCKET = 'store-docs';
@@ -55,7 +56,11 @@ async function handler(req, res) {
 
       if (action === 'stores_list') {
         const stores = await getAllStores();
-        return res.status(200).json(stores);
+        const safeStores = stores.map(({ admin_token, ...rest }) => ({
+          ...rest,
+          has_admin: !!admin_token,
+        }));
+        return res.status(200).json(safeStores);
       }
 
       if (action === 'pipeline_log') {
@@ -80,18 +85,34 @@ async function handler(req, res) {
 
       if (action === 'profit_summary') {
         const days = parseInt(req.query.days) || 7;
+        const storeId = req.query.store_id;
         const since = new Date();
         since.setDate(since.getDate() - days);
         const sinceStr = since.toISOString().split('T')[0];
 
+        // Create per-store Shopify client
+        let shopifyClient;
+        let store;
+        if (storeId) {
+          store = await getStore(storeId);
+          if (store?.admin_token) {
+            shopifyClient = createShopifyClient(store.shopify_url, store.admin_token);
+          }
+        }
+        if (!shopifyClient) {
+          shopifyClient = { getRevenueSummary, getRecentOrders };
+        }
+
         // Shopify orders for revenue + COGS
-        const shopifyData = await getRevenueSummary(days);
+        const shopifyData = await shopifyClient.getRevenueSummary(days);
 
         // Get detailed orders for daily breakdown
-        const ordersResp = await getRecentOrders(250);
+        const ordersResp = await shopifyClient.getRecentOrders(250);
 
-        // Get all products with COGS
-        const { data: products } = await supabase.from('products').select('title, cogs');
+        // Get all products with COGS (filtered by store)
+        let productsQuery = supabase.from('products').select('title, cogs');
+        if (storeId) productsQuery = productsQuery.eq('store_id', storeId);
+        const { data: products } = await productsQuery;
         const cogsMap = {};
         (products || []).forEach((p) => { if (p.cogs) cogsMap[p.title] = parseFloat(p.cogs); });
         const missingCogs = (products || []).filter((p) => !p.cogs).length;
@@ -102,49 +123,64 @@ async function handler(req, res) {
         // Get manual adspend
         const { data: manualSpend } = await supabase.from('manual_adspend').select('*').gte('date', sinceStr);
 
+        // Per-gateway payment fee rates from store config
+        const paymentFees = store?.brand_config?.payment_fees || {};
+        const defaultFeeRate = store?.brand_config?.transaction_fee_pct || paymentFees.default || 0.035;
+        const hasPerGatewayFees = Object.keys(paymentFees).length > 1;
+
         // Build daily breakdown
+        const emptyDay = (date) => ({ date, revenue: 0, returns: 0, cogs: 0, shipping: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, adspend_manual: 0, transaction_fees: 0 });
         const dailyMap = {};
         const filteredOrders = (ordersResp || []).filter((o) => o.created_at >= since.toISOString());
 
         for (const order of filteredOrders) {
           const date = order.created_at.split('T')[0];
-          if (!dailyMap[date]) dailyMap[date] = { date, revenue: 0, cogs: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, adspend_manual: 0, transaction_fees: 0 };
+          if (!dailyMap[date]) dailyMap[date] = emptyDay(date);
           dailyMap[date].revenue += order.total;
+          // Returns/refunds
+          dailyMap[date].returns += order.refund_amount || 0;
+          // Shipping
+          dailyMap[date].shipping += order.shipping || 0;
           // COGS from line items
           for (const item of order.items || []) {
             const unitCost = cogsMap[item.title] || 0;
             dailyMap[date].cogs += unitCost * item.quantity;
           }
-          // Transaction fees ~3.5% of revenue (Shopify Payments typical)
-          dailyMap[date].transaction_fees += order.total * 0.035;
+          // Transaction fees — per-gateway rate or store default
+          const feeRate = paymentFees[order.payment_gateway] || defaultFeeRate;
+          dailyMap[date].transaction_fees += order.total * feeRate;
         }
 
         // Add Meta adspend
         for (const p of metaPerf || []) {
           const date = p.date;
-          if (!dailyMap[date]) dailyMap[date] = { date, revenue: 0, cogs: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, adspend_manual: 0, transaction_fees: 0 };
+          if (!dailyMap[date]) dailyMap[date] = emptyDay(date);
           dailyMap[date].adspend_meta += Number(p.spend || 0);
         }
 
         // Add manual adspend
         for (const m of manualSpend || []) {
           const date = m.date;
-          if (!dailyMap[date]) dailyMap[date] = { date, revenue: 0, cogs: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, adspend_manual: 0, transaction_fees: 0 };
+          if (!dailyMap[date]) dailyMap[date] = emptyDay(date);
           if (m.channel === 'tiktok') dailyMap[date].adspend_tiktok += Number(m.amount);
           else if (m.channel === 'pinterest') dailyMap[date].adspend_pinterest += Number(m.amount);
           else dailyMap[date].adspend_manual += Number(m.amount);
         }
 
-        // Calculate profit for each day
+        // Calculate profit for each day: revenue - returns - cogs - shipping - adspend - fees
+        const round2 = (n) => Math.round(n * 100) / 100;
         const daily = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date)).map((d) => {
           const adspend_total = d.adspend_meta + d.adspend_tiktok + d.adspend_pinterest + d.adspend_manual;
-          const profit = d.revenue - d.cogs - adspend_total - d.transaction_fees;
+          const net_revenue = d.revenue - d.returns;
+          const profit = net_revenue - d.cogs - d.shipping - adspend_total - d.transaction_fees;
           return {
             ...d,
-            cogs: Math.round(d.cogs * 100) / 100,
-            transaction_fees: Math.round(d.transaction_fees * 100) / 100,
-            profit: Math.round(profit * 100) / 100,
-            roas: adspend_total > 0 ? Math.round((d.revenue / adspend_total) * 100) / 100 : 0,
+            returns: round2(d.returns),
+            cogs: round2(d.cogs),
+            shipping: round2(d.shipping),
+            transaction_fees: round2(d.transaction_fees),
+            profit: round2(profit),
+            roas: adspend_total > 0 ? round2(d.revenue / adspend_total) : 0,
             profit_pct: d.revenue > 0 ? Math.round((profit / d.revenue) * 10000) / 100 : 0,
           };
         });
@@ -152,13 +188,15 @@ async function handler(req, res) {
         // Totals
         const totals = daily.reduce((acc, d) => ({
           revenue: acc.revenue + d.revenue,
+          returns: acc.returns + d.returns,
           cogs: acc.cogs + d.cogs,
+          shipping: acc.shipping + d.shipping,
           adspend_meta: acc.adspend_meta + d.adspend_meta,
           adspend_tiktok: acc.adspend_tiktok + d.adspend_tiktok,
           adspend_pinterest: acc.adspend_pinterest + d.adspend_pinterest,
           transaction_fees: acc.transaction_fees + d.transaction_fees,
           profit: acc.profit + d.profit,
-        }), { revenue: 0, cogs: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, transaction_fees: 0, profit: 0 });
+        }), { revenue: 0, returns: 0, cogs: 0, shipping: 0, adspend_meta: 0, adspend_tiktok: 0, adspend_pinterest: 0, transaction_fees: 0, profit: 0 });
 
         const adspend_total = totals.adspend_meta + totals.adspend_tiktok + totals.adspend_pinterest;
 
@@ -167,11 +205,16 @@ async function handler(req, res) {
           daily,
           totals: {
             ...totals,
-            adspend_total: Math.round(adspend_total * 100) / 100,
-            roas: adspend_total > 0 ? Math.round((totals.revenue / adspend_total) * 100) / 100 : 0,
+            adspend_total: round2(adspend_total),
+            roas: adspend_total > 0 ? round2(totals.revenue / adspend_total) : 0,
             profit_pct: totals.revenue > 0 ? Math.round((totals.profit / totals.revenue) * 10000) / 100 : 0,
           },
           missing_cogs: missingCogs,
+          accuracy: {
+            shipping: true,
+            returns: true,
+            per_gateway_fees: hasPerGatewayFees,
+          },
         });
       }
 
@@ -365,6 +408,25 @@ async function handler(req, res) {
         return res.status(200).json({ connected: true, insights, campaigns, active_ads: activeAds });
       }
 
+      if (action === 'custom_styles') {
+        const storeId = req.query.store_id;
+        if (!storeId) return res.status(400).json({ error: 'store_id required' });
+        const { data, error } = await supabase.from('store_skills')
+          .select('id, skill_type, title, metadata, generated_at')
+          .eq('store_id', storeId)
+          .like('skill_type', 'custom-style-%')
+          .is('product_name', null)
+          .order('generated_at', { ascending: false });
+        if (error) throw error;
+        return res.status(200).json((data || []).map(s => ({
+          style_key: s.metadata?.style_key || `cs_${s.skill_type.replace('custom-style-', '')}`,
+          name: s.title,
+          color_palette: s.metadata?.color_palette || [],
+          reference_images: s.metadata?.reference_images || [],
+          created_at: s.generated_at,
+        })));
+      }
+
       return res.status(400).json({ error: 'Unknown GET action' });
     }
 
@@ -400,7 +462,7 @@ async function handler(req, res) {
       }
 
       if (action === 'optimize_product') {
-        if (!rateLimit('optimize_product', 30, 3600000)) {
+        if (!await rateLimit('optimize_product', 30, 3600000)) {
           return res.status(429).json({ error: 'Rate limit exceeded' });
         }
         const { product_id, brand_context } = req.body;
@@ -439,7 +501,7 @@ async function handler(req, res) {
           tags: tags.join(', '),
           image_count: images.length,
           variants,
-        }, brand_context || '');
+        }, brand_context || '', product.store_id);
 
         // Delete any existing pending optimization for this product
         await supabase.from('product_optimizations').delete().eq('product_id', product_id).eq('status', 'pending');
@@ -554,7 +616,7 @@ async function handler(req, res) {
       }
 
       if (action === 'generate_branded') {
-        if (!rateLimit('generate_branded', 20, 3600000)) {
+        if (!await rateLimit('generate_branded', 20, 3600000)) {
           return res.status(429).json({ error: 'Rate limit exceeded' });
         }
         const { store_id, type = 'branded_lifestyle', prompt, style = 'lifestyle', show_model = true } = req.body;
@@ -716,51 +778,12 @@ async function handler(req, res) {
         let eventsCreated = 0;
         let proposalsCreated = 0;
 
-        // Get top products with creative counts (only if admin token)
         if (store.admin_token) {
           const client = createShopifyClient(store.shopify_url, store.admin_token);
           const topProducts = await client.getTopProductsWithCreatives(7, 30);
-
-          for (const p of topProducts) {
-            // product_no_creatives
-            if (p.units > 0 && p.creative_count === 0 && p.product_id) {
-              const { data: existing } = await supabase.from('events').select('id').eq('store_id', store_id).eq('product_id', p.product_id).eq('type', 'product_no_creatives').in('status', ['new', 'proposal_created']).limit(1).single();
-              if (!existing) {
-                const { data: evt } = await supabase.from('events').insert({ store_id, type: 'product_no_creatives', product_id: p.product_id, severity: 'high', title: `${p.title} has no creatives`, description: `Sold ${p.units} units but has 0 creatives`, metadata: JSON.stringify({ revenue: p.revenue, units: p.units }) }).select().single();
-                if (evt) {
-                  await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-                  await supabase.from('proposals').insert({ store_id, event_id: evt.id, type: 'generate_creatives', product_id: p.product_id, title: `Generate creatives for "${p.title}"`, description: `${p.units} units sold, 0 creatives. Styles: ad_creative, lifestyle`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 4, styles: ['ad_creative', 'lifestyle'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-                  eventsCreated++; proposalsCreated++;
-                }
-              }
-            }
-
-            // revenue_declining
-            if (p.trend !== null && parseInt(p.trend) < -10 && p.creative_count > 0 && p.product_id) {
-              const { data: existing } = await supabase.from('events').select('id').eq('store_id', store_id).eq('product_id', p.product_id).eq('type', 'revenue_declining').in('status', ['new', 'proposal_created']).limit(1).single();
-              if (!existing) {
-                const { data: evt } = await supabase.from('events').insert({ store_id, type: 'revenue_declining', product_id: p.product_id, severity: 'medium', title: `${p.title} revenue declining (${p.trend}%)`, description: `Revenue dropped ${p.trend}% vs previous period`, metadata: JSON.stringify({ revenue: p.revenue, trend: p.trend }) }).select().single();
-                if (evt) {
-                  await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-                  await supabase.from('proposals').insert({ store_id, event_id: evt.id, type: 'try_different_style', product_id: p.product_id, title: `Try new style for "${p.title}"`, description: `Revenue ${p.trend}%. Try lifestyle or UGC style.`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 2, styles: ['lifestyle'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-                  eventsCreated++; proposalsCreated++;
-                }
-              }
-            }
-
-            // winner_detected
-            if (p.trend !== null && parseInt(p.trend) > 15 && p.revenue > 100 && p.product_id) {
-              const { data: existing } = await supabase.from('events').select('id').eq('store_id', store_id).eq('product_id', p.product_id).eq('type', 'winner_detected').in('status', ['new', 'proposal_created']).limit(1).single();
-              if (!existing) {
-                const { data: evt } = await supabase.from('events').insert({ store_id, type: 'winner_detected', product_id: p.product_id, severity: 'low', title: `Winner: ${p.title} (+${p.trend}%)`, description: `Revenue growing ${p.trend}%. Scale with more creatives.`, metadata: JSON.stringify({ revenue: p.revenue, trend: p.trend }) }).select().single();
-                if (evt) {
-                  await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-                  await supabase.from('proposals').insert({ store_id, event_id: evt.id, type: 'generate_variations', product_id: p.product_id, title: `Scale winner: "${p.title}"`, description: `Top performer. Generate more in same style.`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 4, styles: ['ad_creative'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-                  eventsCreated++; proposalsCreated++;
-                }
-              }
-            }
-          }
+          const result = await detectEventsForStore(store_id, topProducts, supabase);
+          eventsCreated = result.eventsCreated;
+          proposalsCreated = result.proposalsCreated;
         }
 
         await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', store_id, message: `Scan complete: ${eventsCreated} events, ${proposalsCreated} proposals created` });
@@ -1517,7 +1540,14 @@ Only include sections that have specific, actionable rules from the sources.` }]
         if (auto_optimize) {
           try {
             const brandContext = store.brand_config?.brand_prompt || '';
-            const optimized = await optimizeProduct(dbProduct.id, brandContext);
+            const optimized = await optimizeProduct({
+              title: shopifyProduct.title,
+              description: shopifyProduct.body_html || '',
+              price: product_data.price || '',
+              product_type: product_data.product_type || '',
+              tags: (product_data.tags || []).join(', '),
+              image_count: shopifyProduct.images?.length || 0,
+            }, brandContext, store_id);
             if (optimized) {
               await supabase.from('product_optimizations').insert({
                 product_id: dbProduct.id,
@@ -1582,6 +1612,183 @@ Only include sections that have specific, actionable rules from the sources.` }]
           optimization_pending: optimizationPending,
           creatives_count: creativesCount,
         });
+      }
+
+      // ─── Custom Style Builder ───
+
+      if (action === 'analyze_style') {
+        const { store_id, images = [], urls = [] } = req.body;
+        if (!store_id) return res.status(400).json({ error: 'store_id required' });
+
+        // Collect images from base64 inputs + fetched URLs
+        const allImages = [...images];
+        for (const url of urls.slice(0, 8)) {
+          try {
+            const resp = await fetch(url);
+            const buf = Buffer.from(await resp.arrayBuffer());
+            const contentType = resp.headers.get('content-type') || 'image/jpeg';
+            allImages.push({ base64: buf.toString('base64'), media_type: contentType.split(';')[0] });
+          } catch (e) { console.warn('[system/analyze_style] Failed to fetch URL:', { url, error: e.message }); }
+        }
+
+        if (allImages.length < 1) return res.status(400).json({ error: 'At least 1 image required' });
+        const limited = allImages.slice(0, 8);
+
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const imageBlocks = limited.map(img => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.media_type, data: img.base64 },
+        }));
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              ...imageBlocks,
+              {
+                type: 'text',
+                text: `Analyze these ${limited.length} reference photos collectively and extract a unified visual style.\n\nReturn ONLY valid JSON:\n{\n  "style_name_suggestion": "short descriptive name (2-4 words)",\n  "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n  "lighting": "description of lighting style",\n  "composition": "how shots are composed, camera framing",\n  "model_posing": "how models pose, body language, expression",\n  "setting": "where photos are taken, background elements",\n  "mood": "emotional feel, energy level",\n  "camera_angle": "typical camera angle and distance",\n  "distinguishing_features": "what makes this style unique vs generic fashion photography",\n  "prompt_template": "A complete image generation prompt that would reproduce this exact visual style. Use {product_name} and {price} as placeholders. Be very specific about lighting, colors, composition, setting, model direction. The prompt should be 8-15 sentences long."\n}`,
+              },
+            ],
+          }],
+        });
+
+        let analysisText = response.content[0].text.trim();
+        if (analysisText.startsWith('```')) analysisText = analysisText.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+        const analysis = JSON.parse(analysisText);
+
+        return res.status(200).json({ analysis, image_count: limited.length });
+      }
+
+      if (action === 'create_custom_style') {
+        const { store_id, name, description, analysis, reference_images = [] } = req.body;
+        if (!store_id || !name || !analysis) return res.status(400).json({ error: 'store_id, name, analysis required' });
+
+        const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30);
+        const styleKey = `cs_${slug}`;
+        const store = await getStore(store_id);
+        const storeName = store?.name || 'Store';
+
+        // Upload reference images to Storage
+        const uploadedUrls = [];
+        for (let i = 0; i < reference_images.length && i < 8; i++) {
+          const img = reference_images[i];
+          const path = `${storeName}/Styles/${slug}/ref_${i}.jpg`;
+          const buf = Buffer.from(img.base64, 'base64');
+          const { error: upErr } = await supabase.storage.from('store-docs').upload(path, buf, {
+            contentType: img.media_type || 'image/jpeg', upsert: true,
+          });
+          if (!upErr) {
+            const { data: urlData } = supabase.storage.from('store-docs').getPublicUrl(path);
+            if (urlData?.publicUrl) uploadedUrls.push(urlData.publicUrl);
+          }
+        }
+
+        // Build skill content
+        const palette = (analysis.color_palette || []).join(', ');
+        const refList = uploadedUrls.map(u => `- ${u}`).join('\n');
+        const content = `# Custom Style: ${name}\n\n${description || ''}\n\n## VISUAL ANALYSIS\n- **Color palette:** ${palette}\n- **Lighting:** ${analysis.lighting || ''}\n- **Composition:** ${analysis.composition || ''}\n- **Model direction:** ${analysis.model_posing || ''}\n- **Setting:** ${analysis.setting || ''}\n- **Mood:** ${analysis.mood || ''}\n- **Camera:** ${analysis.camera_angle || ''}\n- **Unique:** ${analysis.distinguishing_features || ''}\n\n## PROMPT TEMPLATE\n${analysis.prompt_template || ''}\n\n## REFERENCE IMAGES\n${refList}`;
+
+        // Upsert into store_skills
+        const skillType = `custom-style-${slug}`;
+        const { data: skill, error: skillErr } = await supabase.from('store_skills').upsert({
+          store_id, skill_type: skillType, title: name, content, product_name: null,
+          metadata: { reference_images: uploadedUrls, color_palette: analysis.color_palette || [], style_key: styleKey },
+        }, { onConflict: 'store_id,skill_type,product_name' }).select().single();
+        if (skillErr) throw skillErr;
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'STYLE_GEN', level: 'success',
+          message: `Created custom style: ${name}`,
+          metadata: { style_key: styleKey, ref_count: uploadedUrls.length },
+        });
+
+        return res.status(200).json({ style_key: styleKey, skill_id: skill.id });
+      }
+
+      if (action === 'delete_custom_style') {
+        const { store_id, style_key } = req.body;
+        if (!store_id || !style_key) return res.status(400).json({ error: 'store_id, style_key required' });
+        if (!style_key.startsWith('cs_')) return res.status(400).json({ error: 'Invalid style_key — must start with cs_' });
+
+        const slug = style_key.slice(3);
+        const skillType = `custom-style-${slug}`;
+        const store = await getStore(store_id);
+        const storeName = store?.name || 'Store';
+
+        // Delete from store_skills
+        await supabase.from('store_skills').delete().eq('store_id', store_id).eq('skill_type', skillType);
+
+        // Delete reference images from Storage
+        try {
+          const { data: files } = await supabase.storage.from('store-docs').list(`${storeName}/Styles/${slug}`);
+          if (files?.length) {
+            await supabase.storage.from('store-docs').remove(files.map(f => `${storeName}/Styles/${slug}/${f.name}`));
+          }
+        } catch (e) { console.warn('[system/delete_custom_style] Storage cleanup:', { error: e.message }); }
+
+        await supabase.from('pipeline_log').insert({
+          store_id, agent: 'STYLE_GEN', level: 'info',
+          message: `Deleted custom style: ${style_key}`,
+        });
+
+        return res.status(200).json({ deleted: true });
+      }
+
+      if (action === 'scrape_style') {
+        const { url, store_id } = req.body;
+        if (!url || !store_id) return res.status(400).json({ error: 'url and store_id required' });
+
+        const scraped = await scrapeProduct(url);
+        const imageUrls = (scraped?.image_urls || scraped?.images || []).slice(0, 8);
+        if (!imageUrls.length) return res.status(400).json({ error: 'No images found on URL' });
+
+        // Fetch images and convert to base64
+        const images = [];
+        for (const imgUrl of imageUrls) {
+          try {
+            const resp = await fetch(imgUrl);
+            const buf = Buffer.from(await resp.arrayBuffer());
+            const contentType = resp.headers.get('content-type') || 'image/jpeg';
+            images.push({ url: imgUrl, base64: buf.toString('base64'), media_type: contentType.split(';')[0] });
+          } catch (e) { console.warn('[system/scrape_style] Failed to fetch image:', { url: imgUrl, error: e.message }); }
+        }
+
+        if (!images.length) return res.status(400).json({ error: 'Failed to fetch any images from URL' });
+
+        // Run Claude Vision analysis
+        const Anthropic = (await import('@anthropic-ai/sdk')).default;
+        const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+        const imageBlocks = images.map(img => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.media_type, data: img.base64 },
+        }));
+
+        const response = await anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 2000,
+          messages: [{
+            role: 'user',
+            content: [
+              ...imageBlocks,
+              {
+                type: 'text',
+                text: `Analyze these ${images.length} reference photos collectively and extract a unified visual style.\n\nReturn ONLY valid JSON:\n{\n  "style_name_suggestion": "short descriptive name (2-4 words)",\n  "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],\n  "lighting": "description of lighting style",\n  "composition": "how shots are composed, camera framing",\n  "model_posing": "how models pose, body language, expression",\n  "setting": "where photos are taken, background elements",\n  "mood": "emotional feel, energy level",\n  "camera_angle": "typical camera angle and distance",\n  "distinguishing_features": "what makes this style unique vs generic fashion photography",\n  "prompt_template": "A complete image generation prompt that would reproduce this exact visual style. Use {product_name} and {price} as placeholders. Be very specific about lighting, colors, composition, setting, model direction. The prompt should be 8-15 sentences long."\n}`,
+              },
+            ],
+          }],
+        });
+
+        let analysisText = response.content[0].text.trim();
+        if (analysisText.startsWith('```')) analysisText = analysisText.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
+        const analysis = JSON.parse(analysisText);
+
+        return res.status(200).json({ analysis, images: images.map(({ base64, ...rest }) => rest) });
       }
 
       return res.status(400).json({ error: 'Unknown POST action' });

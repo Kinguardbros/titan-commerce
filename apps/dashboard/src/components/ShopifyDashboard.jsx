@@ -25,10 +25,10 @@ export default function ShopifyDashboard({ storeId, store, onNavigateToProduct }
       <div className="sdb-empty-icon">🔌</div>
       <div className="sdb-empty-title">Shopify Admin not connected</div>
       <div className="sdb-empty-desc">Connect your Shopify Admin API to see orders, revenue, and analytics.</div>
-      {store?.client_id && !store?.admin_token && (
+      {store?.client_id && !store?.has_admin && !store?.admin_token && (
         <a href={`/api/auth/shopify?store_id=${store.id}`} className="sdb-connect-btn">Connect Shopify Admin</a>
       )}
-      {!store?.client_id && !store?.admin_token && (
+      {!store?.client_id && !store?.has_admin && !store?.admin_token && (
         <div className="sdb-empty-hint">Contact admin to set up Shopify connection for this store.</div>
       )}
     </div>

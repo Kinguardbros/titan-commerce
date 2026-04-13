@@ -20,7 +20,8 @@ function verifyHmac(query, secret) {
   const digest = crypto.createHmac('sha256', secret).update(message).digest('hex');
   try {
     return crypto.timingSafeEqual(Buffer.from(digest, 'hex'), Buffer.from(hmac, 'hex'));
-  } catch {
+  } catch (err) {
+    console.error('[ShopifyAuth] HMAC verification failed:', { error: err.message });
     return false;
   }
 }

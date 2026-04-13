@@ -6,6 +6,15 @@ import './Products.css';
 
 const ImportModal = lazy(() => import('../components/ImportModal'));
 
+function formatTimeAgo(date) {
+  const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 const PRICE_RANGES = [
   { key: 'all', label: 'All prices' },
   { key: '0-30', label: 'Under $30', min: 0, max: 30 },
@@ -34,6 +43,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState(() => {
+    const ts = localStorage.getItem(`last_synced_${storeId}`);
+    return ts ? new Date(ts) : null;
+  });
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [creativesFilter, setCreativesFilter] = useState('all');
@@ -129,6 +142,9 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     try {
       const result = await syncProducts(storeId);
       await fetchProducts();
+      const now = new Date();
+      localStorage.setItem(`last_synced_${storeId}`, now.toISOString());
+      setLastSynced(now);
       toast.success(`${result?.synced || 'All'} products synced!`);
     } catch (err) {
       console.error('Sync failed:', err);
@@ -162,6 +178,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}
           </button>
+          <span className="products-sync-ts">{lastSynced ? `Synced ${formatTimeAgo(lastSynced)}` : 'Never synced'}</span>
         </div>
       </div>
 

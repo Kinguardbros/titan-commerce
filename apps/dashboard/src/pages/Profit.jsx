@@ -15,7 +15,7 @@ const PERIODS = [
 export default function Profit({ storeId, store }) {
   const toast = useToast();
   const [days, setDays] = useState(7);
-  const { data, loading, refresh } = useProfit(days);
+  const { data, loading, refresh } = useProfit(days, storeId);
   const [products, setProducts] = useState([]);
   const [showCogs, setShowCogs] = useState(false);
   const [editingCogs, setEditingCogs] = useState(null);
@@ -50,9 +50,9 @@ export default function Profit({ storeId, store }) {
 
   const handleExportCSV = () => {
     if (!data?.daily) return;
-    const headers = 'Date,Revenue,COGS,Meta Adspend,TikTok,Pinterest,Fees,Profit,ROAS,Profit %';
+    const headers = 'Date,Revenue,Returns,COGS,Shipping,Meta Adspend,TikTok,Pinterest,Fees,Profit,ROAS,Profit %';
     const rows = data.daily.map((d) =>
-      `${d.date},${d.revenue},${d.cogs},${d.adspend_meta},${d.adspend_tiktok},${d.adspend_pinterest},${d.transaction_fees},${d.profit},${d.roas},${d.profit_pct}%`
+      `${d.date},${d.revenue},${d.returns},${d.cogs},${d.shipping},${d.adspend_meta},${d.adspend_tiktok},${d.adspend_pinterest},${d.transaction_fees},${d.profit},${d.roas},${d.profit_pct}%`
     );
     const csv = [headers, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -97,9 +97,19 @@ export default function Profit({ storeId, store }) {
               <div className="profit-kpi-value">${t.revenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </div>
             <div className="profit-kpi">
+              <div className="profit-kpi-label">Returns</div>
+              <div className="profit-kpi-value profit-kpi--red">${t.returns?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="profit-kpi-sub">{t.revenue > 0 ? ((t.returns / t.revenue) * 100).toFixed(1) : 0}%</div>
+            </div>
+            <div className="profit-kpi">
               <div className="profit-kpi-label"><Tooltip text="Cost of Goods Sold — your purchase price per unit">COGS</Tooltip></div>
               <div className="profit-kpi-value">${t.cogs?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
               <div className="profit-kpi-sub">{t.revenue > 0 ? ((t.cogs / t.revenue) * 100).toFixed(1) : 0}%</div>
+            </div>
+            <div className="profit-kpi">
+              <div className="profit-kpi-label">Shipping</div>
+              <div className="profit-kpi-value">${t.shipping?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <div className="profit-kpi-sub">{t.revenue > 0 ? ((t.shipping / t.revenue) * 100).toFixed(1) : 0}%</div>
             </div>
             <div className="profit-kpi">
               <div className="profit-kpi-label">Adspend</div>
@@ -121,10 +131,23 @@ export default function Profit({ storeId, store }) {
 
           {missingCogs > 0 && (
             <div className="profit-warning">
-              ⚠ {missingCogs} products missing COGS — profit calculation may be inaccurate.
+              {missingCogs} products missing COGS — profit calculation may be inaccurate.
               <button className="profit-warning-btn" onClick={() => setShowCogs(true)}>Set COGS</button>
             </div>
           )}
+
+          {/* Accuracy indicators */}
+          <div className="profit-accuracy">
+            <span className={`profit-accuracy-item ${data?.accuracy?.shipping ? 'profit-accuracy--ok' : 'profit-accuracy--warn'}`}>
+              {data?.accuracy?.shipping ? 'Shipping: Tracked' : 'Shipping: Not available'}
+            </span>
+            <span className={`profit-accuracy-item ${data?.accuracy?.returns ? 'profit-accuracy--ok' : 'profit-accuracy--warn'}`}>
+              {data?.accuracy?.returns ? 'Returns: Tracked' : 'Returns: Not tracked'}
+            </span>
+            <span className={`profit-accuracy-item ${data?.accuracy?.per_gateway_fees ? 'profit-accuracy--ok' : 'profit-accuracy--warn'}`}>
+              {data?.accuracy?.per_gateway_fees ? 'Fees: Per-gateway' : 'Fees: Flat rate'}
+            </span>
+          </div>
 
           {/* Daily P&L table */}
           <div className="profit-table-wrap">
@@ -133,7 +156,9 @@ export default function Profit({ storeId, store }) {
                 <tr>
                   <th>Date</th>
                   <th>Revenue</th>
+                  <th>Returns</th>
                   <th>COGS</th>
+                  <th>Shipping</th>
                   <th>Meta</th>
                   <th>TikTok</th>
                   <th>Pinterest</th>
@@ -148,7 +173,9 @@ export default function Profit({ storeId, store }) {
                   <tr key={d.date}>
                     <td className="profit-td-date">{d.date}</td>
                     <td>${d.revenue?.toFixed(2)}</td>
+                    <td className="profit-td--red">${d.returns?.toFixed(2)}</td>
                     <td>${d.cogs?.toFixed(2)}</td>
+                    <td>${d.shipping?.toFixed(2)}</td>
                     <td>${d.adspend_meta?.toFixed(2)}</td>
                     <td>${d.adspend_tiktok?.toFixed(2)}</td>
                     <td>${d.adspend_pinterest?.toFixed(2)}</td>
@@ -163,7 +190,9 @@ export default function Profit({ storeId, store }) {
                 <tr>
                   <td>TOTAL</td>
                   <td>${t.revenue?.toFixed(2)}</td>
+                  <td className="profit-td--red">${t.returns?.toFixed(2)}</td>
                   <td>${t.cogs?.toFixed(2)}</td>
+                  <td>${t.shipping?.toFixed(2)}</td>
                   <td>${t.adspend_meta?.toFixed(2)}</td>
                   <td>${t.adspend_tiktok?.toFixed(2)}</td>
                   <td>${t.adspend_pinterest?.toFixed(2)}</td>

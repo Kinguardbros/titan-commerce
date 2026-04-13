@@ -42,7 +42,7 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!rateLimit('convert-to-video', 10, 3600000)) {
+  if (!await rateLimit('convert-to-video', 10, 3600000)) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 

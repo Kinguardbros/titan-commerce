@@ -41,7 +41,7 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!rateLimit('generate', 20, 3600000)) {
+  if (!await rateLimit('generate', 20, 3600000)) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
@@ -81,7 +81,7 @@ async function handler(req, res) {
 
     let feedback = '';
     const approvals = (approveLogs || [])
-      .map((l) => { try { return JSON.parse(l.metadata); } catch { return null; } })
+      .map((l) => { try { return JSON.parse(l.metadata); } catch (e) { console.warn('[Generate] Metadata parse failed:', { error: e.message }); return null; } })
       .filter((m) => m?.product_id === product_id);
     if (approvals.length > 0) {
       const details = approvals.map((a) => {
@@ -92,7 +92,7 @@ async function handler(req, res) {
       feedback += `\nLEARNING — Client APPROVED these: ${details.join('; ')}. Generate more like these.`;
     }
     const rejections = (rejLogs || [])
-      .map((l) => { try { return JSON.parse(l.metadata); } catch { return null; } })
+      .map((l) => { try { return JSON.parse(l.metadata); } catch (e) { console.warn('[Generate] Metadata parse failed:', { error: e.message }); return null; } })
       .filter((m) => m?.product_id === product_id);
     if (rejections.length > 0) {
       const reasons = rejections.map((r) => {

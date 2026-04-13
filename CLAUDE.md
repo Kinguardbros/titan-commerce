@@ -44,7 +44,7 @@ Key patterns:
 
 - **UI text:** English
 - **Code, comments, variable names:** English
-- **DEVELOPER-BRIEF.md:** Czech (team language)
+- **Docs/Briefs/, Docs/Sprints/:** Czech (team language)
 - **This file:** English
 
 ---
@@ -70,7 +70,7 @@ Key patterns:
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
-- Pipeline activity → `pipeline_log` table (agent, message, level, metadata)
+- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js`: generate 20/hr, video 10/hr, optimize 30/hr
 - Vercel 12-route limit: consolidated endpoints in `api/system.js` mega-handler with `?action=X` pattern
@@ -115,7 +115,7 @@ Key patterns:
 | `apps/dashboard/src/pages/Studio.jsx` | Branded + product creative generation |
 | `apps/dashboard/src/pages/Products.jsx` | Paginated product grid with filters, sort, search, sync, view modes (grid/list/cards) |
 | `apps/dashboard/src/pages/ProductWorkspace.jsx` | Per-product workspace: creatives by style, generate image/video, optimize, size chart, product detail/editor |
-| `apps/dashboard/src/pages/Profit.jsx` | P&L dashboard with COGS, manual adspend, CSV export |
+| `apps/dashboard/src/pages/Profit.jsx` | P&L dashboard: revenue, returns, COGS, shipping, per-gateway fees, adspend, profit + accuracy indicators + CSV export |
 | `apps/dashboard/src/pages/Login.jsx` | Password gate login screen |
 | **Components** | |
 | `apps/dashboard/src/components/OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
@@ -150,7 +150,7 @@ Key patterns:
 | `apps/dashboard/src/lib/api.js` | All API fetch functions (25+), auth token handling, `getProducts()` (paginated), `getAllProducts()` (full list) |
 | `apps/dashboard/src/lib/supabase.js` | Supabase client for realtime subscriptions |
 | **Libs (backend)** | |
-| `lib/claude.js` | Claude API wrapper + brand system prompt + `optimizeProduct()` |
+| `lib/claude.js` | Claude API wrapper + dynamic per-store brand system prompt from `store_skills` + `optimizeProduct()` |
 | `lib/higgsfield.js` | Higgsfield image/video generation + styled prompts (7 styles) + per-store brand context + feedback learning |
 | `lib/shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) |
 | `lib/meta-api.js` | Meta Marketing API: read-only (insights, campaigns, active ads) |
@@ -158,9 +158,11 @@ Key patterns:
 | `lib/scraper-utils.js` | Product scraping + hook/headline generation |
 | `lib/store-context.js` | `getStore(id)`, `getAllStores()`, `hasAdminAccess(store)` |
 | `lib/auth.js` | Password-based HMAC token verification, `withAuth(handler)` wrapper |
-| `lib/rate-limit.js` | In-memory rate limiter with configurable window |
+| `lib/rate-limit.js` | Supabase-backed async rate limiter (persists across Vercel cold starts) |
+| `lib/event-detector.js` | Shared event detection logic: `detectEventsForStore()` — used by cron + scan_events |
+| `lib/fal.js` | fal.ai image generation API (FLUX.2, Ideogram v3) — alternative to Higgsfield |
 | **API Endpoints** | |
-| `api/system.js` | Consolidated mega-handler (15+ actions): stores_list, pipeline_log, kpi, profit_summary, proposals, events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale |
+| `api/system.js` | Consolidated mega-handler (~1600 lines, 15+ actions): stores_list, pipeline_log, kpi, profit_summary (per-store, shipping, returns, per-gateway fees), proposals, events, scan_events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale, import_confirm |
 | `api/auth/login.js` | Password authentication → session token |
 | `api/creatives/generate.js` | Generate image creative via Higgsfield |
 | `api/creatives/regenerate.js` | Regenerate image or video creative |
@@ -198,6 +200,7 @@ Key patterns:
 | `briefs` | SCRAPER output (product hooks, headlines, visual refs) |
 | `winner_refs` | LOOPER feedback (winning hooks/headlines for FORGE) |
 | `product_docs` | Per-product document uploads (future) |
+| `rate_limits` | Persistent rate limiting (key + created_at), indexed by key+time |
 
 ---
 
@@ -232,19 +235,29 @@ META_AD_ACCOUNT_ID=             # EMPTY
 - `@supabase/supabase-js` — Database + auth + storage + realtime
 - `cheerio` — HTML scraping for product data extraction
 - `dompurify` — Safe HTML rendering in OptimizePanel
+- `vitest` (dev) — Test framework
 
 ---
 
 ## Important Patterns
 
 ### Multi-Store Data Isolation
-Every query filters by `store_id`. Frontend passes active store ID to all API calls. Store switcher in header changes context for entire dashboard.
+Every query filters by `store_id`. Frontend passes active store ID to all API calls. Store switcher in header changes context for entire dashboard. `stores_list` API strips `admin_token` and returns `has_admin` boolean instead.
 
 ### Auth Flow
 Password gate → `api/auth/login.js` → HMAC session token → stored in localStorage → `withAuth()` middleware validates on every API call. No Supabase Auth for dashboard users.
 
+### Brand Voice (Dynamic Per-Store)
+`lib/claude.js` builds system prompt dynamically: loads brand-voice skill from `store_skills` table → falls back to generic prompt with store name. No hardcoded brand references. Store name and vendor injected into optimization prompt from `stores` table.
+
+### P&L (Per-Store)
+`profit_summary` action accepts `store_id` query param → creates per-store Shopify client. P&L includes: Revenue - Returns - COGS - Shipping - Adspend - Transaction Fees = Profit. Transaction fees are per-gateway from `stores.brand_config.payment_fees`. Shipping parsed from Shopify `shipping_lines`. Returns from `refunds[].transactions[].amount`. Accuracy indicators in UI show tracking status.
+
+### Rate Limiting
+Async, Supabase-backed (`rate_limits` table). Persists across Vercel cold starts. Fails open on DB error. All callers use `await rateLimit(...)`.
+
 ### Event → Proposal System
-Cron (every 6h) → `detect-events.js` scans for actionable events → creates proposals → Overview shows proposal queue with Approve/Dismiss/Approve All. Event types: `product_no_creatives`, `revenue_declining`, `winner_detected`.
+Cron (every 6h) → `detect-events.js` scans for actionable events → creates proposals → Overview shows proposal queue with Approve/Dismiss/Approve All. Event types: `product_no_creatives`, `revenue_declining`, `winner_detected`. Core detection logic shared via `lib/event-detector.js`.
 
 ### Product Optimizer Approval Workflow
 ```
@@ -342,7 +355,7 @@ Dashboard → Password gate (Login.jsx)
 | 🟡 MED | Meta Ads integration — awaiting credentials | When ready |
 | 🟡 MED | Product docs drag & drop upload (Supabase Storage) | Future |
 | 🟡 MED | Product Optimizer — auto-detect unoptimized imports | Future |
-| 🟡 MED | system.js is 666+ lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
+| 🟡 MED | system.js is ~1600 lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
 | 🟢 LOW | PUBLISHER agent (auto-publish to Meta) | Future |
 | 🟢 LOW | LOOPER agent (performance scoring feedback loop) | Future |
 | 🟢 LOW | TikTok/Pinterest API integration (replace manual adspend) | Future |
@@ -364,4 +377,7 @@ npm install --legacy-peer-deps       # always use --legacy-peer-deps
 
 # Build
 cd apps/dashboard && npm run build   # production build
+
+# Tests
+npm test                             # Vitest — auth, rate-limit, profit, system-routing
 ```

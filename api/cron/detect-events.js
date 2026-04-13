@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { createShopifyClient } from '../../lib/shopify-admin.js';
+import { detectEventsForStore } from '../../lib/event-detector.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
     let totalProposals = 0;
 
     for (const store of stores || []) {
-      if (!store.admin_token) continue; // Skip stores without admin access
+      if (!store.admin_token) continue;
 
       const client = createShopifyClient(store.shopify_url, store.admin_token);
       let topProducts = [];
@@ -29,48 +30,9 @@ export default async function handler(req, res) {
         continue;
       }
 
-      for (const p of topProducts) {
-        if (!p.product_id) continue;
-
-        // product_no_creatives
-        if (p.units > 0 && p.creative_count === 0) {
-          const { data: existing } = await supabase.from('events').select('id').eq('store_id', store.id).eq('product_id', p.product_id).eq('type', 'product_no_creatives').in('status', ['new', 'proposal_created']).limit(1).single();
-          if (!existing) {
-            const { data: evt } = await supabase.from('events').insert({ store_id: store.id, type: 'product_no_creatives', product_id: p.product_id, severity: 'high', title: `${p.title} has no creatives`, description: `Sold ${p.units} units but has 0 creatives`, metadata: JSON.stringify({ revenue: p.revenue, units: p.units }) }).select().single();
-            if (evt) {
-              await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-              await supabase.from('proposals').insert({ store_id: store.id, event_id: evt.id, type: 'generate_creatives', product_id: p.product_id, title: `Generate creatives for "${p.title}"`, description: `${p.units} units sold, 0 creatives`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 4, styles: ['ad_creative', 'lifestyle'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-              totalEvents++; totalProposals++;
-            }
-          }
-        }
-
-        // revenue_declining
-        if (p.trend !== null && parseInt(p.trend) < -10 && p.creative_count > 0) {
-          const { data: existing } = await supabase.from('events').select('id').eq('store_id', store.id).eq('product_id', p.product_id).eq('type', 'revenue_declining').in('status', ['new', 'proposal_created']).limit(1).single();
-          if (!existing) {
-            const { data: evt } = await supabase.from('events').insert({ store_id: store.id, type: 'revenue_declining', product_id: p.product_id, severity: 'medium', title: `${p.title} revenue declining (${p.trend}%)`, metadata: JSON.stringify({ revenue: p.revenue, trend: p.trend }) }).select().single();
-            if (evt) {
-              await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-              await supabase.from('proposals').insert({ store_id: store.id, event_id: evt.id, type: 'try_different_style', product_id: p.product_id, title: `Try new style for "${p.title}"`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 2, styles: ['lifestyle'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-              totalEvents++; totalProposals++;
-            }
-          }
-        }
-
-        // winner_detected
-        if (p.trend !== null && parseInt(p.trend) > 15 && p.revenue > 100) {
-          const { data: existing } = await supabase.from('events').select('id').eq('store_id', store.id).eq('product_id', p.product_id).eq('type', 'winner_detected').in('status', ['new', 'proposal_created']).limit(1).single();
-          if (!existing) {
-            const { data: evt } = await supabase.from('events').insert({ store_id: store.id, type: 'winner_detected', product_id: p.product_id, severity: 'low', title: `Winner: ${p.title} (+${p.trend}%)`, metadata: JSON.stringify({ revenue: p.revenue, trend: p.trend }) }).select().single();
-            if (evt) {
-              await supabase.from('events').update({ status: 'proposal_created' }).eq('id', evt.id);
-              await supabase.from('proposals').insert({ store_id: store.id, event_id: evt.id, type: 'generate_variations', product_id: p.product_id, title: `Scale winner: "${p.title}"`, suggested_action: JSON.stringify({ action: 'generate', product_id: p.product_id, count: 4, styles: ['ad_creative'], format: 'image' }), expires_at: new Date(Date.now() + 7 * 86400000).toISOString() });
-              totalEvents++; totalProposals++;
-            }
-          }
-        }
-      }
+      const result = await detectEventsForStore(store.id, topProducts, supabase);
+      totalEvents += result.eventsCreated;
+      totalProposals += result.proposalsCreated;
     }
 
     // Check for unprocessed files in Inbox (all stores, no admin_token needed)
