@@ -162,8 +162,23 @@ Key patterns:
 | `lib/rate-limit.js` | Supabase-backed async rate limiter (persists across Vercel cold starts) |
 | `lib/event-detector.js` | Shared event detection logic: `detectEventsForStore()` — used by cron + scan_events |
 | `lib/fal.js` | fal.ai image generation API (FLUX.2, Ideogram v3) — alternative to Higgsfield |
+| `lib/validate.js` | Input validation helpers: `requireFields()`, `requireQuery()` |
+| **Action Modules** (`lib/actions/`) | |
+| `lib/actions/stores.js` | `stores_list` — store listing with stripped admin_token |
+| `lib/actions/pipeline.js` | `pipeline_log` — activity log query |
+| `lib/actions/analytics.js` | `kpi`, `meta_overview`, `insights` — dashboard analytics |
+| `lib/actions/profit.js` | `profit_summary` — P&L with shipping, returns, per-gateway fees |
+| `lib/actions/proposals.js` | `proposals_list`, `approve/reject/approve_all_proposals`, `scan_events` |
+| `lib/actions/optimizations.js` | `pending_optimizations`, `optimize_product`, `approve/reject/save_optimization` |
+| `lib/actions/skills.js` | `get_skills`, `generate_skills`, `regenerate_skill` + shared `upsertSkill()` |
+| `lib/actions/size-chart.js` | `read/save/parse_size_chart`, `refresh_size_charts` |
+| `lib/actions/creatives.js` | `update_creative`, `generate_branded`, `push_creative_to_shopify`, `cleanup_stale` |
+| `lib/actions/products.js` | `product_detail`, `scrape_product`, `import_confirm`, `update_product_full`, `bulk_price` |
+| `lib/actions/docs.js` | `store_docs`, `store_docs_download`, `upload_store_doc`, `process_single_file`, `process_inbox` |
+| `lib/actions/custom-styles.js` | `custom_styles`, `analyze/create/delete/describe_style`, `scrape_style` |
+| `lib/actions/pricing.js` | `update_cogs`, `manual_adspend` |
 | **API Endpoints** | |
-| `api/system.js` | Consolidated mega-handler (~1800 lines, 20+ actions): stores_list, pipeline_log, kpi, profit_summary, proposals, events, scan_events, optimizations, update_creative, update_cogs, manual_adspend, generate_branded, bulk_price, cleanup_stale, import_confirm, analyze_style, create_custom_style, custom_styles, delete_custom_style, scrape_style |
+| `api/system.js` | Thin router (~91 lines) — delegates 45 actions to 13 modules in `lib/actions/` |
 | `api/auth/login.js` | Password authentication → session token |
 | `api/creatives/generate.js` | Generate image creative via Higgsfield |
 | `api/creatives/regenerate.js` | Regenerate image or video creative |
@@ -304,7 +319,7 @@ CSV-format metafield (`custom.size_chart_text`) in Shopify. Two input methods: m
 Product edit writes to Shopify immediately (no approval queue). Unlike Optimizer which goes through pending → approve flow. All changes logged to pipeline_log with before/after audit trail.
 
 ### Vercel Hobby Limits
-- Max 12 serverless functions → consolidated into `api/system.js` mega-handler
+- Max 12 serverless functions → `api/system.js` thin router delegates to 13 modules in `lib/actions/`
 - 1 cron/day schedule → running every 6h via `0 */6 * * *`
 - 60s timeout → fire-and-forget for long operations
 
@@ -363,7 +378,7 @@ Dashboard → Password gate (Login.jsx)
 | 🟡 MED | Meta Ads integration — awaiting credentials | When ready |
 | 🟡 MED | Product docs drag & drop upload (Supabase Storage) | Future |
 | 🟡 MED | Product Optimizer — auto-detect unoptimized imports | Future |
-| 🟡 MED | system.js is ~1800 lines | Could split into router + modules, but Vercel 12-route limit makes consolidation intentional |
+| ✅ DONE | system.js modularized | 91-line router + 13 modules in `lib/actions/` (Sprint 2) |
 | 🟢 LOW | PUBLISHER agent (auto-publish to Meta) | Future |
 | 🟢 LOW | LOOPER agent (performance scoring feedback loop) | Future |
 | 🟢 LOW | TikTok/Pinterest API integration (replace manual adspend) | Future |
