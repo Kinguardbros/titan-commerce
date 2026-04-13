@@ -16,12 +16,23 @@
   overflow: hidden; cursor: pointer; transition: all 0.2s;
 }
 .av-card:hover { border-color: var(--gold); transform: translateY(-2px); }
-.av-card-img { aspect-ratio: 3/4; background: var(--surface); overflow: hidden; }
+.av-card-img { aspect-ratio: 3/4; background: var(--surface); overflow: hidden; position: relative; }
 .av-card-img img { width: 100%; height: 100%; object-fit: cover; }
 .av-card-placeholder {
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   font-size: 32px; color: var(--text4); font-family: var(--mono);
 }
+.av-card-gen {
+  position: absolute; bottom: 8px; right: 8px;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: var(--gold); border: none; color: var(--void);
+  font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.av-card:hover .av-card-gen { opacity: 1; }
+.av-card-gen:hover { background: #b8a050; transform: scale(1.1); }
+.av-card-gen:disabled { opacity: 0.5; cursor: wait; }
 .av-card-info { padding: 12px; }
 .av-card-name { font-family: var(--body); font-size: 14px; font-weight: 600; color: var(--text1); }
 .av-card-label { font-family: var(--mono); font-size: 10px; color: var(--text4); margin-top: 2px; }

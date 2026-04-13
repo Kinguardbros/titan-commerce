@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAvatars, getSkills } from '../lib/api';
+import { getAvatars, getSkills, generateAvatar } from '../lib/api';
 import AvatarDetail from '../components/AvatarDetail';
 import AvatarBuilder from '../components/AvatarBuilder';
 import { useToast } from '../hooks/useToast.jsx';
@@ -74,6 +74,22 @@ export default function Avatars({ storeId, store }) {
                 <img src={p.reference_url} alt={p.name} />
               ) : (
                 <div className="av-card-placeholder">?</div>
+              )}
+              {!p.reference_url && (
+                <button
+                  className="av-card-gen"
+                  title="Generate avatar from persona"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const btn = e.currentTarget;
+                    btn.disabled = true;
+                    btn.textContent = '...';
+                    generateAvatar(storeId, p.name, p.description || p.label)
+                      .then(() => { toast.success(`Generating avatar for ${p.name}`); refresh(); })
+                      .catch(err => toast.error(`Failed: ${err.message}`))
+                      .finally(() => { btn.disabled = false; btn.textContent = '🎲'; });
+                  }}
+                >🎲</button>
               )}
             </div>
             <div className="av-card-info">
