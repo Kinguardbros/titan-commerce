@@ -3,7 +3,8 @@ import { analyzeStyle, createCustomStyle, scrapeStyle, describeStyle } from '../
 import { useToast } from '../hooks/useToast.jsx';
 import './StyleBuilder.css';
 
-const MAX_SIZE = 1024;
+const MAX_SIZE = 512;
+const MAX_IMAGES = 5;
 const resizeAndEncode = (file) => new Promise((resolve, reject) => {
   const img = new Image();
   img.onload = () => {
@@ -17,7 +18,7 @@ const resizeAndEncode = (file) => new Promise((resolve, reject) => {
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
     const base64 = dataUrl.split(',')[1];
     resolve(base64);
   };
@@ -44,13 +45,13 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
 
   const handleFiles = useCallback(async (files) => {
     const allowed = ['image/png', 'image/jpeg', 'image/webp'];
-    const valid = Array.from(files).filter(f => allowed.includes(f.type)).slice(0, 8 - images.length);
+    const valid = Array.from(files).filter(f => allowed.includes(f.type)).slice(0, MAX_IMAGES - images.length);
     const newImages = [];
     for (const f of valid) {
       const base64 = await resizeAndEncode(f);
       newImages.push({ base64, media_type: 'image/jpeg', preview_url: URL.createObjectURL(f), filename: f.name });
     }
-    setImages(prev => [...prev, ...newImages].slice(0, 8));
+    setImages(prev => [...prev, ...newImages].slice(0, MAX_IMAGES));
   }, [images.length]);
 
   const handleDrop = (e) => {
@@ -122,12 +123,7 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
     setCreating(true);
     try {
       const finalAnalysis = { ...analysis, prompt_template: promptTemplate };
-      const refImages = tab === 'upload'
-        ? images.map(i => ({ base64: i.base64, media_type: i.media_type, filename: i.filename }))
-        : tab === 'url'
-          ? scrapedImages.filter(i => i.selected).map(i => ({ base64: i.base64, media_type: i.media_type, filename: 'ref.jpg' }))
-          : [];
-      const result = await createCustomStyle(storeId, styleName.trim(), styleDesc, finalAnalysis, refImages);
+      const result = await createCustomStyle(storeId, styleName.trim(), styleDesc, finalAnalysis, []);
       toast.success(`Style "${styleName}" created!`);
       onCreated?.(result.style_key);
     } catch (err) {
@@ -166,7 +162,7 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
                   onDrop={handleDrop}
                   onClick={() => document.getElementById('sb-file-input').click()}
                 >
-                  <div className="sb-dropzone-text">{dragging ? 'Drop images here' : 'Drag & drop reference photos (3-8)'}</div>
+                  <div className="sb-dropzone-text">{dragging ? 'Drop images here' : 'Drag & drop reference photos (3-5)'}</div>
                   <div className="sb-dropzone-sub">PNG, JPEG, WebP — click to browse</div>
                   <input id="sb-file-input" type="file" accept="image/png,image/jpeg,image/webp" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
                 </div>
@@ -180,7 +176,7 @@ export default function StyleBuilder({ storeId, storeName, onClose, onCreated })
                     ))}
                   </div>
                 )}
-                <div className="sb-count">{images.length}/8 images{images.length < 3 && ' (min 3)'}</div>
+                <div className="sb-count">{images.length}/{MAX_IMAGES} images{images.length < 3 && ' (min 3)'}</div>
               </div>
             )}
 
