@@ -94,7 +94,8 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
 
     try {
       const storyId = genStoryId();
-      const shots = STORY_SHOTS.filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
+      const shots = (STORY_SHOTS || []).filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
+      if (!shots.length && !variantColors.size) { toast.error('No shots selected'); setGenerating(false); return; }
 
       // Build scene + audience context to append to each prompt
       const sceneCtx = scene !== 'Auto' ? `\nScene/Environment: ${scene}. Set the photo in this specific environment.` : '';
@@ -163,7 +164,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
       toast.success(`Generated ${total} photos for ${product.title}`);
       onCompleted?.();
     } catch (err) {
-      console.error('[PhotoStory] Generation failed:', { error: err.message });
+      console.error('[PhotoStory] Generation failed:', err, err?.stack);
       toast.error(`Photo story failed: ${err.message}`);
     } finally {
       setGenerating(false);
