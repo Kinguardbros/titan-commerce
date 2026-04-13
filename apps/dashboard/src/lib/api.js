@@ -409,3 +409,7 @@ export function scrapeStyle(url, storeId) {
     body: JSON.stringify({ url, store_id: storeId }),
   });
 }
+
+export function refreshSizeCharts(storeId) {
+  return fetchJSON(`/api/system?action=refresh_size_charts&store_id=${storeId}`);
+}

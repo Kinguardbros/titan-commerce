@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { getProducts, syncProducts } from '../lib/api';
+import { getProducts, syncProducts, refreshSizeCharts } from '../lib/api';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './Products.css';
@@ -43,6 +43,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [refreshingSC, setRefreshingSC] = useState(false);
   const [lastSynced, setLastSynced] = useState(() => {
     const ts = localStorage.getItem(`last_synced_${storeId}`);
     return ts ? new Date(ts) : null;
@@ -154,6 +155,21 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     }
   };
 
+  const handleRefreshSizeCharts = async () => {
+    setRefreshingSC(true);
+    toast.info('Checking size charts...');
+    try {
+      const result = await refreshSizeCharts(storeId);
+      await fetchProducts();
+      toast.success(`${result.with_size_chart} of ${result.total} products have size charts`);
+    } catch (err) {
+      console.error('[Products] Refresh size charts failed:', { error: err.message });
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setRefreshingSC(false);
+    }
+  };
+
   return (
     <div className="products-page">
       <div className="products-header">
@@ -174,6 +190,9 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           <input className="products-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search products by name" />
           <button className="products-import-btn" onClick={() => setShowImport(true)}>
             Import
+          </button>
+          <button className="products-sync-btn" onClick={handleRefreshSizeCharts} disabled={refreshingSC} title="Check Shopify for size chart metafields">
+            {refreshingSC ? 'Checking...' : '📏 Size Charts'}
           </button>
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}

@@ -408,6 +408,26 @@ async function handler(req, res) {
         return res.status(200).json({ connected: true, insights, campaigns, active_ads: activeAds });
       }
 
+      if (action === 'refresh_size_charts') {
+        const storeId = req.query.store_id;
+        if (!storeId) return res.status(400).json({ error: 'store_id required' });
+        const store = await getStore(storeId);
+        if (!store?.admin_token) return res.status(400).json({ error: 'Store has no admin token' });
+
+        const { data: products } = await supabase.from('products').select('id, shopify_id').eq('store_id', storeId).not('shopify_id', 'is', null);
+        const client = createShopifyClient(store.shopify_url, store.admin_token);
+        let updated = 0;
+        for (const p of (products || [])) {
+          try {
+            const mf = await client.getMetafield(p.shopify_id, 'custom', 'size_chart_text');
+            const has = !!(mf?.value && mf.value.length > 5);
+            await supabase.from('products').update({ has_size_chart: has }).eq('id', p.id);
+            if (has) updated++;
+          } catch (e) { /* skip individual failures */ }
+        }
+        return res.status(200).json({ total: (products || []).length, with_size_chart: updated });
+      }
+
       if (action === 'custom_styles') {
         const storeId = req.query.store_id;
         if (!storeId) return res.status(400).json({ error: 'store_id required' });
