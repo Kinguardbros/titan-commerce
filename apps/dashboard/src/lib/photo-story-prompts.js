@@ -1,6 +1,9 @@
 // Photo Story prompt templates — extracted from ISOLA-MASTER-PROMPT-SYSTEM.md
 // Each shot's buildPrompt(product, heroColor) returns a custom_prompt string for generateCreatives()
 
+// Consistency instruction appended to every shot (except material close-up)
+const MODEL_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: Use the EXACT SAME woman across ALL shots in this series — same face, same hair color and style, same skin tone, same body type, same age. She must be recognizable as the same person in every image. Do NOT change the model between shots.`;
+
 export const STORY_SHOTS = [
   {
     key: 'hero',
@@ -15,7 +18,7 @@ Swimsuit: ${p.title} in ${color}.
 ${p.description ? `Product details: ${p.description}` : ''}
 Fabric sitting smoothly on body with zero bunching, zero rolling at waistband.
 
-This is the ANCHOR image. All subsequent images must match this lighting exactly.`,
+This is the ANCHOR image. All subsequent images must match this lighting and THIS EXACT MODEL.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'lifestyle',
@@ -24,12 +27,12 @@ This is the ANCHOR image. All subsequent images must match this lighting exactly
     defaultOn: true,
     suggestedStyle: 'lifestyle',
     cost: 0.14,
-    buildPrompt: (p, color) => `Full body shot, slightly wider framing. Model walking slowly toward camera at slight angle, one foot ahead of other, natural stride. Arms swinging gently or one hand lightly touching hair. Genuine relaxed smile, looking slightly past camera. Wind catching hair slightly.
+    buildPrompt: (p, color) => `Full body shot, slightly wider framing. SAME MODEL as the hero shot. Model walking slowly toward camera at slight angle, one foot ahead of other, natural stride. Arms swinging gently or one hand lightly touching hair. Genuine relaxed smile, looking slightly past camera. Wind catching hair slightly.
 
 Swimsuit: ${p.title} in ${color}.
 Full product visible from neckline to mid-thigh. Fabric moving naturally with body motion — no stiff frozen look. Waistband staying in place during movement.
 
-Environment more visible — background fills 40% of frame. Shot feels candid and natural, as if photographer captured a genuine moment.`,
+Environment more visible — background fills 40% of frame. Shot feels candid and natural, as if photographer captured a genuine moment.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'detail',
@@ -38,13 +41,13 @@ Environment more visible — background fills 40% of frame. Shot feels candid an
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Tightly cropped shot. Frame from just below bust to mid-thigh ONLY. No face visible. Model standing straight, slight left hip tilt. Both hands relaxed at sides, not touching swimsuit.
+    buildPrompt: (p, color) => `Tightly cropped shot. SAME MODEL as the hero shot. Frame from just below bust to mid-thigh ONLY. No face visible. Model standing straight, slight left hip tilt. Both hands relaxed at sides, not touching swimsuit.
 
 Swimsuit: ${p.title} in ${color}.
 
 CRITICAL FOCUS AREA: Wide ruched high-waist panel sitting smoothly across the stomach with no rolling or folding, waistband edge invisible under fabric. Tummy control band lying completely flat with no digging.
 
-Fabric texture sharp and highly detailed — weave pattern visible. Skin texture natural and visible. No excessive retouching on stomach area — show real fit on real body. Warm side light from left creates subtle shadow defining the waist shaping effect.`,
+Fabric texture sharp and highly detailed — weave pattern visible. Skin texture natural and visible. No excessive retouching on stomach area — show real fit on real body. Warm side light from left creates subtle shadow defining the waist shaping effect.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'back',
@@ -53,13 +56,13 @@ Fabric texture sharp and highly detailed — weave pattern visible. Skin texture
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Three-quarter back view. Model facing away from camera at roughly 160-degree angle, looking over right shoulder toward camera with slight smile. Natural standing pose, weight evenly distributed.
+    buildPrompt: (p, color) => `Three-quarter back view. SAME MODEL as the hero shot. Model facing away from camera at roughly 160-degree angle, looking over right shoulder toward camera with slight smile. Natural standing pose, weight evenly distributed.
 
 Full body from shoulders to just below knees.
 Swimsuit: ${p.title} in ${color}.
 FOCUS: Back coverage — show how bottom sits on glutes without riding up, how waistband sits at back without rolling, how top straps lie flat at back. Fabric smooth, no bunching at lower back. Natural body shape visible.
 
-Same warm left-side lighting. Background soft bokeh.`,
+Same warm left-side lighting. Background soft bokeh.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'profile',
@@ -68,13 +71,13 @@ Same warm left-side lighting. Background soft bokeh.`,
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Full side profile shot. Model facing camera-left, standing straight with slight natural arch in lower back. Arms relaxed at sides or one hand lightly on hip. Chin slightly lifted.
+    buildPrompt: (p, color) => `Full side profile shot. SAME MODEL as the hero shot. Model facing camera-left, standing straight with slight natural arch in lower back. Arms relaxed at sides or one hand lightly on hip. Chin slightly lifted.
 
 Full body from head to knees.
 Swimsuit: ${p.title} in ${color}.
 FOCUS: Silhouette — the shaping effect of the high-waist panel visible in profile. Show how the waistband creates a smooth line from ribcage to hip. Natural bust profile, supported but not pushed up unnaturally.
 
-Warm left-side lighting creates definition along the body's edge. Background soft, model is a clean silhouette against bokeh.`,
+Warm left-side lighting creates definition along the body's edge. Background soft, model is a clean silhouette against bokeh.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'material',
@@ -106,7 +109,7 @@ LEFT HALF — BEFORE: Woman wearing a generic plain black one-piece swimsuit (no
 
 RIGHT HALF — AFTER: Same woman, same framing, same backdrop. Upright confident posture, shoulders back, slight warm smile. Wearing ${p.title} in ${color}. Swimsuit sitting perfectly: waistband completely flat, no bunching, fabric smooth across stomach and thighs, body supported and shaped NOT squeezed. Natural skin texture visible.
 
-A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing. NO text, NO labels, NO arrows — just the two images side by side.`,
+A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing. NO text, NO labels, NO arrows — just the two images side by side.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'feature_callout',
@@ -122,17 +125,17 @@ Every construction detail must be clearly visible and unobstructed: straps, neck
 
 Clean, neutral studio-style background (warm beige or light gray). Even flat lighting from both sides — minimal shadows so all product details are equally visible.
 
-Leave clear space on both sides of the model for callout labels in post-production.`,
+Leave clear space on both sides of the model for callout labels in post-production.${MODEL_CONSISTENCY}`,
   },
 ];
 
 export function buildColorVariantPrompt(product, color) {
-  return `Three-quarter angle full body shot. IDENTICAL POSE to Hero Shot — 30-degree angle to left, weight on right hip, relaxed arms. Model fills 70% of frame.
+  return `Three-quarter angle full body shot. SAME MODEL as the hero shot — IDENTICAL face, hair, skin tone, body type. IDENTICAL POSE — 30-degree angle to left, weight on right hip, relaxed arms. Model fills 70% of frame.
 
 Swimsuit: ${product.title} in ${color}.
 
 Fabric smooth and sitting correctly on body. Same lighting as Hero Shot. Background identical framing.
-This image MUST look like it was shot in the same session as the Hero image.`;
+This image MUST look like it was shot in the same session as the Hero image — same woman, same setting, only the color changes.${MODEL_CONSISTENCY}`;
 }
 
 export function buildUGCPrompt(product, color) {
