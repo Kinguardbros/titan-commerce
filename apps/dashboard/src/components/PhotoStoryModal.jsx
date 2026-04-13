@@ -76,45 +76,40 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
     try {
       const shots = STORY_SHOTS.filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
 
-      // Generate each shot sequentially
-      for (const shot of shots) {
-        setProgress({ current: completed, total, label: shot.label });
-        try {
-          await generateCreatives({
-            product_id: product.id,
-            store_id: storeId,
-            style: shot.suggestedStyle,
+      // Build all jobs
+      const allJobs = [
+        ...shots.map(shot => ({
+          label: shot.label,
+          fn: () => generateCreatives({
+            product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
             custom_prompt: shot.buildPrompt(product, heroColor),
-            show_model: true,
-            text_overlay: 'none',
-            ai_model: aiModel,
-            aspect_ratio: aspectRatio,
-          });
-        } catch (err) {
-          console.error(`[PhotoStory] Failed ${shot.key}:`, { error: err.message });
-          toast.error(`${shot.label} failed: ${err.message}`);
-        }
-        completed++;
-      }
-
-      // Color variants
-      for (const color of variantColors) {
-        setProgress({ current: completed, total, label: `Color: ${color}` });
-        try {
-          await generateCreatives({
-            product_id: product.id,
-            store_id: storeId,
-            style: 'product_shot',
+            show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
+          }),
+        })),
+        ...variantColors.map(color => ({
+          label: `Color: ${color}`,
+          fn: () => generateCreatives({
+            product_id: product.id, store_id: storeId, style: 'product_shot',
             custom_prompt: buildColorVariantPrompt(product, color),
-            show_model: true,
-            text_overlay: 'none',
-            ai_model: aiModel,
-            aspect_ratio: aspectRatio,
-          });
-        } catch (err) {
-          console.error(`[PhotoStory] Color variant ${color} failed:`, { error: err.message });
-        }
-        completed++;
+            show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
+          }),
+        })),
+      ];
+
+      // Generate in parallel (max 5 concurrent)
+      setProgress({ current: 0, total, label: 'Generating all shots...' });
+      const BATCH = 5;
+      for (let i = 0; i < allJobs.length; i += BATCH) {
+        const batch = allJobs.slice(i, i + BATCH);
+        setProgress({ current: completed, total, label: batch.map(j => j.label).join(', ') });
+        const results = await Promise.allSettled(batch.map(j => j.fn()));
+        results.forEach((r, idx) => {
+          if (r.status === 'rejected') {
+            console.error(`[PhotoStory] Failed ${batch[idx].label}:`, { error: r.reason?.message });
+            toast.error(`${batch[idx].label} failed`);
+          }
+        });
+        completed += batch.length;
       }
 
       // UGC
