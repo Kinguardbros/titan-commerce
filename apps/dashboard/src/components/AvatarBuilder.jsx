@@ -20,20 +20,10 @@ const SKIN_TONES = [
 
 function buildAvatarPrompt(p) {
   const impStr = p.imperfections.length > 0
-    ? `Realistic body details: ${p.imperfections.join(', ')}. These should be subtly visible, natural, NOT exaggerated.`
-    : 'Natural skin texture, no excessive retouching.';
+    ? `Subtle natural body details visible: ${p.imperfections.join(', ')}.`
+    : '';
 
-  return `Professional headshot portrait photograph. Shoulders and face visible, neutral studio background with soft even lighting.
-
-Model: Woman, age ${p.age}. Body type: ${p.bodyType}. Skin tone: ${p.skinTone}.
-Hair: ${p.hairColor}, ${p.hairLength}, ${p.hairStyle}.
-Expression: ${p.expression}, looking directly at camera.
-
-${impStr}
-
-${p.extraNotes ? `Additional details: ${p.extraNotes}` : ''}
-
-Style: Clean beauty portrait. Natural skin texture, minimal retouching. Shot on 85mm lens, f/2.8, shallow depth of field. The focus is on creating a RECOGNIZABLE, CONSISTENT face for use across multiple product photo shoots.`;
+  return `Full body photograph of a real woman, age ${p.age}. Head to knees visible. She is NOT a fashion model — she looks like a real person, a real customer. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${p.expression} expression, looking at camera with warmth. Standing naturally with weight on one hip, arms relaxed at sides. Wearing simple black fitted activewear. Warm inviting studio lighting, clean neutral background, soft shadows. Sun-kissed natural skin texture, age-appropriate face with natural expression lines. No retouching, no airbrushing — real skin, real body. ${impStr} ${p.extraNotes || ''} Shot on 85mm portrait lens, f/2.8, soft bokeh. Photorealistic, authentic, aspirational but achievable.`.replace(/\s{2,}/g, ' ').trim();
 }
 
 export default function AvatarBuilder({ storeId, onClose, onCreated }) {
