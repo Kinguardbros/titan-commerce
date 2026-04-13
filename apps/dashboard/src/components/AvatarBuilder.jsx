@@ -23,7 +23,11 @@ function buildAvatarPrompt(p) {
     ? `Subtle natural body details visible: ${p.imperfections.join(', ')}.`
     : '';
 
-  return `Full body photograph of a real woman, age ${p.age}. Head to knees visible. She is NOT a fashion model — she looks like a real person, a real customer. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${p.expression} expression, looking at camera with warmth. Standing naturally with weight on one hip, arms relaxed at sides. Wearing simple black fitted activewear. Warm inviting studio lighting, clean neutral background, soft shadows. Sun-kissed natural skin texture, age-appropriate face with natural expression lines. No retouching, no airbrushing — real skin, real body. ${impStr} ${p.extraNotes || ''} Shot on 85mm portrait lens, f/2.8, soft bokeh. Photorealistic, authentic, aspirational but achievable.`.replace(/\s{2,}/g, ' ').trim();
+  const ageDetails = parseInt(p.age) > 45
+    ? `She clearly looks ${p.age} years old — visible crow's feet, smile lines, slight neck lines, mature skin texture, natural signs of aging.`
+    : `She clearly looks ${p.age} years old — visible smile lines, natural expression lines, real skin texture.`;
+
+  return `Full body photograph of a real ${p.age}-year-old woman. ${ageDetails} Head to knees visible. NOT a young model — she is a real ${p.age}-year-old person, a real customer. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${p.expression} expression, looking at camera with warmth. Standing naturally with weight on one hip, arms relaxed. Wearing simple black fitted activewear. Warm inviting studio lighting, clean neutral background. Sun-kissed natural skin with real texture — pores, fine lines. No retouching, no airbrushing, no skin smoothing. ${impStr} ${p.extraNotes || ''} Shot on 85mm portrait lens, soft bokeh. Photorealistic, authentic.`.replace(/\s{2,}/g, ' ').trim();
 }
 
 export default function AvatarBuilder({ storeId, onClose, onCreated }) {
