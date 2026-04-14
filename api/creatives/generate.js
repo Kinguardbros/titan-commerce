@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { buildStyledPrompt, generateFluxKontext } from '../../lib/higgsfield.js';
+import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib/higgsfield.js';
 import { generateFal } from '../../lib/fal.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
@@ -169,20 +169,30 @@ async function handler(req, res) {
     let requestId = null;
     const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
-    // Map ai_model key → fal.ai model path
+    // Map ai_model key → fal.ai model path (only for models NOT available on Higgsfield directly)
     const FAL_MODEL_MAP = {
       fal_flux2_edit:       'fal-ai/flux-2/edit',
       fal_flux2_pro_edit:   'fal-ai/flux-2-pro/edit',
       fal_ideogram_bg:      'fal-ai/ideogram/v3/replace-background',
       fal_ideogram_edit:    'fal-ai/ideogram/v3/edit',
       fal_flux_kontext:     'fal-ai/flux-pro/kontext',
-      fal_nano_banana:      'fal-ai/nano-banana-2/edit',
+      // fal_nano_banana removed — using direct Higgsfield API (10x cheaper)
     };
 
     const falModel = FAL_MODEL_MAP[ai_model];
 
-    if (falModel) {
-      // All fal.ai models
+    if (ai_model === 'fal_nano_banana') {
+      // Nano Banana via direct Higgsfield API (~$0.01 vs $0.08 via fal.ai)
+      const refImages = images.slice(0, 3);
+      console.log(`[generate] Using Higgsfield Nano Banana DIRECT, ref images: ${refImages.length}`);
+      const hfPrompt = refImages.length > 0
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
+        : prompt;
+      const result = await generateImage({ prompt: hfPrompt, imageUrls: refImages, aspectRatio: aspect_ratio });
+      imageUrl = result.url;
+      requestId = result.jobId;
+    } else if (falModel) {
+      // fal.ai models (Flux, Ideogram — not available on Higgsfield)
       const maxRef = falModel.includes('ideogram') ? 1 : falModel.includes('flux-2') ? 4 : 3;
       const refImages = images.slice(0, maxRef);
       console.log(`[generate] Using fal.ai ${falModel}, ref images: ${refImages.length}`);
