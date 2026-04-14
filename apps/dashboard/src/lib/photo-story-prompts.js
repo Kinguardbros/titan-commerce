@@ -103,11 +103,11 @@ This shot proves the product is high quality. Every stitch must look intentional
     defaultOn: false,
     suggestedStyle: 'static_split',
     cost: 0.14,
-    buildPrompt: (p, color) => `Split-screen before/after comparison in ONE single image. Clean white seamless studio backdrop. Flat even lighting. Same model in both halves.
+    buildPrompt: (p, color) => `Split-screen before/after comparison in ONE single image. Clean white seamless studio backdrop. Flat even lighting. Same model in both halves. DRAMATIC visible difference between before and after.
 
-LEFT HALF — BEFORE: Woman wearing a generic plain black one-piece swimsuit (no branding, basic). Visible fit problems: waistband rolling down, fabric bunching at hips, slight muffin-top effect. Posture: shoulders slightly forward, stomach relaxed, subtle discomfort. NOT exaggerated or mocking.
+LEFT HALF — BEFORE: Woman wearing a cheap, ill-fitting generic black one-piece swimsuit. CLEARLY VISIBLE problems: waistband rolled down and folded over, fabric bunching and wrinkling at hips, obvious muffin-top spilling over the waistband, straps digging into shoulders leaving red marks, fabric pulling and stretching across stomach showing every bump. Posture: hunched shoulders, arms awkwardly trying to cover stomach, uncomfortable frustrated expression, looking down avoiding camera. Unflattering harsh overhead lighting that emphasizes every flaw. She looks like she wants to hide.
 
-RIGHT HALF — AFTER: Same woman, same framing, same backdrop. Upright confident posture, shoulders back, slight warm smile. Wearing ${p.title} in ${color}. Swimsuit sitting perfectly: waistband completely flat, no bunching, fabric smooth across stomach and thighs, body supported and shaped NOT squeezed. Natural skin texture visible.
+RIGHT HALF — AFTER: SAME woman, DRAMATIC transformation. Standing tall, shoulders back, beaming confident smile, direct eye contact with camera. Wearing ${p.title} in ${color}. The difference is STRIKING: waistband completely flat and smooth, tummy visibly sculpted and held, fabric draping beautifully with zero bunching, straps sitting comfortably with no digging. She looks 10 pounds slimmer. Warm flattering golden-hour style lighting. Her whole body language screams confidence — hands on hips, chin up, radiating joy.
 
 A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing. NO text, NO labels, NO arrows — just the two images side by side.${MODEL_CONSISTENCY}`,
   },
