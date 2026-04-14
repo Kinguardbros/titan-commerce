@@ -6,8 +6,8 @@ import { useToast } from '../hooks/useToast.jsx';
 import './PhotoStoryModal.css';
 
 const AI_MODELS = [
-  { key: 'fal_nano_banana', label: 'Nano Banana 2', cost: 0.01 },
-  { key: 'flux_kontext', label: 'Flux Kontext Max', cost: 0.10 },
+  { key: 'fal_nano_banana', label: 'Flux Kontext Max (HF)', cost: 0.01 },
+  { key: 'flux_kontext', label: 'Flux Kontext (fal.ai)', cost: 0.10 },
   { key: 'soul_ref', label: 'Soul Reference', cost: 0.12 },
 ];
 
