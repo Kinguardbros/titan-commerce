@@ -182,20 +182,27 @@ async function handler(req, res) {
     const falModel = FAL_MODEL_MAP[ai_model];
 
     if (ai_model === 'fal_nano_banana') {
-      // Flux Kontext Max via direct Higgsfield API (good quality, ~$0.01)
-      console.log(`[generate] Using Higgsfield Flux Kontext Max DIRECT`);
-      const hfPrompt = images.length > 0
-        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
-        : prompt;
-      try {
-        const result = await generateFluxKontext({ prompt: hfPrompt, aspectRatio: aspect_ratio === '4:5' ? '3:4' : aspect_ratio });
-        imageUrl = result.url;
-        requestId = result.jobId;
-      } catch (hfErr) {
-        console.error('[generate] HF Flux Kontext failed, falling back to fal.ai:', hfErr.message);
-        const result = await generateFal({ model: 'fal-ai/flux-pro/kontext', prompt: hfPrompt, imageUrl: images.slice(0, 1), aspectRatio: aspect_ratio });
+      // Smart routing: if reference_url exists → fal.ai Nano Banana (image-to-image, consistent model)
+      //                 if no reference → HF Flux Kontext Max (text-to-image, cheaper)
+      if (reference_url || images.length > 0) {
+        const refImages = reference_url ? [reference_url, ...images.slice(0, 2)] : images.slice(0, 3);
+        console.log(`[generate] Using fal.ai Nano Banana (has reference), ref images: ${refImages.length}`);
+        const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`;
+        const result = await generateFal({ model: 'fal-ai/nano-banana-2/edit', prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         imageUrl = result.url;
         requestId = result.requestId;
+      } else {
+        console.log(`[generate] Using Higgsfield Flux Kontext Max (no reference)`);
+        try {
+          const result = await generateFluxKontext({ prompt, aspectRatio: aspect_ratio === '4:5' ? '3:4' : aspect_ratio });
+          imageUrl = result.url;
+          requestId = result.jobId;
+        } catch (hfErr) {
+          console.error('[generate] HF Flux Kontext failed, falling back to fal.ai:', hfErr.message);
+          const result = await generateFal({ model: 'fal-ai/flux-pro/kontext', prompt, aspectRatio: aspect_ratio });
+          imageUrl = result.url;
+          requestId = result.requestId;
+        }
       }
     } else if (falModel) {
       // fal.ai models (Flux, Ideogram — not available on Higgsfield)
