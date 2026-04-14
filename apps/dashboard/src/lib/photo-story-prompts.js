@@ -2,7 +2,7 @@
 // Each shot's buildPrompt(product, heroColor) returns a custom_prompt string for generateCreatives()
 
 // Consistency instruction appended to every shot (except material close-up)
-const MODEL_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: The FIRST reference image shows the EXACT model to use — match her face, hair color and style, skin tone, body type, and age PRECISELY. She must be recognizable as the same person. Do NOT change the model.`;
+const MODEL_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: The FIRST reference image shows the EXACT model to use — match her face, hair color and style, skin tone, body type, and age PRECISELY. She must be recognizable as the same person. Do NOT change the model. IMPORTANT: Follow the GAZE direction specified above — each shot has a DIFFERENT eye/head direction. Do NOT default to looking at camera for every shot.`;
 
 export const STORY_SHOTS = [
   {
@@ -12,7 +12,7 @@ export const STORY_SHOTS = [
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Three-quarter angle full body shot. Model positioned at 30-degree angle to camera, facing slightly left. Weight on right hip, creating natural S-curve silhouette. Arms relaxed at sides, fingers slightly apart — not stiff, not touching swimsuit. Model fills approximately 70% of vertical frame. Head to just below knees visible.
+    buildPrompt: (p, color) => `Three-quarter angle full body shot. Model positioned at 30-degree angle to camera, facing slightly left. GAZE: Looking directly at camera with warm confident eye contact. Weight on right hip, creating natural S-curve silhouette. Arms relaxed at sides, fingers slightly apart. Model fills approximately 70% of vertical frame. Head to just below knees visible.
 
 Swimsuit: ${p.title} in ${color}.
 ${p.description ? `Product details: ${p.description}` : ''}
@@ -27,12 +27,12 @@ This is the ANCHOR image. All subsequent images must match this lighting and THI
     defaultOn: true,
     suggestedStyle: 'lifestyle',
     cost: 0.14,
-    buildPrompt: (p, color) => `Full body shot, slightly wider framing. SAME MODEL as the hero shot. Model walking slowly toward camera at slight angle, one foot ahead of other, natural stride. Arms swinging gently or one hand lightly touching hair. Genuine relaxed smile, looking slightly past camera. Wind catching hair slightly.
+    buildPrompt: (p, color) => `Full body shot, slightly wider framing. SAME MODEL as the hero shot. Model walking slowly toward camera at slight angle, one foot ahead of other, natural stride. Arms swinging gently or one hand lightly touching hair. GAZE: Looking slightly past camera to the right, as if noticing something interesting — NOT looking at camera. Genuine relaxed smile. Wind catching hair slightly.
 
 Swimsuit: ${p.title} in ${color}.
-Full product visible from neckline to mid-thigh. Fabric moving naturally with body motion — no stiff frozen look. Waistband staying in place during movement.
+Full product visible from neckline to mid-thigh. Fabric moving naturally with body motion. Waistband staying in place during movement.
 
-Environment more visible — background fills 40% of frame. Shot feels candid and natural, as if photographer captured a genuine moment.${MODEL_CONSISTENCY}`,
+Environment more visible — background fills 40% of frame. Shot feels candid, as if photographer captured a genuine moment.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'detail',
@@ -45,9 +45,9 @@ Environment more visible — background fills 40% of frame. Shot feels candid an
 
 Swimsuit: ${p.title} in ${color}.
 
-CRITICAL FOCUS AREA: Wide ruched high-waist panel sitting smoothly across the stomach with no rolling or folding, waistband edge invisible under fabric. Tummy control band lying completely flat with no digging.
+CRITICAL FOCUS AREA: Wide ruched high-waist panel sitting smoothly across the stomach with no rolling or folding. Tummy control band lying completely flat with no digging.
 
-Fabric texture sharp and highly detailed — weave pattern visible. Skin texture natural and visible. No excessive retouching on stomach area — show real fit on real body. Warm side light from left creates subtle shadow defining the waist shaping effect.${MODEL_CONSISTENCY}`,
+Fabric texture sharp and highly detailed. Skin texture natural and visible. Warm side light from left creates subtle shadow defining the waist shaping effect.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'back',
@@ -56,11 +56,11 @@ Fabric texture sharp and highly detailed — weave pattern visible. Skin texture
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Three-quarter back view. SAME MODEL as the hero shot. Model facing away from camera at roughly 160-degree angle, looking over right shoulder toward camera with slight smile. Natural standing pose, weight evenly distributed.
+    buildPrompt: (p, color) => `Three-quarter back view. SAME MODEL as the hero shot. Model facing away from camera at roughly 160-degree angle. GAZE: Looking over right shoulder toward camera with slight playful smile — a glance back. Natural standing pose, weight evenly distributed.
 
 Full body from shoulders to just below knees.
 Swimsuit: ${p.title} in ${color}.
-FOCUS: Back coverage — show how bottom sits on glutes without riding up, how waistband sits at back without rolling, how top straps lie flat at back. Fabric smooth, no bunching at lower back. Natural body shape visible.
+FOCUS: Back coverage — how bottom sits without riding up, waistband without rolling, straps flat at back. Fabric smooth, no bunching at lower back.
 
 Same warm left-side lighting. Background soft bokeh.${MODEL_CONSISTENCY}`,
   },
@@ -71,13 +71,13 @@ Same warm left-side lighting. Background soft bokeh.${MODEL_CONSISTENCY}`,
     defaultOn: true,
     suggestedStyle: 'product_shot',
     cost: 0.14,
-    buildPrompt: (p, color) => `Full side profile shot. SAME MODEL as the hero shot. Model facing camera-left, standing straight with slight natural arch in lower back. Arms relaxed at sides or one hand lightly on hip. Chin slightly lifted.
+    buildPrompt: (p, color) => `Full side profile shot. SAME MODEL as the hero shot. Model facing camera-left, standing straight with slight natural arch in lower back. One hand lightly on hip. GAZE: Looking straight ahead in the direction she is facing — chin slightly lifted, profile visible. NOT looking at camera.
 
 Full body from head to knees.
 Swimsuit: ${p.title} in ${color}.
-FOCUS: Silhouette — the shaping effect of the high-waist panel visible in profile. Show how the waistband creates a smooth line from ribcage to hip. Natural bust profile, supported but not pushed up unnaturally.
+FOCUS: Silhouette — the shaping effect of the high-waist panel visible in profile. Smooth line from ribcage to hip.
 
-Warm left-side lighting creates definition along the body's edge. Background soft, model is a clean silhouette against bokeh.${MODEL_CONSISTENCY}`,
+Warm left-side lighting creates definition along the body's edge. Background soft bokeh.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'material',
