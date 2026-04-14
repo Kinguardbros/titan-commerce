@@ -120,7 +120,7 @@ const IMG_MODELS = [
   { id: "ideogram-bg", label: "Ideogram BG Swap", detail: "Replace background — $0.03" },
   { id: "ideogram-edit", label: "Ideogram Edit", detail: "Smart editing — $0.03" },
   { id: "flux-kontext", label: "FLUX Kontext Pro", detail: "Identity preserve — $0.04" },
-  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.01" },
+  { id: "nano-banana", label: "Flux Kontext Max (HF)", detail: "Best quality — $0.01" },
 ];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
