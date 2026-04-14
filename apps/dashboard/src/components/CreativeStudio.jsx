@@ -41,7 +41,7 @@ const MODEL_COST = {
   "ideogram-bg": 0.03,
   "ideogram-edit": 0.03,
   "flux-kontext": 0.04,
-  "nano-banana": 0.08,
+  "nano-banana": 0.01,
 };
 
 const NEON = "#E2A832";
@@ -120,7 +120,7 @@ const IMG_MODELS = [
   { id: "ideogram-bg", label: "Ideogram BG Swap", detail: "Replace background — $0.03" },
   { id: "ideogram-edit", label: "Ideogram Edit", detail: "Smart editing — $0.03" },
   { id: "flux-kontext", label: "FLUX Kontext Pro", detail: "Identity preserve — $0.04" },
-  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.08" },
+  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.01" },
 ];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
