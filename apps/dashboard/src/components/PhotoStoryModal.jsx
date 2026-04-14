@@ -82,8 +82,12 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
     return count;
   }, [selectedShots, variantColors, includeUGC]);
 
-  const modelCost = AI_MODELS.find(m => m.key === aiModel)?.cost || DEFAULT_COST_PER_IMAGE;
-  const estimatedCost = (totalImages * modelCost).toFixed(2);
+  // Smart cost: hero via HF ($0.01), rest via fal.ai Nano Banana ($0.08)
+  const heroCost = 0.01;
+  const refCost = 0.08;
+  const heroCount = selectedShots.has('hero') ? 1 : 0;
+  const restCount = totalImages - heroCount;
+  const estimatedCost = (heroCount * heroCost + restCount * refCost).toFixed(2);
 
   const handleGenerate = async () => {
     if (!heroColor) { toast.error('Select a hero color'); return; }
