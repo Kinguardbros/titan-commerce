@@ -6,7 +6,7 @@ import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
 import OptimizePanel from '../components/OptimizePanel';
 import PhotoStoryModal from '../components/PhotoStoryModal';
-import { approveAd, rejectAd, updateCreative, convertToVideo } from '../lib/api';
+import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify } from '../lib/api';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
@@ -208,6 +208,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
                 case 'download': window.open(editingCreative.file_url, '_blank'); break;
                 case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
                 case 'convert-video': convertToVideo(id).then(() => { toast.success('Converting to video...'); setEditingCreative(null); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
+                case 'push-shopify': pushCreativeToShopify(id, storeId).then((r) => { toast.success(r.message || 'Pushed to Shopify'); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
                 default: break;
               }
             }}

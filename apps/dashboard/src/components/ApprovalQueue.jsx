@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPendingCreatives, approveAd, rejectAd, updateCreative } from '../lib/api';
+import { getPendingCreatives, approveAd, rejectAd, updateCreative, pushCreativeToShopify } from '../lib/api';
 import supabase from '../lib/supabase';
 import { useToast } from '../hooks/useToast.jsx';
 import CreativeDetailModal, { mapCreativeToModalData } from './CreativeDetailModal';
@@ -167,6 +167,7 @@ export default function ApprovalQueue({ storeId }) {
                 case 'reject': handleReject(id); break;
                 case 'download': window.open(editingCreative.file_url, '_blank'); break;
                 case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
+                case 'push-shopify': pushCreativeToShopify(id, storeId).then((r) => { toast.success(r.message || 'Pushed to Shopify'); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
                 default: break;
               }
             }}
