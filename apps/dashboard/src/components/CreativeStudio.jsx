@@ -115,12 +115,12 @@ const STYLE_CATEGORIES = [
 ];
 
 const IMG_MODELS = [
+  { id: "nano-banana", label: "Nano Banana 2", detail: "Smart routing — $0.01–0.08" },
   { id: "flux2-edit", label: "FLUX.2 Edit", detail: "Best value — $0.012" },
   { id: "flux2-pro-edit", label: "FLUX.2 Pro Edit", detail: "Best quality — $0.03" },
   { id: "ideogram-bg", label: "Ideogram BG Swap", detail: "Replace background — $0.03" },
   { id: "ideogram-edit", label: "Ideogram Edit", detail: "Smart editing — $0.03" },
   { id: "flux-kontext", label: "FLUX Kontext Pro", detail: "Identity preserve — $0.04" },
-  { id: "nano-banana", label: "Flux Kontext Max (HF)", detail: "Best quality — $0.01" },
 ];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
