@@ -15,6 +15,8 @@ import { custom_styles, analyze_style, create_custom_style, delete_custom_style,
 import { update_creative, generate_branded, push_creative_to_shopify, cleanup_stale } from '../lib/actions/creatives.js';
 import { update_cogs, manual_adspend } from '../lib/actions/pricing.js';
 import { persona_avatars, generate_avatar, upload_avatar, set_avatar_reference, delete_avatar } from '../lib/actions/avatars.js';
+import { sync_products } from '../lib/actions/sync.js';
+import { register_webhooks, list_webhooks, unregister_webhooks } from '../lib/actions/webhooks.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -33,6 +35,7 @@ const GET_ACTIONS = {
   refresh_size_charts,
   custom_styles,
   persona_avatars,
+  list_webhooks,
 };
 
 const POST_ACTIONS = {
@@ -70,6 +73,9 @@ const POST_ACTIONS = {
   upload_avatar,
   set_avatar_reference,
   delete_avatar,
+  sync_products,
+  register_webhooks,
+  unregister_webhooks,
 };
 
 async function handler(req, res) {

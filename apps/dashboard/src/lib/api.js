@@ -116,7 +116,7 @@ export async function getAllProducts(storeId) {
 }
 
 export function syncProducts(storeId) {
-  return fetchJSON('/api/products/sync', {
+  return fetchJSON('/api/system?action=sync_products', {
     method: 'POST',
     body: JSON.stringify(storeId ? { store_id: storeId } : {}),
   });
@@ -444,5 +444,24 @@ export function deleteAvatar(storeId, personaName) {
   return fetchJSON('/api/system?action=delete_avatar', {
     method: 'POST',
     body: JSON.stringify({ store_id: storeId, persona_name: personaName }),
+  });
+}
+
+// Shopify Webhooks
+export function registerWebhooks(storeId) {
+  return fetchJSON('/api/system?action=register_webhooks', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
+  });
+}
+
+export function listWebhooks(storeId) {
+  return fetchJSON(`/api/system?action=list_webhooks&store_id=${storeId}`);
+}
+
+export function unregisterWebhooks(storeId) {
+  return fetchJSON('/api/system?action=unregister_webhooks', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
   });
 }

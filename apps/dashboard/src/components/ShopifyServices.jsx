@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { listWebhooks, registerWebhooks, getPipelineLog } from '../lib/api';
+import { useToast } from '../hooks/useToast.jsx';
 import './ShopifyServices.css';
 
 const SERVICES = [
@@ -53,9 +56,84 @@ const SERVICES = [
   },
 ];
 
-export default function ShopifyServices({ onSwitchTab }) {
+function formatTimeAgo(iso) {
+  if (!iso) return 'never';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function WebhookStatus({ storeId }) {
+  const toast = useToast();
+  const [oursCount, setOursCount] = useState(null);
+  const [totalTopics, setTotalTopics] = useState(3);
+  const [lastEvent, setLastEvent] = useState(null);
+  const [registering, setRegistering] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    if (!storeId) return;
+    setLoading(true);
+    try {
+      const [wh, logs] = await Promise.all([
+        listWebhooks(storeId).catch(() => null),
+        getPipelineLog(storeId).catch(() => []),
+      ]);
+      if (wh) { setOursCount(wh.ours_count || 0); setTotalTopics(wh.topics?.length || 3); }
+      const webhookLog = (logs || []).find((l) => l.agent === 'SCRAPER' && typeof l.message === 'string' && l.message.startsWith('Webhook '));
+      setLastEvent(webhookLog?.created_at || null);
+    } catch (err) {
+      console.error('[ShopifyServices/Webhooks] load failed:', { error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [storeId]);
+
+  const handleRegister = async () => {
+    if (!storeId) return;
+    setRegistering(true);
+    try {
+      const res = await registerWebhooks(storeId);
+      const ok = (res.results || []).filter((r) => r.status === 'registered' || r.status === 'exists').length;
+      toast.success(`${ok}/${totalTopics} webhooks registered`);
+      await load();
+    } catch (err) {
+      console.error('[ShopifyServices/Webhooks] register failed:', { error: err.message });
+      toast.error(`Register failed: ${err.message}`);
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const count = oursCount ?? 0;
+  const allRegistered = count === totalTopics;
+
+  return (
+    <div className="ssv-webhook">
+      <div className="ssv-webhook-head">
+        <div>
+          <div className="ssv-webhook-title">Webhooks — auto-sync on Shopify changes</div>
+          <div className="ssv-webhook-meta">
+            {loading ? 'Loading...' : `${count}/${totalTopics} registered · Last event: ${formatTimeAgo(lastEvent)}`}
+          </div>
+        </div>
+        <button className="ssv-webhook-btn" onClick={handleRegister} disabled={registering || !storeId}>
+          {registering ? '...' : (allRegistered ? 'Re-register' : 'Register')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export default function ShopifyServices({ onSwitchTab, storeId }) {
   return (
     <div className="ssv">
+      <WebhookStatus storeId={storeId} />
       <div className="ssv-grid">
         {SERVICES.map((cat) => (
           <div key={cat.category} className="ssv-card">

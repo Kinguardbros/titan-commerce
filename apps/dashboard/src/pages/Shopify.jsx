@@ -88,7 +88,7 @@ export default function Shopify({ onNavigateToProduct, storeId, store }) {
           <ShopifyDashboard storeId={storeId} store={store} onNavigateToProduct={onNavigateToProduct} />
           <div style={{ marginTop: 24 }}>
             <div className="sh-title gradient-heading" style={{ fontSize: 11, marginBottom: 12 }}>Services</div>
-            <ShopifyServices onSwitchTab={(action) => {
+            <ShopifyServices storeId={storeId} onSwitchTab={(action) => {
               if (action === 'pricing') setSubTab('pricing');
               else if (action === 'knowledge') setSubTab('knowledge');
             }} />

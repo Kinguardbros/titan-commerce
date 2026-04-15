@@ -163,6 +163,8 @@ Key patterns:
 | `lib/event-detector.js` | Shared event detection logic: `detectEventsForStore()` — used by cron + scan_events |
 | `lib/fal.js` | fal.ai image generation API (FLUX.2, Ideogram v3) — alternative to Higgsfield |
 | `lib/validate.js` | Input validation helpers: `requireFields()`, `requireQuery()` |
+| `lib/product-upsert.js` | Shared `upsertProductFromShopify()` — DRY helper used by full sync + webhook handlers (webhook path preserves `tags`) |
+| `lib/shopify-webhook-handlers.js` | `handleProductCreate/Update/Delete` — delete = soft archive, not hard delete |
 | **Action Modules** (`lib/actions/`) | |
 | `lib/actions/stores.js` | `stores_list` — store listing with stripped admin_token |
 | `lib/actions/pipeline.js` | `pipeline_log` — activity log query |
@@ -178,6 +180,8 @@ Key patterns:
 | `lib/actions/custom-styles.js` | `custom_styles`, `analyze/create/delete/describe_style`, `scrape_style` |
 | `lib/actions/pricing.js` | `update_cogs`, `manual_adspend` |
 | `lib/actions/avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
+| `lib/actions/sync.js` | `sync_products` — full Shopify product + collections sync (moved from api/products/sync.js) |
+| `lib/actions/webhooks.js` | `register_webhooks`, `list_webhooks`, `unregister_webhooks` — programmatic Shopify webhook admin |
 | **API Endpoints** | |
 | `api/system.js` | Thin router (~91 lines) — delegates 45 actions to 14 modules in `lib/actions/` |
 | `api/auth/login.js` | Password authentication → session token |
@@ -189,7 +193,7 @@ Key patterns:
 | `api/shopify/overview.js` | Shopify analytics: KPIs, daily revenue, top products, traffic, orders |
 | `api/meta/overview.js` | Meta Ads overview |
 | `api/products/list.js` | Paginated products with creative counts (page, limit params) |
-| `api/products/sync.js` | Sync products from Shopify |
+| `api/webhooks/shopify.js` | Shopify webhook receiver (products/create, update, delete). Raw body + base64 HMAC verify against `stores.client_secret`. |
 | `api/cron/detect-events.js` | Event detection cron (every 6h): scans for actionable events → creates proposals |
 | **Agents** | |
 | `agents/style-analyzer.md` | STYLE_ANALYZER: Claude Vision visual style extraction from reference photos → custom styles |
@@ -240,6 +244,7 @@ SHOPIFY_ACCESS_TOKEN=***        # Default storefront token
 SHOPIFY_ADMIN_TOKEN=***         # Default admin token
 ANTHROPIC_API_KEY=***           # Claude API for Product Optimizer
 SITE_URL=***
+APP_URL=***                     # Public app URL (e.g. https://titan-commerce.vercel.app) — used as webhook callback target
 
 META_APP_ID=                    # EMPTY — awaiting setup
 META_APP_SECRET=                # EMPTY
@@ -320,9 +325,19 @@ CSV-format metafield (`custom.size_chart_text`) in Shopify. Two input methods: m
 Product edit writes to Shopify immediately (no approval queue). Unlike Optimizer which goes through pending → approve flow. All changes logged to pipeline_log with before/after audit trail.
 
 ### Vercel Hobby Limits
-- Max 12 serverless functions → `api/system.js` thin router delegates to 13 modules in `lib/actions/`
+- Max 12 serverless functions → `api/system.js` thin router delegates to 15+ modules in `lib/actions/`. Route budget = 12/12: `system.js`, `webhooks/shopify.js`, `cron/detect-events.js`, 4× `creatives/*`, 2× `products/*`, 2× `auth/*`, `ads/action.js`, `shopify/overview.js`.
 - 1 cron/day schedule → running every 6h via `0 */6 * * *`
 - 60s timeout → fire-and-forget for long operations
+- Shopify webhooks have a 5s response SLA — keep handlers light (simple upsert or status update)
+
+### Shopify Webhooks
+- Endpoint: `api/webhooks/shopify.js` — receives `products/create|update|delete` for all stores. Routes via `X-Shopify-Shop-Domain` header → lookup `stores.client_secret`.
+- **HMAC is base64** (`digest('base64')`) — NOT hex. OAuth callback in `api/auth/shopify.js:16-27` uses hex; webhook uses base64. Do not confuse the two.
+- `bodyParser: false` is required — HMAC is computed over the raw request body. JSON parsing would mutate it.
+- Secret: `stores.client_secret` (already stored from OAuth). No separate webhook secret needed because we register programmatically via Admin API, which signs with the app's client_secret.
+- `products/delete` = soft archive (`status='archived'`), never hard delete.
+- Webhook payload does NOT include collection memberships. The shared `upsertProductFromShopify()` helper intentionally does not touch `tags`; full sync (`sync_products`) populates them.
+- Registration: admin UI in Shopify tab → `register_webhooks` action → Shopify Admin API registers 3 topics pointing at `${APP_URL}/api/webhooks/shopify`. Env var `APP_URL` must be set in Vercel.
 
 ---
 
