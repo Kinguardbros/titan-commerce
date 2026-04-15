@@ -198,7 +198,7 @@ async function handler(req, res) {
       } else {
         console.log(`[generate] Using Higgsfield Flux Kontext Max (no reference)`);
         try {
-          const result = await generateFluxKontext({ prompt, aspectRatio: aspect_ratio === '4:5' ? '3:4' : aspect_ratio });
+          const result = await generateFluxKontext({ prompt, aspectRatio: aspect_ratio });
           imageUrl = result.url;
           requestId = result.jobId;
         } catch (hfErr) {
