@@ -41,7 +41,7 @@ const MODEL_COST = {
   "ideogram-bg": 0.03,
   "ideogram-edit": 0.03,
   "flux-kontext": 0.04,
-  "nano-banana": 0.01,
+  "nano-banana": 0.08,
 };
 
 const NEON = "#E2A832";
@@ -115,7 +115,7 @@ const STYLE_CATEGORIES = [
 ];
 
 const IMG_MODELS = [
-  { id: "nano-banana", label: "Nano Banana 2", detail: "Smart routing — $0.01–0.08" },
+  { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.08" },
   { id: "flux2-edit", label: "FLUX.2 Edit", detail: "Best value — $0.012" },
   { id: "flux2-pro-edit", label: "FLUX.2 Pro Edit", detail: "Best quality — $0.03" },
   { id: "ideogram-bg", label: "Ideogram BG Swap", detail: "Replace background — $0.03" },
