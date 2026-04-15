@@ -187,7 +187,11 @@ async function handler(req, res) {
       if (reference_url || images.length > 0) {
         const refImages = reference_url ? [reference_url, ...images.slice(0, 2)] : images.slice(0, 3);
         console.log(`[generate] Using fal.ai Nano Banana (has reference), ref images: ${refImages.length}`);
-        const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`;
+        const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
+        const colorOverride = colorMatch
+          ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch[1].trim()}. Keep the design, pattern, cut, and details identical to the reference, but the product color MUST be ${colorMatch[1].trim()}.`
+          : `\n\nKeep the same colors as the reference image.`;
+        const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride}\n\n${prompt}`;
         const result = await generateFal({ model: 'fal-ai/nano-banana-2/edit', prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         imageUrl = result.url;
         requestId = result.requestId;
@@ -210,8 +214,12 @@ async function handler(req, res) {
       const refImages = images.slice(0, maxRef);
       console.log(`[generate] Using fal.ai ${falModel}, ref images: ${refImages.length}`);
 
+      const colorMatch2 = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
+      const colorOverride2 = colorMatch2
+        ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch2[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch2[1].trim()}. Keep the design, pattern, cut, and details identical, but the product color MUST be ${colorMatch2[1].trim()}.`
+        : '';
       const falPrompt = refImages.length > 0
-        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same colors, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.\n\n${prompt}`
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}`
         : prompt;
 
       const result = await generateFal({

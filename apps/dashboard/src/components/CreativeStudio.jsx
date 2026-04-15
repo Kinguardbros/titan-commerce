@@ -334,6 +334,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   // Load colors from product variants
   const [colors, setColors] = useState([]);
   const [selectedColor, setSelectedColor] = useState("All colors");
+  const [colorToImage, setColorToImage] = useState({});
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState("auto");
   const [useAudience, setUseAudience] = useState(true);
@@ -345,12 +346,20 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
       if (!data?.product?.variants) return;
       const sizes = new Set(["S","M","L","XL","XXL","2XL","3XL","XS","OS","One Size"]);
       const colorSet = new Set();
+      const imageById = new Map((data.product.images || []).map((img) => [img.id, img.src]));
+      const mapping = {};
       for (const v of data.product.variants) {
         for (const opt of [v.option1, v.option2, v.option3]) {
-          if (opt && !sizes.has(opt)) colorSet.add(opt);
+          if (!opt || sizes.has(opt)) continue;
+          colorSet.add(opt);
+          if (v.image_id && !mapping[opt]) {
+            const url = imageById.get(v.image_id);
+            if (url) mapping[opt] = url;
+          }
         }
       }
       if (colorSet.size > 0) setColors(["All colors", ...colorSet]);
+      setColorToImage(mapping);
     }).catch(() => {});
     getSkills(sid).then((data) => {
       const as = (data.skills || []).find((s) => s.skill_type === "audience-personas");
@@ -478,6 +487,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
     const backendStyle = imgStyle.startsWith('cs_') ? imgStyle : (STYLE_MAP[imgStyle] || "ad_creative");
     const backendModel = MODEL_MAP[imgModel] || "fal_nano_banana";
+    const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
     const bodyHint = subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
@@ -504,6 +514,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             overlay_text: textMode === "Custom" ? customText : "",
             audience: useAudience && audience !== "auto" ? audience : undefined,
             aspect_ratio: imgRatio,
+            reference_url: colorRef,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
         );
@@ -513,7 +524,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, abMode, abStyle, selectedColor, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
