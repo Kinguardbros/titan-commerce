@@ -213,20 +213,21 @@ async function handler(req, res) {
       // Smart routing: reference → fal.ai Nano Banana 2 (fire-and-forget)
       //                 no reference → HF Flux Kontext Max (synchronous, text-to-image)
       if (reference_url || images.length > 0) {
-        // When we have a persona avatar (reference_url), put it FIRST and use FEWER product images
-        // so the AI doesn't average faces across product-model photos.
-        const refImages = reference_url ? [reference_url, ...images.slice(0, 1)] : images.slice(0, 3);
+        // With persona avatar: 1 avatar + up to 2 product images.
+        // AI now gets explicit role labels so it doesn't average faces.
+        const refImages = reference_url ? [reference_url, ...images.slice(0, 2)] : images.slice(0, 3);
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
           ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch[1].trim()}. Keep the design, pattern, cut, and details identical to the reference, but the product color MUST be ${colorMatch[1].trim()}.`
           : '';
         // Identity-locked prompt when persona avatar is present
+        const productRefRange = refImages.length > 2 ? '2-' + refImages.length : '2';
         const identityLock = reference_url
-          ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nREFERENCE IMAGE ROLES:\n- Image 1 (FIRST reference): THE MODEL — use this woman's EXACT face, hair, skin tone, body shape, and identity. The generated woman MUST look identical to image 1.\n- Image 2${refImages.length > 2 ? '-' + refImages.length : ''} (remaining references): THE PRODUCT ONLY — use only the garment/product from these images. DO NOT copy the face, hair, or body of any model shown in product images.\n\nIDENTITY LOCK: The generated woman must be THE SAME PERSON as in image 1. Same face, same features, same hair, same skin. If you see a different-looking model in product images, IGNORE her face entirely and keep image 1's identity.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+          ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nREFERENCE IMAGE ROLES — READ CAREFULLY:\n- Image 1 (FIRST reference): THE MODEL/PERSON — use this woman's EXACT face, hair, skin tone, body shape, and identity. The woman in the final image MUST be this exact person.\n- Image ${productRefRange} (remaining references): THE PRODUCT — these show the SAME product garment from different angles. Use these to learn the product's exact design, fabric, colors, cut, stitching, patterns, and every detail. Do NOT invent a new product. Do NOT copy the face, hair, or body of any model shown in product images — only the garment.\n\nTASK: Dress the woman from image 1 in the exact product shown across images ${productRefRange}. Same woman (image 1) + same product (images ${productRefRange}) = final photograph.\n\nIDENTITY LOCK: If the product reference images show a different-looking woman, IGNORE her face and body entirely. Keep ONLY image 1's identity.\nPRODUCT LOCK: The product must match images ${productRefRange} exactly — same pattern, same colors, same cut. Do NOT invent a new design.\n━━━━━━━━━━━━━━━━━━━━━━━━`
           : '';
         const productInstr = reference_url
-          ? `Place the product from reference images 2+ onto the woman from reference image 1. Keep her face, hair, and body identical to image 1.`
+          ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.`;
         const falPrompt = `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}`;
         falModelUsed = 'fal-ai/nano-banana-2/edit';
