@@ -68,7 +68,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
     if (!hasPending) return;
     const tick = () => { pollGenerations(storeId).catch((err) => console.warn('[ProductWorkspace] poll failed:', err.message)); };
     tick();
-    const iv = setInterval(tick, 5000);
+    const iv = setInterval(tick, 3000);
     return () => clearInterval(iv);
   }, [storeId, creatives]);
 
@@ -153,16 +153,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
                   Generating...<span className="pw-section-count">{generating.length}</span>
                 </div>
                 <div className="pw-grid">
-                  {generating.map((c) => (
-                    <div key={c.id} className="pw-card pw-card--generating">
-                      <div className="pw-card-img" style={{ background: 'var(--surface)' }}>
-                        <div className="pw-generating-spinner" />
-                      </div>
-                      <div className="pw-card-body">
-                        <div className="pw-card-hook">Generating image...</div>
-                      </div>
-                    </div>
-                  ))}
+                  {generating.map((c) => <GeneratingCard key={c.id} creative={c} />)}
                 </div>
               </div>
             )}
@@ -235,6 +226,37 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           onCompleted={() => { setShowPhotoStory(false); fetchCreatives(); }}
         />
       )}
+    </div>
+  );
+}
+
+function GeneratingCard({ creative: c }) {
+  const meta = typeof c.metadata === 'string' ? JSON.parse(c.metadata || '{}') : (c.metadata || {});
+  const startedAt = meta.submitted_at ? new Date(meta.submitted_at).getTime() : new Date(c.created_at).getTime();
+  const model = meta.model || '';
+  const eta = model.includes('nano-banana-pro') ? 15
+    : model.includes('nano-banana-2') ? 8
+    : model.includes('flux-pro/kontext') ? 12
+    : model.includes('flux-2') ? 10
+    : 15;
+  const [elapsed, setElapsed] = useState(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+  useEffect(() => {
+    const iv = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [startedAt]);
+  const modelLabel = model.includes('nano-banana-pro') ? 'Nano Banana Pro'
+    : model.includes('nano-banana-2') ? 'Nano Banana 2'
+    : model.includes('flux-pro/kontext') ? 'Flux Kontext Pro'
+    : model.includes('flux-2') ? 'Flux 2'
+    : 'AI';
+  return (
+    <div className="pw-card pw-card--generating">
+      <div className="pw-card-img" style={{ background: 'var(--surface)' }}>
+        <div className="pw-generating-spinner" />
+      </div>
+      <div className="pw-card-body">
+        <div className="pw-card-hook">{modelLabel} · {elapsed}s / ~{eta}s</div>
+      </div>
     </div>
   );
 }

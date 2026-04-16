@@ -133,7 +133,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
     if (!hasPending) return;
     const tick = () => { pollGenerations(storeId).catch((err) => console.warn('[Studio] poll failed:', err.message)); };
     tick();
-    const iv = setInterval(tick, 5000);
+    const iv = setInterval(tick, 3000);
     return () => clearInterval(iv);
   }, [storeId, creatives]);
 
