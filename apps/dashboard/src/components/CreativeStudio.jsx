@@ -32,6 +32,7 @@ const MODEL_MAP = {
   "ideogram-edit": "fal_ideogram_edit",
   "flux-kontext": "fal_flux_kontext",
   "nano-banana": "fal_nano_banana",
+  "nano-banana-pro": "fal_nano_banana_pro",
 };
 
 // Per-model cost estimate ($/image)
@@ -42,6 +43,7 @@ const MODEL_COST = {
   "ideogram-edit": 0.03,
   "flux-kontext": 0.04,
   "nano-banana": 0.08,
+  "nano-banana-pro": 0.15,
 };
 
 const NEON = "#E2A832";
@@ -115,6 +117,7 @@ const STYLE_CATEGORIES = [
 ];
 
 const IMG_MODELS = [
+  { id: "nano-banana-pro", label: "Nano Banana Pro", detail: "Best identity preserve — $0.15" },
   { id: "nano-banana", label: "Nano Banana 2", detail: "Reference editing — $0.08" },
   { id: "flux2-edit", label: "FLUX.2 Edit", detail: "Best value — $0.012" },
   { id: "flux2-pro-edit", label: "FLUX.2 Pro Edit", detail: "Best quality — $0.03" },
@@ -381,7 +384,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [tab, setTab] = useState("image");
   // Image config
   const [imgStyle, setImgStyle] = useState("ad-creative");
-  const [imgModel, setImgModel] = useState("nano-banana");
+  const [imgModel, setImgModel] = useState("nano-banana-pro");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
   const [customText, setCustomText] = useState("");

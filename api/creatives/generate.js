@@ -209,7 +209,8 @@ async function handler(req, res) {
 
     const falModel = FAL_MODEL_MAP[ai_model];
 
-    if (ai_model === 'fal_nano_banana') {
+    if (ai_model === 'fal_nano_banana' || ai_model === 'fal_nano_banana_pro') {
+      const bananaModel = ai_model === 'fal_nano_banana_pro' ? 'fal-ai/nano-banana-pro/edit' : 'fal-ai/nano-banana-2/edit';
       // Smart routing: reference → fal.ai Nano Banana 2 (fire-and-forget)
       //                 no reference → HF Flux Kontext Max (synchronous, text-to-image)
       if (reference_url || images.length > 0) {
@@ -230,7 +231,7 @@ async function handler(req, res) {
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.`;
         const falPrompt = `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}`;
-        falModelUsed = 'fal-ai/nano-banana-2/edit';
+        falModelUsed = bananaModel;
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
         pollBase = job.pollBase;
