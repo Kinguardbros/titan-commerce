@@ -214,7 +214,7 @@ Key patterns:
 |-------|---------|
 | `stores` | Multi-store config: shopify_url, admin_token, storefront_token, brand_config JSONB |
 | `products` | Shopify products (synced) + `cogs` + `store_id` FK |
-| `creatives` | Generated ad creatives (image/video), status: generating/pending/approved/rejected, `store_id` FK |
+| `creatives` | Generated ad creatives (image/video), status: generating/pending/approved/rejected/published/failed, `store_id` FK |
 | `events` | Detected events (product_no_creatives, revenue_declining, winner_detected) |
 | `proposals` | Actionable proposals from events, status: pending/approved/dismissed |
 | `product_optimizations` | AI optimization proposals: pending/approved/rejected with original + optimized JSONB |
