@@ -12,7 +12,7 @@ import { read_size_chart, refresh_size_charts, save_size_chart, parse_size_chart
 import { product_detail, scrape_product, import_confirm, update_product_full, bulk_price } from '../lib/actions/products.js';
 import { store_docs, store_docs_download, upload_store_doc, process_single_file, process_inbox } from '../lib/actions/docs.js';
 import { custom_styles, analyze_style, create_custom_style, delete_custom_style, describe_style, scrape_style } from '../lib/actions/custom-styles.js';
-import { update_creative, generate_branded, push_creative_to_shopify, cleanup_stale } from '../lib/actions/creatives.js';
+import { update_creative, generate_branded, push_creative_to_shopify, cleanup_stale, poll_generations } from '../lib/actions/creatives.js';
 import { update_cogs, manual_adspend } from '../lib/actions/pricing.js';
 import { persona_avatars, generate_avatar, upload_avatar, set_avatar_reference, delete_avatar } from '../lib/actions/avatars.js';
 import { sync_products } from '../lib/actions/sync.js';
@@ -36,6 +36,7 @@ const GET_ACTIONS = {
   custom_styles,
   persona_avatars,
   list_webhooks,
+  poll_generations,
 };
 
 const POST_ACTIONS = {

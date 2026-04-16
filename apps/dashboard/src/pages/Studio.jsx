@@ -3,7 +3,7 @@ import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives,
 import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
-import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify } from '../lib/api';
+import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify, pollGenerations } from '../lib/api';
 import supabase from '../lib/supabase';
 import { useToast } from '../hooks/useToast.jsx';
 import './Studio.css';
@@ -125,6 +125,17 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [storeId]);
+
+  // Poll fal.ai jobs while any creative is still generating
+  useEffect(() => {
+    if (!storeId) return;
+    const hasPending = creatives.some((c) => c.status === 'generating');
+    if (!hasPending) return;
+    const tick = () => { pollGenerations(storeId).catch((err) => console.warn('[Studio] poll failed:', err.message)); };
+    tick();
+    const iv = setInterval(tick, 5000);
+    return () => clearInterval(iv);
+  }, [storeId, creatives]);
 
   // Filtered creatives
   const filtered = useMemo(() => {

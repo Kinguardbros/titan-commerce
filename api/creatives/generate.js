@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib/higgsfield.js';
-import { generateFal } from '../../lib/fal.js';
+import { submitFalJob } from '../../lib/fal.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -165,8 +165,10 @@ async function handler(req, res) {
     console.log('[generate] Prompt length:', prompt.length, 'Contains NO BRANDING:', prompt.includes('NO BRANDING'), 'Contains STRICT:', prompt.includes('STRICT'), 'Contains text-free:', prompt.includes('text-free'));
 
     // Route by selected AI model
-    let imageUrl;
-    let requestId = null;
+    let imageUrl = null;             // set only for synchronous paths (HF Soul / Flux Kontext)
+    let requestId = null;            // fal.ai request_id or HF job_id
+    let pollBase = null;             // fal.ai poll base (null for HF)
+    let falModelUsed = null;         // full fal model path (for poll worker fallback)
     const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
     // Map ai_model key → fal.ai model path (only for models NOT available on Higgsfield directly)
@@ -176,25 +178,26 @@ async function handler(req, res) {
       fal_ideogram_bg:      'fal-ai/ideogram/v3/replace-background',
       fal_ideogram_edit:    'fal-ai/ideogram/v3/edit',
       fal_flux_kontext:     'fal-ai/flux-pro/kontext',
-      // fal_nano_banana removed — using direct Higgsfield API (10x cheaper)
     };
 
     const falModel = FAL_MODEL_MAP[ai_model];
 
     if (ai_model === 'fal_nano_banana') {
-      // Smart routing: if reference_url exists → fal.ai Nano Banana (image-to-image, consistent model)
-      //                 if no reference → HF Flux Kontext Max (text-to-image, cheaper)
+      // Smart routing: reference → fal.ai Nano Banana 2 (fire-and-forget)
+      //                 no reference → HF Flux Kontext Max (synchronous, text-to-image)
       if (reference_url || images.length > 0) {
         const refImages = reference_url ? [reference_url, ...images.slice(0, 2)] : images.slice(0, 3);
-        console.log(`[generate] Using fal.ai Nano Banana (has reference), ref images: ${refImages.length}`);
+        console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
           ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch[1].trim()}. Keep the design, pattern, cut, and details identical to the reference, but the product color MUST be ${colorMatch[1].trim()}.`
           : `\n\nKeep the same colors as the reference image.`;
         const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride}\n\n${prompt}`;
-        const result = await generateFal({ model: 'fal-ai/nano-banana-2/edit', prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
-        imageUrl = result.url;
-        requestId = result.requestId;
+        falModelUsed = 'fal-ai/nano-banana-2/edit';
+        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
+        requestId = job.requestId;
+        pollBase = job.pollBase;
+        if (job.completed && job.url) imageUrl = job.url;  // some models return sync
       } else {
         console.log(`[generate] Using Higgsfield Flux Kontext Max (no reference)`);
         try {
@@ -203,16 +206,18 @@ async function handler(req, res) {
           requestId = result.jobId;
         } catch (hfErr) {
           console.error('[generate] HF Flux Kontext failed, falling back to fal.ai:', hfErr.message);
-          const result = await generateFal({ model: 'fal-ai/flux-pro/kontext', prompt, aspectRatio: aspect_ratio });
-          imageUrl = result.url;
-          requestId = result.requestId;
+          falModelUsed = 'fal-ai/flux-pro/kontext';
+          const job = await submitFalJob({ model: falModelUsed, prompt, aspectRatio: aspect_ratio });
+          requestId = job.requestId;
+          pollBase = job.pollBase;
+          if (job.completed && job.url) imageUrl = job.url;
         }
       }
     } else if (falModel) {
-      // fal.ai models (Flux, Ideogram — not available on Higgsfield)
+      // fal.ai models (Flux, Ideogram — not available on Higgsfield) → fire-and-forget
       const maxRef = falModel.includes('ideogram') ? 1 : falModel.includes('flux-2') ? 4 : 3;
       const refImages = images.slice(0, maxRef);
-      console.log(`[generate] Using fal.ai ${falModel}, ref images: ${refImages.length}`);
+      console.log(`[generate] Submitting fal.ai ${falModel}, ref images: ${refImages.length}`);
 
       const colorMatch2 = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
       const colorOverride2 = colorMatch2
@@ -222,16 +227,13 @@ async function handler(req, res) {
         ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}`
         : prompt;
 
-      const result = await generateFal({
-        model: falModel,
-        prompt: falPrompt,
-        imageUrl: refImages,
-        aspectRatio: aspect_ratio,
-      });
-      imageUrl = result.url;
-      requestId = result.requestId;
+      falModelUsed = falModel;
+      const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
+      requestId = job.requestId;
+      pollBase = job.pollBase;
+      if (job.completed && job.url) imageUrl = job.url;
     } else if (ai_model === 'flux_kontext') {
-      // Legacy: Higgsfield Flux Kontext Max
+      // Legacy: Higgsfield Flux Kontext Max (synchronous)
       const fluxPrompt = `PRODUCT: ${product.title}${product.price ? ` ($${product.price})` : ''}${productDesc ? `\nProduct details: ${productDesc}` : ''}\n\n${prompt}`;
       console.log('[generate] Using Higgsfield Flux Kontext Max');
       try {
@@ -240,12 +242,14 @@ async function handler(req, res) {
         requestId = result.jobId;
       } catch (fluxErr) {
         console.error('[generate] Flux failed, falling back to fal.ai:', fluxErr.message);
-        const result = await generateFal({ model: 'fal-ai/flux-2/edit', prompt, imageUrl: images.slice(0, 5) });
-        imageUrl = result.url;
-        requestId = result.requestId;
+        falModelUsed = 'fal-ai/flux-2/edit';
+        const job = await submitFalJob({ model: falModelUsed, prompt, imageUrl: images.slice(0, 5) });
+        requestId = job.requestId;
+        pollBase = job.pollBase;
+        if (job.completed && job.url) imageUrl = job.url;
       }
     } else {
-      // Legacy: Higgsfield Soul / Soul Reference
+      // Legacy: Higgsfield Soul / Soul Reference (still synchronous — Higgsfield polls fast)
       const refImages = images.slice(0, ai_model === 'soul_ref' ? 5 : 3);
       console.log(`[generate] Using Higgsfield ${ai_model === 'soul_ref' ? 'Soul Reference' : 'Soul'}, ref images:`, refImages.length);
       try {
@@ -258,24 +262,27 @@ async function handler(req, res) {
       imageUrl = await pollUntilDone(requestId);
     }
 
-    if (!imageUrl) throw new Error('Generation failed — no image URL');
-
     // Use store_id from request, or fall back to product's store_id
     const effectiveStoreId = store_id || product.store_id || null;
     const storagePath = `creatives/${product.handle}_${style}_${Date.now()}.png`;
 
-    // Save creative immediately with fal.ai URL (fast response)
+    // Decide: did we already get an image URL (synchronous path), or is it queued for polling?
+    const isPending = !imageUrl && !!pollBase;
+
     const creativeRecord = {
       product_id, variant_index: 1, format: 'image',
-      file_url: imageUrl, storage_path: storagePath,
+      file_url: imageUrl || null, storage_path: storagePath,
       hook_used: custom_prompt || style, headline: product.title,
-      hf_job_id: requestId, status: 'pending', style,
+      hf_job_id: requestId,
+      status: isPending ? 'generating' : 'pending',
+      style,
       store_id: effectiveStoreId, aspect_ratio,
+      metadata: isPending ? { poll_base: pollBase, model: falModelUsed, submitted_at: new Date().toISOString() } : null,
       ...(story_id && { story_id }),
       ...(story_shot && { story_shot }),
     };
 
-    console.log('[generate] Inserting creative:', JSON.stringify({ product_id, store_id: effectiveStoreId, style, file_url: imageUrl?.slice(0, 60) }));
+    console.log('[generate] Inserting creative:', JSON.stringify({ product_id, store_id: effectiveStoreId, style, status: creativeRecord.status, file_url: imageUrl?.slice(0, 60) }));
 
     const { data: creative, error: cErr } = await supabase.from('creatives').insert(creativeRecord).select().single();
 
@@ -284,25 +291,32 @@ async function handler(req, res) {
       throw cErr;
     }
 
-    // Upload to Supabase Storage in background (don't block response)
-    (async () => {
-      try {
-        const imgResp = await fetch(imageUrl);
-        const buf = await imgResp.arrayBuffer();
-        await supabase.storage.from('creatives').upload(storagePath, buf, { contentType: 'image/png', upsert: true });
-        const { data: pub } = supabase.storage.from('creatives').getPublicUrl(storagePath);
-        await supabase.from('creatives').update({ file_url: pub.publicUrl }).eq('id', creative.id);
-      } catch (storageErr) {
-        console.error('[generate] Background storage upload failed:', storageErr.message);
-      }
-    })();
+    // For synchronous paths, upload to Supabase Storage in background (don't block response)
+    if (imageUrl) {
+      (async () => {
+        try {
+          const imgResp = await fetch(imageUrl);
+          const buf = await imgResp.arrayBuffer();
+          await supabase.storage.from('creatives').upload(storagePath, buf, { contentType: 'image/png', upsert: true });
+          const { data: pub } = supabase.storage.from('creatives').getPublicUrl(storagePath);
+          await supabase.from('creatives').update({ file_url: pub.publicUrl }).eq('id', creative.id);
+        } catch (storageErr) {
+          console.error('[generate] Background storage upload failed:', storageErr.message);
+        }
+      })();
+    }
 
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info', store_id: effectiveStoreId,
-      message: `Generated ${style} creative for ${product.title}`,
+      message: isPending ? `Queued ${style} generation for ${product.title}` : `Generated ${style} creative for ${product.title}`,
     });
 
-    return res.status(200).json({ creative_id: creative.id, file_url: imageUrl, generated: 1 });
+    return res.status(200).json({
+      creative_id: creative.id,
+      file_url: imageUrl || null,
+      status: creativeRecord.status,
+      generated: isPending ? 0 : 1,
+    });
   } catch (err) {
     console.error('[generate] Error:', err);
     const hint = err.message.includes('timeout') ? 'Image generation took too long. Try again.'

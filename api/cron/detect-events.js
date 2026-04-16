@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { createShopifyClient } from '../../lib/shopify-admin.js';
 import { detectEventsForStore } from '../../lib/event-detector.js';
+import { poll_generations } from '../../lib/actions/creatives.js';
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -11,6 +12,14 @@ export default async function handler(req, res) {
   if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
     return res.status(401).json({ error: 'Invalid cron secret' });
   }
+
+  // Safety-net: finalize any fal.ai generations that were submitted but left unclaimed
+  // (user closed the browser before polling finished, etc.). Ignore errors.
+  let pollResult = { checked: 0, completed: 0, failed: 0 };
+  try {
+    const mockRes = { status: () => ({ json: (payload) => { pollResult = payload; } }) };
+    await poll_generations({ query: {}, body: {} }, mockRes);
+  } catch (pollErr) { console.error('[cron] poll_generations failed:', pollErr.message); }
 
   try {
     // Get all active stores
@@ -74,8 +83,8 @@ export default async function handler(req, res) {
       }
     } catch (cleanErr) { console.error('[cron] Cleanup failed:', cleanErr.message); }
 
-    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned` });
-    return res.status(200).json({ events: totalEvents, proposals: totalProposals, cleaned: cleanedUp });
+    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned, ${pollResult.completed || 0} generations finalized` });
+    return res.status(200).json({ events: totalEvents, proposals: totalProposals, cleaned: cleanedUp, polled: pollResult });
   } catch (err) {
     console.error('[cron/detect-events] Error:', err);
     return res.status(500).json({ error: 'Cron failed', details: err.message });

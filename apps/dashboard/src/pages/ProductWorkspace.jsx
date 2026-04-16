@@ -6,7 +6,7 @@ import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
 import OptimizePanel from '../components/OptimizePanel';
 import PhotoStoryModal from '../components/PhotoStoryModal';
-import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify } from '../lib/api';
+import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify, pollGenerations } from '../lib/api';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
@@ -60,6 +60,17 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [product.id, fetchCreatives]);
+
+  // Poll fal.ai jobs while any creative is still generating
+  useEffect(() => {
+    if (!storeId) return;
+    const hasPending = creatives.some((c) => c.status === 'generating');
+    if (!hasPending) return;
+    const tick = () => { pollGenerations(storeId).catch((err) => console.warn('[ProductWorkspace] poll failed:', err.message)); };
+    tick();
+    const iv = setInterval(tick, 5000);
+    return () => clearInterval(iv);
+  }, [storeId, creatives]);
 
   const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
   const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);

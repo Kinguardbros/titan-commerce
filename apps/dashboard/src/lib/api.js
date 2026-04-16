@@ -269,6 +269,11 @@ export function cleanupStaleCreatives() {
   return fetchJSON('/api/system?action=cleanup_stale', { method: 'POST' });
 }
 
+// Async generation polling
+export function pollGenerations(storeId) {
+  return fetchJSON(`/api/system?action=poll_generations${storeId ? `&store_id=${storeId}` : ''}`);
+}
+
 // Product Import
 export function scrapeProductUrl(url) {
   return fetchJSON('/api/system?action=scrape_product', {
