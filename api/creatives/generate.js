@@ -162,7 +162,26 @@ async function handler(req, res) {
     });
 
     // Debug: log prompt to verify skills are loaded
-    console.log('[generate] Prompt length:', prompt.length, 'Contains NO BRANDING:', prompt.includes('NO BRANDING'), 'Contains STRICT:', prompt.includes('STRICT'), 'Contains text-free:', prompt.includes('text-free'));
+    const hasAgeOverride = prompt.includes('CRITICAL AGE OVERRIDE');
+    const hasTargetPersona = prompt.includes('TARGET PERSONA');
+    const ageMatch = prompt.match(/Age:\s*(\d+)\s*years old/);
+    console.log('[generate] Prompt length:', prompt.length, 'has AGE_OVERRIDE:', hasAgeOverride, 'has PERSONA:', hasTargetPersona, 'age found:', ageMatch?.[1] || 'none', 'audience:', audience || 'none');
+    if (audience && !hasAgeOverride) {
+      console.error('[generate] WARN: audience set but no AGE OVERRIDE in prompt — first 800 chars:', prompt.slice(0, 800));
+    }
+
+    // Amplify persona age: inject a short, aggressive reminder at the END of the prompt
+    // (AI models weigh last instructions more due to recency bias). This survives even
+    // when the full AGE OVERRIDE block is buried under 10k+ chars of brand knowledge.
+    let ageReminder = '';
+    if (ageMatch?.[1]) {
+      const age = parseInt(ageMatch[1], 10);
+      const visual = age >= 55 ? 'grey/silver hair, deep crow\'s feet, mature softening jawline, visibly older woman'
+        : age >= 45 ? 'visible fine lines, some grey hair, mature skin with natural texture, clearly NOT a 20-something'
+        : age >= 38 ? 'adult woman, fine lines around eyes, mature facial structure — clearly NOT a young 20s model'
+        : `${age}-year-old natural features`;
+      ageReminder = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL AGE ENFORCEMENT — READ THIS LAST:\nThe model MUST be ${age} years old. NOT younger. Visual requirements: ${visual}. If the generated woman looks under ${Math.max(age - 5, 30)}, the image is WRONG. Generate an older woman.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+    }
 
     // Route by selected AI model
     let imageUrl = null;             // set only for synchronous paths (HF Soul / Flux Kontext)
@@ -192,7 +211,7 @@ async function handler(req, res) {
         const colorOverride = colorMatch
           ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch[1].trim()}. Keep the design, pattern, cut, and details identical to the reference, but the product color MUST be ${colorMatch[1].trim()}.`
           : `\n\nKeep the same colors as the reference image.`;
-        const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride}\n\n${prompt}`;
+        const falPrompt = `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride}\n\n${prompt}${ageReminder}`;
         falModelUsed = 'fal-ai/nano-banana-2/edit';
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
@@ -224,8 +243,8 @@ async function handler(req, res) {
         ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch2[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch2[1].trim()}. Keep the design, pattern, cut, and details identical, but the product color MUST be ${colorMatch2[1].trim()}.`
         : '';
       const falPrompt = refImages.length > 0
-        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}`
-        : prompt;
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}${ageReminder}`
+        : `${prompt}${ageReminder}`;
 
       falModelUsed = falModel;
       const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
