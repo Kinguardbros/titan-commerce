@@ -57,10 +57,18 @@ async function handler(req, res) {
     try {
       const { data: avatar } = await supabase.from('persona_avatars')
         .select('reference_url')
-        .eq('store_id', store_id).eq('persona_name', audience).eq('is_active', true)
+        .eq('store_id', store_id).eq('persona_name', audience)
+        .not('reference_url', 'is', null)
         .single();
-      if (avatar?.reference_url) reference_url = avatar.reference_url;
-    } catch (e) { /* no avatar for this persona — continue without reference */ }
+      if (avatar?.reference_url) {
+        reference_url = avatar.reference_url;
+        console.log(`[generate] Auto-injected persona avatar for "${audience}": ${reference_url.slice(0, 80)}`);
+      } else {
+        console.log(`[generate] No avatar reference found for persona "${audience}"`);
+      }
+    } catch (e) {
+      console.log(`[generate] Avatar lookup failed for "${audience}":`, e.message);
+    }
   }
 
   try {
