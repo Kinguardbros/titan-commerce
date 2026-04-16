@@ -3,10 +3,33 @@
   display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 8px;
 }
-.imgm-item { position: relative; aspect-ratio: 1; }
+.imgm-item {
+  position: relative; aspect-ratio: 1;
+  transition: transform .15s, opacity .15s;
+}
+.imgm-item[draggable="true"] { cursor: grab; }
+.imgm-item[draggable="true"]:active { cursor: grabbing; }
+.imgm-item--dragging { opacity: .4; transform: scale(.95); }
+.imgm-item--drop .imgm-thumb {
+  border-color: var(--gold, #d4a853);
+  box-shadow: 0 0 0 2px var(--gold, #d4a853);
+}
 .imgm-thumb {
   width: 100%; height: 100%; object-fit: cover; border-radius: 8px;
   border: 1px solid var(--edge); display: block;
+  pointer-events: none;
+}
+.imgm-badge {
+  position: absolute; top: 4px; left: 4px;
+  background: rgba(0,0,0,.75); color: var(--gold, #d4a853);
+  font-family: var(--mono, monospace); font-size: 9px; font-weight: 600;
+  letter-spacing: .5px; text-transform: uppercase;
+  padding: 2px 6px; border-radius: 4px; backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+.imgm-hint {
+  margin-top: 8px; font-size: 10px; color: var(--text3, #888);
+  font-family: var(--mono, monospace); letter-spacing: .3px;
 }
 .imgm-actions {
   position: absolute; top: 4px; right: 4px;
