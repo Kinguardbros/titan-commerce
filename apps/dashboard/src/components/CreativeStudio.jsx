@@ -150,19 +150,20 @@ const ICON_OPTIONS = ["✦","◉","◐","▣","◫","□","▥","◆","▤","◑
 
 // ─── SHARED COMPONENTS ───
 
-function Pill({ active, onClick, children, accent }) {
+function Pill({ active, onClick, children, accent, disabled }) {
   const isAlt = accent === "cyan";
   const border = active ? (isAlt ? CYAN_BORDER : NEON_BORDER) : BORDER_DEFAULT;
   const bg = active ? (isAlt ? CYAN_DIM : NEON_DIM) : "transparent";
   const color = active ? (isAlt ? CYAN : NEON_LIGHT) : TEXT_MID;
   const glow = active ? (isAlt ? CYAN_GLOW_SM : NEON_GLOW_SM) : "none";
   return (
-    <button onClick={onClick} style={{
+    <button onClick={disabled ? undefined : onClick} disabled={disabled} style={{
       padding: "7px 16px", borderRadius: 999, fontSize: 13,
-      fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+      fontFamily: "'DM Sans', sans-serif", cursor: disabled ? "not-allowed" : "pointer",
       whiteSpace: "nowrap", fontWeight: active ? 500 : 400,
       border: `1.5px solid ${border}`, color, background: bg,
       boxShadow: glow, transition: "all 0.25s",
+      opacity: disabled ? 0.4 : 1,
     }}>{children}</button>
   );
 }
@@ -489,8 +490,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const backendModel = MODEL_MAP[imgModel] || "fal_nano_banana";
     const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
+    const personaOverrides = useAudience && audience !== "auto";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
-    const bodyHint = subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
+    const bodyHint = !personaOverrides && subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
     const framingHint = subject === "On model" ? (
       framing === "Head crop" ? `Framing: crop from chest up, do NOT show full head — cut off the top of the head above the eyes. Focus on the product, not the face. `
       : framing === "Cropped with head" ? `Framing: crop from waist/hip up, show full head and face. Upper body portrait with the product clearly visible. `
@@ -733,17 +735,23 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Body type — conditional on model */}
-          {subject === "On model" && !abMode && (
-            <div>
-              <SectionLabel>Body type</SectionLabel>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {BODY_TYPES.map((b) => (
-                  <Pill key={b} active={bodyType === b} onClick={() => setBodyType(b)}>{b}</Pill>
-                ))}
+          {/* Body type — conditional on model, disabled when persona audience is active */}
+          {subject === "On model" && !abMode && (() => {
+            const personaActive = useAudience && audience !== "auto";
+            return (
+              <div>
+                <SectionLabel>
+                  Body type
+                  {personaActive && <span style={{ opacity: 0.5, marginLeft: 8, fontSize: 10 }}>— using {audience} avatar</span>}
+                </SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {BODY_TYPES.map((b) => (
+                    <Pill key={b} active={bodyType === b} onClick={() => setBodyType(b)} disabled={personaActive}>{b}</Pill>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Framing — conditional on model */}
           {subject === "On model" && !abMode && (
