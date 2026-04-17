@@ -32,6 +32,12 @@ function AppContent() {
   });
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [studioProductId, setStudioProductId] = useState(null);
+  const [clock, setClock] = useState('');
+  const [showStorePicker, setShowStorePicker] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem('titan-theme') || 'dark');
+
+  const storeId = activeStore?.id;
 
   // Restore product workspace on page reload via URL ?tab=Products&product=<id>
   useEffect(() => {
@@ -46,12 +52,6 @@ function AppContent() {
       ).catch(() => {});
     }
   }, [storeId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [clock, setClock] = useState('');
-  const [showStorePicker, setShowStorePicker] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('titan-theme') || 'dark');
-
-  const storeId = activeStore?.id;
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
