@@ -163,7 +163,11 @@ export default function ProductDetail({ product, storeId, store }) {
 
           {/* Media */}
           <div className="pd-card">
-            <div className="pd-field-label">Media</div>
+            <div className="pd-field-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              Media
+              <button onClick={() => { fetchDetail(); toast.info('Media refreshed'); }} title="Refresh images from Shopify"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', fontSize: 14, padding: '2px 6px' }}>↻</button>
+            </div>
             <ImageManager images={images} editing onChange={(imgs) => { setImages(imgs); markDirty(); }} />
           </div>
 

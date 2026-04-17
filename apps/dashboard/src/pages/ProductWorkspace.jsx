@@ -35,6 +35,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   const [editingCreative, setEditingCreative] = useState(null);
   const [showOptimize, setShowOptimize] = useState(false);
   const [showPhotoStory, setShowPhotoStory] = useState(false);
+  const [detailKey, setDetailKey] = useState(0);
 
   const fetchCreatives = useCallback(async () => {
     try {
@@ -115,7 +116,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
       {/* ══ PRODUCT EDITOR (Shopify-style) ══ */}
       <Suspense fallback={<div className="pw-detail-loading">Loading...</div>}>
-        <ProductDetail product={product} storeId={storeId} store={store} />
+        <ProductDetail key={detailKey} product={product} storeId={storeId} store={store} />
       </Suspense>
 
       {/* ══ CREATIVES SECTION ══ */}
@@ -210,7 +211,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
                 case 'download': window.open(editingCreative.file_url, '_blank'); break;
                 case 'copy-url': navigator.clipboard.writeText(editingCreative.file_url); toast.success('URL copied'); break;
                 case 'convert-video': convertToVideo(id).then(() => { toast.success('Converting to video...'); setEditingCreative(null); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
-                case 'push-shopify': pushCreativeToShopify(id, storeId).then((r) => { toast.success(r.message || 'Pushed to Shopify'); fetchCreatives(); }).catch(e => toast.error(e.message)); break;
+                case 'push-shopify': pushCreativeToShopify(id, storeId).then((r) => { toast.success(r.message || 'Pushed to Shopify'); fetchCreatives(); setDetailKey((k) => k + 1); }).catch(e => toast.error(e.message)); break;
                 default: break;
               }
             }}
