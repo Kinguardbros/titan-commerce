@@ -15,6 +15,7 @@ import './ProductWorkspace.css';
 const ProductDetail = lazy(() => import('../components/ProductDetail'));
 
 const STYLES = [
+  { key: 'all_media', label: 'All Media' },
   { key: 'ad_creative', label: 'Ad Creatives' },
   { key: 'product_shot', label: 'Product Shots' },
   { key: 'product_photo_beach', label: 'Beach Photo' },
@@ -27,7 +28,7 @@ const STYLES = [
 
 export default function ProductWorkspace({ product, onBack, onNavigateToStudio, storeId, store }) {
   const toast = useToast();
-  const [activeStyle, setActiveStyle] = useState('ad_creative');
+  const [activeStyle, setActiveStyle] = useState('all_media');
   const [creatives, setCreatives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showGenerate, setShowGenerate] = useState(false);
@@ -73,9 +74,11 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
     return () => clearInterval(iv);
   }, [storeId, creatives]);
 
-  const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
-  const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
-  const approved = useMemo(() => creatives.filter((c) => (c.status === 'approved' || c.status === 'published') && (c.style || 'ad_creative') === activeStyle), [creatives, activeStyle]);
+  const isAllMedia = activeStyle === 'all_media';
+  const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
+  const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
+  const approved = useMemo(() => creatives.filter((c) => (c.status === 'approved' || c.status === 'published') && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
+  const shopifyImages = useMemo(() => JSON.parse(product.images || '[]'), [product.images]);
 
   const handleApprove = async (id, comment) => {
     try { await approveAd(id, 'Team', comment); toast.success('Creative approved!'); } catch (e) { console.error(e); toast.error(`Approve failed: ${e.message}`); }
@@ -134,7 +137,9 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
 
         <div className="pw-tabs">
           {STYLES.map((s) => {
-            const count = creatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
+            const count = s.key === 'all_media'
+              ? shopifyImages.length + creatives.length
+              : creatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
             return (
               <button key={s.key} className={`pw-tab${activeStyle === s.key ? ' pw-tab--active' : ''}`}
                 onClick={() => setActiveStyle(s.key)}>
@@ -148,6 +153,21 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           <SkeletonGrid count={4} />
         ) : (
           <>
+            {isAllMedia && shopifyImages.length > 0 && (
+              <div className="pw-section">
+                <div className="pw-section-title">Shopify Images<span className="pw-section-count">{shopifyImages.length}</span></div>
+                <div className="pw-grid">
+                  {shopifyImages.map((src, i) => (
+                    <div key={`shopify-${i}`} className="pw-card" onClick={() => window.open(src, '_blank')}>
+                      <div className="pw-card-img" style={{ backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        <span className="pill" style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, padding: '2px 7px', background: 'rgba(0,0,0,.6)', color: '#fff' }}>Shopify</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {generating.length > 0 && (
               <div className="pw-section">
                 <div className="pw-section-title pw-section-title--generating">
@@ -177,7 +197,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
               </div>
             )}
 
-            {generating.length === 0 && pending.length === 0 && approved.length === 0 && (
+            {generating.length === 0 && pending.length === 0 && approved.length === 0 && !(isAllMedia && shopifyImages.length > 0) && (
               <div className="pw-empty">
                 <div>No {STYLES.find((s) => s.key === activeStyle)?.label.toLowerCase()} yet</div>
                 <div className="pw-empty-actions">
