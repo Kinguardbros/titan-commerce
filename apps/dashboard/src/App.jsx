@@ -26,9 +26,26 @@ function isTokenValid() {
 
 function AppContent() {
   const { stores, activeStore, switchStore, refreshStores } = useActiveStore();
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') || 'Overview';
+  });
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [studioProductId, setStudioProductId] = useState(null);
+
+  // Restore product workspace on page reload via URL ?tab=Products&product=<id>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const productId = params.get('product');
+    if (productId && storeId && !selectedProduct) {
+      import('./lib/api').then(({ getAllProducts }) =>
+        getAllProducts(storeId).then((products) => {
+          const p = products?.find((x) => x.id === productId);
+          if (p) { setActiveTab('Products'); setSelectedProduct(p); }
+        })
+      ).catch(() => {});
+    }
+  }, [storeId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [clock, setClock] = useState('');
   const [showStorePicker, setShowStorePicker] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -68,8 +85,19 @@ function AppContent() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSelectProduct = useCallback((p) => setSelectedProduct(p), []);
-  const handleBackToProducts = useCallback(() => setSelectedProduct(null), []);
+  const handleSelectProduct = useCallback((p) => {
+    setSelectedProduct(p);
+    const url = new URL(window.location);
+    url.searchParams.set('tab', 'Products');
+    url.searchParams.set('product', p.id);
+    window.history.replaceState({}, '', url);
+  }, []);
+  const handleBackToProducts = useCallback(() => {
+    setSelectedProduct(null);
+    const url = new URL(window.location);
+    url.searchParams.delete('product');
+    window.history.replaceState({}, '', url);
+  }, []);
   const handleNavigateToProduct = useCallback(async (productId) => {
     try {
       const { getAllProducts } = await import('./lib/api');
@@ -140,7 +168,13 @@ function AppContent() {
         <nav className={`nav${mobileMenuOpen ? ' nav--open' : ''}`}>
           {TABS.map((tab) => (
             <button key={tab} className={activeTab === tab ? 'active' : ''}
-              onClick={() => { setActiveTab(tab); setSelectedProduct(null); setMobileMenuOpen(false); }}>
+              onClick={() => {
+                setActiveTab(tab); setSelectedProduct(null); setMobileMenuOpen(false);
+                const url = new URL(window.location);
+                url.searchParams.set('tab', tab);
+                url.searchParams.delete('product');
+                window.history.replaceState({}, '', url);
+              }}>
               {tab}
             </button>
           ))}
