@@ -310,15 +310,45 @@ async function handler(req, res) {
     // Decide: did we already get an image URL (synchronous path), or is it queued for polling?
     const isPending = !imageUrl && !!pollBase;
 
+    // Parse UI settings from custom_prompt for display in Generation Config
+    const poseMatch = (custom_prompt || '').match(/Model pose:\s*([^.]+)\./);
+    const bodyMatch = (custom_prompt || '').match(/Model body type:\s*([^.]+)\./);
+    const framingMatch = (custom_prompt || '').match(/Framing:\s*([^.]+)\./);
+    const sceneMatch = (custom_prompt || '').match(/Scene:\s*([^.]+)\./);
+    const colorVariant = (custom_prompt || '').match(/Product color:\s*([^.]+)\./);
+    const negMatch = (custom_prompt || '').match(/Negative:\s*(.+)/);
+
+    const MODEL_LABELS = {
+      fal_nano_banana: 'Nano Banana 2', fal_nano_banana_pro: 'Nano Banana Pro',
+      fal_flux2_edit: 'FLUX.2 Edit', fal_flux2_pro_edit: 'FLUX.2 Pro Edit',
+      fal_ideogram_bg: 'Ideogram BG', fal_ideogram_edit: 'Ideogram Edit',
+      fal_flux_kontext: 'FLUX Kontext Pro', flux_kontext: 'Flux Kontext Max',
+    };
+
+    const configMeta = {
+      model: falModelUsed || MODEL_LABELS[ai_model] || ai_model,
+      provider: falModelUsed ? 'fal.ai' : 'Higgsfield',
+      ...(poseMatch && { pose: poseMatch[1].trim() }),
+      ...(bodyMatch && { body_type: bodyMatch[1].trim() }),
+      ...(framingMatch && { framing: framingMatch[1].trim() }),
+      ...(sceneMatch && { scene: sceneMatch[1].trim() }),
+      ...(colorVariant && { color: colorVariant[1].trim() }),
+      ...(negMatch && { negative_prompt: negMatch[1].trim() }),
+      ...(audience && { audience }),
+      subject: show_model ? 'On model' : 'Product only',
+      submitted_at: new Date().toISOString(),
+      ...(isPending && { poll_base: pollBase }),
+    };
+
     const creativeRecord = {
       product_id, variant_index: 1, format: 'image',
       file_url: imageUrl || null, storage_path: storagePath,
       hook_used: custom_prompt || style, headline: product.title,
       hf_job_id: requestId,
       status: isPending ? 'generating' : 'pending',
-      style,
+      style, show_model,
       store_id: effectiveStoreId, aspect_ratio,
-      metadata: isPending ? { poll_base: pollBase, model: falModelUsed, submitted_at: new Date().toISOString() } : null,
+      metadata: configMeta,
       ...(story_id && { story_id }),
       ...(story_shot && { story_shot }),
     };
