@@ -75,9 +75,11 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   }, [storeId, creatives]);
 
   const isAllMedia = activeStyle === 'all_media';
-  const generating = useMemo(() => creatives.filter((c) => c.status === 'generating' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
-  const pending = useMemo(() => creatives.filter((c) => c.status === 'pending' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
-  const approved = useMemo(() => creatives.filter((c) => (c.status === 'approved' || c.status === 'published') && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [creatives, activeStyle, isAllMedia]);
+  const activeCreatives = useMemo(() => creatives.filter((c) => c.status !== 'failed'), [creatives]);
+  const generating = useMemo(() => activeCreatives.filter((c) => c.status === 'generating' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [activeCreatives, activeStyle, isAllMedia]);
+  const pending = useMemo(() => activeCreatives.filter((c) => c.status === 'pending' && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [activeCreatives, activeStyle, isAllMedia]);
+  const approved = useMemo(() => activeCreatives.filter((c) => (c.status === 'approved' || c.status === 'published') && (isAllMedia || (c.style || 'ad_creative') === activeStyle)), [activeCreatives, activeStyle, isAllMedia]);
+  const failedCount = useMemo(() => creatives.filter((c) => c.status === 'failed').length, [creatives]);
   const shopifyImages = useMemo(() => JSON.parse(product.images || '[]'), [product.images]);
 
   const handleApprove = async (id, comment) => {
@@ -95,8 +97,8 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
     setCreatives((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c));
   };
 
-  const totalPending = creatives.filter((c) => c.status === 'pending').length;
-  const totalApproved = creatives.filter((c) => c.status === 'approved' || c.status === 'published').length;
+  const totalPending = activeCreatives.filter((c) => c.status === 'pending').length;
+  const totalApproved = activeCreatives.filter((c) => c.status === 'approved' || c.status === 'published').length;
 
   return (
     <div className="pw">
@@ -138,8 +140,8 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
         <div className="pw-tabs">
           {STYLES.map((s) => {
             const count = s.key === 'all_media'
-              ? shopifyImages.length + creatives.length
-              : creatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
+              ? shopifyImages.length + activeCreatives.length
+              : activeCreatives.filter((c) => (c.style || 'ad_creative') === s.key).length;
             return (
               <button key={s.key} className={`pw-tab${activeStyle === s.key ? ' pw-tab--active' : ''}`}
                 onClick={() => setActiveStyle(s.key)}>
@@ -194,6 +196,21 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
                 <div className="pw-grid">
                   {approved.map((c) => <CreativeCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} status="approved" />)}
                 </div>
+              </div>
+            )}
+
+            {failedCount > 0 && (
+              <div style={{ padding: '8px 14px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
+                <span>{failedCount} generation(s) failed — timed out or errored</span>
+                <button style={{ background: 'none', border: 'none', color: 'var(--coral, #ef4444)', cursor: 'pointer', fontSize: 11, fontWeight: 600 }}
+                  onClick={async () => {
+                    const failedIds = creatives.filter((c) => c.status === 'failed').map((c) => c.id);
+                    for (const fid of failedIds) {
+                      await supabase.from('creatives').delete().eq('id', fid);
+                    }
+                    setCreatives((prev) => prev.filter((c) => c.status !== 'failed'));
+                    toast.success(`Removed ${failedIds.length} failed creative(s)`);
+                  }}>Clear failed</button>
               </div>
             )}
 
