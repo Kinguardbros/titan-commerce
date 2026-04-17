@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './ImageManager.css';
 
 const VISIBLE_COUNT = 8;
@@ -7,6 +7,24 @@ export default function ImageManager({ images, editing, onChange }) {
   const [expanded, setExpanded] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
+  const [lightbox, setLightbox] = useState(null);
+
+  const allImages = images || [];
+  const openLightbox = useCallback((idx) => { if (!editing) setLightbox(idx); }, [editing]);
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+  const prevImage = useCallback(() => setLightbox((i) => i > 0 ? i - 1 : allImages.length - 1), [allImages.length]);
+  const nextImage = useCallback(() => setLightbox((i) => i < allImages.length - 1 ? i + 1 : 0), [allImages.length]);
+
+  useEffect(() => {
+    if (lightbox === null) return;
+    const handler = (e) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === 'ArrowRight') nextImage();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [lightbox, closeLightbox, prevImage, nextImage]);
 
   const handleDelete = (idx) => {
     onChange(images.filter((_, i) => i !== idx));
@@ -37,7 +55,6 @@ export default function ImageManager({ images, editing, onChange }) {
 
   const handleDragEnd = () => { setDragIndex(null); setDropIndex(null); };
 
-  const allImages = images || [];
   const showImages = expanded ? allImages : allImages.slice(0, VISIBLE_COUNT);
   const hiddenCount = allImages.length - VISIBLE_COUNT;
 
@@ -57,7 +74,8 @@ export default function ImageManager({ images, editing, onChange }) {
               onDrop={editing ? handleDrop(i) : undefined}
               onDragEnd={editing ? handleDragEnd : undefined}
             >
-              <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false} />
+              <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false}
+                onClick={() => openLightbox(i)} style={!editing ? { cursor: 'zoom-in' } : undefined} />
               {i === 0 && <span className="imgm-badge">Cover</span>}
               {editing && (
                 <div className="imgm-actions">
@@ -74,6 +92,24 @@ export default function ImageManager({ images, editing, onChange }) {
       {editing && allImages.length > 1 && (
         <div className="imgm-hint">Drag images to reorder. First image is the cover.</div>
       )}
+
+      {lightbox !== null && (() => {
+        const lbImg = allImages[lightbox];
+        const lbSrc = typeof lbImg === 'string' ? lbImg : lbImg?.src;
+        return (
+          <div className="imgm-lightbox" onClick={closeLightbox}>
+            <button className="imgm-lightbox-close" onClick={closeLightbox}>&times;</button>
+            {allImages.length > 1 && (
+              <button className="imgm-lightbox-nav imgm-lightbox-nav--prev" onClick={(e) => { e.stopPropagation(); prevImage(); }}>&#8249;</button>
+            )}
+            <img src={lbSrc} alt="" className="imgm-lightbox-img" onClick={(e) => e.stopPropagation()} />
+            {allImages.length > 1 && (
+              <button className="imgm-lightbox-nav imgm-lightbox-nav--next" onClick={(e) => { e.stopPropagation(); nextImage(); }}>&#8250;</button>
+            )}
+            <div className="imgm-lightbox-counter">{lightbox + 1} / {allImages.length}</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

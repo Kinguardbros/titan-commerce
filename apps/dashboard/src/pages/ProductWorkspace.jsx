@@ -116,6 +116,11 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           {onNavigateToStudio && (
             <button className="pw-action-btn pw-action-btn--muted" onClick={() => onNavigateToStudio(product.id)}>Studio</button>
           )}
+          {store?.shopify_url && product.shopify_id && (
+            <a className="pw-action-btn pw-action-btn--muted" style={{ textDecoration: 'none' }}
+              href={`https://${store.shopify_url}/admin/products/${product.shopify_id}`}
+              target="_blank" rel="noopener noreferrer">Shopify ↗</a>
+          )}
         </div>
       </div>
 
