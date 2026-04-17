@@ -83,7 +83,10 @@ async function handler(req, res) {
     }
 
     let images = JSON.parse(product.images || '[]');
-    if (reference_url) {
+    // Prepend reference_url to product images ONLY for non-audience flows (color variant, etc.).
+    // For audience/persona flows, the avatar reference is added separately in the Nano Banana
+    // routing below — prepending here would duplicate it in refImages.
+    if (reference_url && !audience) {
       images = [reference_url, ...images];
     }
     // If store has a different shopify_url, re-map image URLs if needed
