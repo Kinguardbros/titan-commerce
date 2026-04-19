@@ -23,17 +23,27 @@ function buildAvatarPrompt(p) {
     ? `Subtle natural body details visible: ${p.imperfections.join(', ')}.`
     : '';
 
-  const ageDetails = parseInt(p.age) > 45
-    ? `She clearly looks ${p.age} years old — visible crow's feet, smile lines, slight neck lines, mature skin texture, natural signs of aging.`
-    : `She clearly looks ${p.age} years old — visible smile lines, natural expression lines, real skin texture.`;
+  const age = parseInt(p.age);
+  const ageDetails = age >= 50
+    ? `Her face shows clear maturity: visible fine lines and crow's feet, some grey hair strands, slightly softer jawline, mature skin texture. Clearly a woman in her 50s or 60s.`
+    : age >= 40
+    ? `Her face shows mid-life maturity: visible fine lines around eyes and mouth, skin pores, natural skin texture. Clearly a woman in her 40s.`
+    : age >= 30
+    ? `Her face shows early adult maturity: smooth skin overall, subtle fine lines around eyes. She clearly looks in her 30s, not 40s. No deep wrinkles, no grey hair.`
+    : `She has youthful features: smooth skin, even complexion, clearly a young adult.`;
 
-  return `Full body photograph of a real ${p.age}-year-old woman. ${ageDetails} Head to knees visible. NOT a young model — she is a real ${p.age}-year-old person, a real customer. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${p.expression} expression, looking at camera with warmth. Standing naturally with weight on one hip, arms relaxed. Wearing simple black fitted activewear. Warm inviting studio lighting, clean neutral background. Sun-kissed natural skin with real texture — pores, fine lines. No retouching, no airbrushing, no skin smoothing. ${impStr} ${p.extraNotes || ''} Shot on 85mm portrait lens, soft bokeh. Photorealistic, authentic.`.replace(/\s{2,}/g, ' ').trim();
+  const weightStr = p.weight ? `She weighs approximately ${p.weight} kg — her body proportions MUST clearly reflect this weight.` : '';
+  const heightStr = p.height ? `She is approximately ${p.height} cm tall.` : '';
+
+  return `Full body reference photograph of a ${p.age}-year-old woman standing in front of a plain wall at home. Natural amateur photo, not a professional shoot. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${heightStr} ${weightStr} FULL BODY shot — head to bare feet fully visible, feet at the bottom of the frame. Do NOT crop at the knees or waist. She is a regular ${p.age}-year-old woman, neither a model nor particularly photogenic. CLOTHING: She is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — NOT black, NOT white. Bare feet, no shoes. Arms relaxed at sides. ${p.expression} expression. Neutral indoor lighting, plain beige wall background. ${ageDetails} No makeup or minimal natural makeup, no styled hair. Imperfect real skin texture with pores, uneven tone. ${impStr} ${p.extraNotes || ''} Snapshot quality, plain and unremarkable. Do NOT make her look like a model, influencer, or professional photo. FINAL CHECK: age ${p.age}, underwear is BEIGE/NUDE not black.`.replace(/\s{2,}/g, ' ').trim();
 }
 
 export default function AvatarBuilder({ storeId, onClose, onCreated }) {
   const toast = useToast();
   const [name, setName] = useState('');
   const [age, setAge] = useState(40);
+  const [weight, setWeight] = useState('');
+  const [height, setHeight] = useState('');
   const [bodyType, setBodyType] = useState('Average');
   const [skinTone, setSkinTone] = useState(SKIN_TONES[2].label);
   const [hairColor, setHairColor] = useState('Brunette');
@@ -57,7 +67,7 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
     setVariants([]);
     setSelectedVariant(null);
     try {
-      const prompt = buildAvatarPrompt({ age, bodyType, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
+      const prompt = buildAvatarPrompt({ age, weight, height, bodyType, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
       const result = await generateAvatar(storeId, name.trim(), prompt);
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
       setVariants(urls);
@@ -105,6 +115,19 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
             <div className="ab-field">
               <label className="ab-label">Age: {age}</label>
               <input type="range" min={18} max={70} value={age} onChange={e => setAge(Number(e.target.value))} className="ab-slider" />
+            </div>
+
+            <div className="ab-field">
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label className="ab-label">Height (cm)</label>
+                  <input className="ab-input" type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="e.g. 165" min="140" max="200" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="ab-label">Weight (kg)</label>
+                  <input className="ab-input" type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="e.g. 70" min="40" max="150" />
+                </div>
+              </div>
             </div>
 
             <div className="ab-field">
