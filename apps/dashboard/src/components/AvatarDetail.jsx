@@ -36,11 +36,13 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
   const [referenceUrl, setReferenceUrl] = useState(persona.reference_url);
   const [showEdit, setShowEdit] = useState(false);
   const [descText, setDescText] = useState(persona.description || '');
+  const [weight, setWeight] = useState('');
 
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const fullDesc = descText || persona.description || persona.label;
+      const baseDesc = descText || persona.description || persona.label;
+      const fullDesc = baseDesc + (weight ? `\nWeight: ${weight} kg.` : '');
       const result = await generateAvatar(storeId, persona.name, fullDesc);
       const newVariants = (result.variants || []).map(url => (typeof url === 'string' ? { url } : url));
       setVariants(prev => [...prev, ...newVariants]);
@@ -130,6 +132,14 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
             ) : (
               <div className="avd-info-desc">{descText || persona.label}</div>
             )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+            <label style={{ fontSize: 11, color: 'var(--text3)', fontFamily: 'var(--mono, monospace)' }}>Weight</label>
+            <input type="number" value={weight} onChange={(e) => setWeight(e.target.value)}
+              placeholder="kg" min="40" max="150" step="1"
+              style={{ width: 64, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--edge)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, fontFamily: 'var(--mono, monospace)' }} />
+            <span style={{ fontSize: 10, color: 'var(--text3)' }}>kg</span>
           </div>
 
           <div className="avd-toolbar">
