@@ -179,6 +179,23 @@ async function handler(req, res) {
       storeId: store_id,
     });
 
+    // Auto-detect tummy control / high-waist swimwear → inject coverage instructions into prompt
+    const titleLower = (product.title || '').toLowerCase();
+    const isTummyControl = /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
+    let coverageReminder = '';
+    if (isTummyControl && show_model) {
+      const coverageInstr = `\n\nCRITICAL PRODUCT COVERAGE RULES — THIS SWIMSUIT IS TUMMY CONTROL:\n` +
+        `- The swimsuit MUST cover the ENTIRE midsection from hip bones to under the bust\n` +
+        `- The belly button MUST NOT be visible — it is fully covered by the fabric\n` +
+        `- High-waist cut sits ABOVE the navel, hugging and smoothing the tummy area\n` +
+        `- The model has a CURVY lower body (wider hips, fuller thighs) with a SOFT midsection — the swimsuit flatters and smooths, NOT reveals\n` +
+        `- The ruched/gathered fabric creates a slimming effect on the stomach\n` +
+        `- Do NOT show any bare midriff or exposed belly — the product's selling point is full tummy coverage\n` +
+        `- The model should look comfortable and confident — the swimsuit makes her feel secure, not exposed`;
+      prompt += coverageInstr;
+      coverageReminder = `\n\nFINAL CHECK: The belly button is NOT visible. The swimsuit covers the entire midsection.`;
+    }
+
     // Debug: log prompt to verify skills are loaded
     const hasAgeOverride = prompt.includes('CRITICAL AGE OVERRIDE');
     const hasTargetPersona = prompt.includes('TARGET PERSONA');
@@ -240,7 +257,7 @@ async function handler(req, res) {
         const productInstr = reference_url
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.`;
-        const falPrompt = `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}`;
+        const falPrompt = `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}`;
         falModelUsed = bananaModel;
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
@@ -272,8 +289,8 @@ async function handler(req, res) {
         ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch2[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch2[1].trim()}. Keep the design, pattern, cut, and details identical, but the product color MUST be ${colorMatch2[1].trim()}.`
         : '';
       const falPrompt = refImages.length > 0
-        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}${ageReminder}`
-        : `${prompt}${ageReminder}`;
+        ? `CRITICAL: KEEP THE EXACT SAME PRODUCT from the reference image(s). Same design, same pattern, same cut, same details. Do NOT create a different product. Place THIS EXACT product in the scene.${colorOverride2}\n\n${prompt}${ageReminder}${coverageReminder}`
+        : `${prompt}${ageReminder}${coverageReminder}`;
 
       falModelUsed = falModel;
       const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
