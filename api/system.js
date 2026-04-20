@@ -97,7 +97,13 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error(`[system/${action}] Error:`, err);
-    return res.status(500).json({ error: `Action '${action}' failed`, details: err.message });
+    // Sanitize: never expose raw error messages (could leak API keys, DB strings)
+    const safeDetails = (err.message || '')
+      .replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***')
+      .replace(/key[=:\s]+\S+/gi, 'key=***')
+      .replace(/postgres:\/\/\S+/g, 'postgres://***')
+      .slice(0, 200);
+    return res.status(500).json({ error: `Action '${action}' failed`, details: safeDetails });
   }
 }
 

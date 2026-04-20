@@ -69,11 +69,11 @@ export default async function handler(req, res) {
       }
     }
 
-    // Auto-cleanup: delete pending creatives older than 2 days
+    // Auto-cleanup: delete pending creatives older than 7 days
     let cleanedUp = 0;
     try {
       const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - 2);
+      cutoff.setDate(cutoff.getDate() - 7);
       const { data: stale } = await supabase.from('creatives').select('id, storage_path')
         .eq('status', 'pending').lt('created_at', cutoff.toISOString());
       for (const c of stale || []) {
