@@ -88,6 +88,7 @@ export function mapCreativeToModalData(creative) {
 export default function CreativeDetailModal({ data, onClose, onAction, onPrev, onNext }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [showNeg, setShowNeg] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const status = STATUS_MAP[data.status] || STATUS_MAP.pending;
 
   // Keyboard navigation
@@ -95,11 +96,12 @@ export default function CreativeDetailModal({ data, onClose, onAction, onPrev, o
     const handler = (e) => {
       if (e.key === 'ArrowLeft' && onPrev) onPrev();
       else if (e.key === 'ArrowRight' && onNext) onNext();
-      else if (e.key === 'Escape') onClose();
+      else if (e.key === 'Escape') { if (fullscreen) setFullscreen(false); else onClose(); }
+      else if (e.key === 'f' || e.key === 'F') setFullscreen((p) => !p);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onPrev, onNext, onClose]);
+  }, [onPrev, onNext, onClose, fullscreen]);
 
   const configRows = [
     { label: 'Model', value: data.model },
@@ -127,13 +129,16 @@ export default function CreativeDetailModal({ data, onClose, onAction, onPrev, o
       <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet" />
       <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
-      <div className="cdm-modal">
+      <div className={`cdm-modal${fullscreen ? ' cdm-modal--fullscreen' : ''}`}>
         {/* Left: Image */}
         <div className="cdm-image-pane">
           {!imgLoaded && <div className="cdm-spinner"><div className="cdm-spinner-ring" /></div>}
-          <img src={data.imageUrl} alt={data.product} onLoad={() => setImgLoaded(true)} style={{ opacity: imgLoaded ? 1 : 0 }} />
+          <img src={data.imageUrl} alt={data.product} onLoad={() => setImgLoaded(true)} style={{ opacity: imgLoaded ? 1 : 0 }} onClick={() => setFullscreen((p) => !p)} />
           {onPrev && <button className="cdm-nav cdm-nav--prev" onClick={onPrev} aria-label="Previous">‹</button>}
           {onNext && <button className="cdm-nav cdm-nav--next" onClick={onNext} aria-label="Next">›</button>}
+          <button className="cdm-fullscreen-btn" onClick={() => setFullscreen((p) => !p)} title="Toggle fullscreen (F)">
+            {fullscreen ? '⛶' : '⛶'}
+          </button>
           <div className="cdm-image-badges">
             <div className="cdm-badge-pill">{data.aspectRatio}</div>
             <div className="cdm-badge-pill">{data.resolution}</div>
