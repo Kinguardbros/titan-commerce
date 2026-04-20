@@ -7,7 +7,7 @@ import { kpi, meta_overview, insights } from '../lib/actions/analytics.js';
 import { profit_summary } from '../lib/actions/profit.js';
 import { proposals_list, approve_proposal, reject_proposal, approve_all_proposals, scan_events } from '../lib/actions/proposals.js';
 import { pending_optimizations, optimize_product, approve_optimization, reject_optimization, save_optimization } from '../lib/actions/optimizations.js';
-import { get_skills, generate_skills, regenerate_skill } from '../lib/actions/skills.js';
+import { get_skills, generate_skills, regenerate_skill, save_skill } from '../lib/actions/skills.js';
 import { read_size_chart, refresh_size_charts, save_size_chart, parse_size_chart_image } from '../lib/actions/size-chart.js';
 import { product_detail, scrape_product, import_confirm, update_product_full, bulk_price } from '../lib/actions/products.js';
 import { store_docs, store_docs_download, upload_store_doc, process_single_file, process_inbox } from '../lib/actions/docs.js';
@@ -56,6 +56,7 @@ const POST_ACTIONS = {
   cleanup_stale,
   generate_skills,
   regenerate_skill,
+  save_skill,
   upload_store_doc,
   process_single_file,
   process_inbox,

@@ -344,6 +344,13 @@ export function regenerateSkill(storeId, skillType, productName = null) {
   });
 }
 
+export function saveSkill(storeId, skillType, content, productName = null) {
+  return fetchJSON('/api/system?action=save_skill', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, skill_type: skillType, content, product_name: productName }),
+  });
+}
+
 export function processSingleFile(storeId, filename) {
   return fetchJSON('/api/system?action=process_single_file', {
     method: 'POST',

@@ -64,6 +64,17 @@
 }
 .bk-card-btn:hover { border-color: var(--gold); color: var(--gold); }
 .bk-card-btn:disabled { opacity: .4; cursor: not-allowed; }
+.bk-card-btn--save { background: var(--accent-success, #22c55e); color: #fff; border-color: transparent; }
+.bk-card-btn--save:hover { filter: brightness(1.1); color: #fff; border-color: transparent; }
+
+.bk-edit-textarea {
+  width: 100%; min-height: 200px; padding: 10px 12px;
+  background: var(--surface, #111); color: var(--text, #fff);
+  border: 1px solid var(--edge); border-radius: 8px;
+  font-family: var(--mono, monospace); font-size: 11px; line-height: 1.6;
+  resize: vertical;
+}
+.bk-edit-textarea:focus { outline: none; border-color: var(--gold, #d4a853); }
 
 .bk-card-meta {
   display: flex; gap: 12px; margin-top: 6px;

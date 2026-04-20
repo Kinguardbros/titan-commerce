@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSkills, generateSkills, regenerateSkill } from '../lib/api';
+import { getSkills, generateSkills, regenerateSkill, saveSkill } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './BrandKnowledge.css';
 
@@ -129,12 +129,12 @@ export default function BrandKnowledge({ storeId, storeName }) {
       {storeSkills.length > 0 && (
         <div className="bk-cards">
           {storeSkills.map((skill) => (
-            <SkillCard key={skill.skill_type} skill={skill}
+            <SkillCard key={skill.skill_type} skill={skill} storeId={storeId}
               expanded={expandedSkill === skill.skill_type}
               regenerating={regenerating === skill.skill_type}
               onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
               onRegenerate={() => handleRegenerate(skill.skill_type, null)}
-              onExport={() => handleExport(skill)} />
+              onExport={() => handleExport(skill)} onSaved={fetchSkills} />
           ))}
         </div>
       )}
@@ -145,12 +145,12 @@ export default function BrandKnowledge({ storeId, storeName }) {
           <div className="bk-product-heading">Studio Skills</div>
           <div className="bk-cards">
             {studioSkills.map((skill) => (
-              <SkillCard key={skill.skill_type} skill={skill}
+              <SkillCard key={skill.skill_type} skill={skill} storeId={storeId}
                 expanded={expandedSkill === skill.skill_type}
                 regenerating={regenerating === skill.skill_type}
                 onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
                 onRegenerate={() => handleRegenerate(skill.skill_type, null)}
-                onExport={() => handleExport(skill)} />
+                onExport={() => handleExport(skill)} onSaved={fetchSkills} />
             ))}
             {/* Show placeholders for missing studio skills */}
             {STUDIO_SKILL_TYPES.filter((t) => !studioSkills.some((s) => s.skill_type === t)).map((type) => (
@@ -174,12 +174,12 @@ export default function BrandKnowledge({ storeId, storeName }) {
           <div className="bk-product-heading">Product Skills</div>
           <div className="bk-cards">
             {productSkills.map((skill) => (
-              <SkillCard key={skill.skill_type} skill={skill} isProduct
+              <SkillCard key={skill.skill_type} skill={skill} isProduct storeId={storeId}
                 expanded={expandedSkill === skill.skill_type}
                 regenerating={regenerating === skill.skill_type}
                 onToggle={() => setExpandedSkill(expandedSkill === skill.skill_type ? null : skill.skill_type)}
                 onRegenerate={() => handleRegenerate(skill.skill_type, skill.product_name)}
-                onExport={() => handleExport(skill)} />
+                onExport={() => handleExport(skill)} onSaved={fetchSkills} />
             ))}
           </div>
         </>
@@ -188,10 +188,29 @@ export default function BrandKnowledge({ storeId, storeName }) {
   );
 }
 
-function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onExport, isProduct }) {
+function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onExport, isProduct, storeId, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState(skill.content || '');
+  const [saving, setSaving] = useState(false);
+  const toast = useToast();
+
   const icon = isProduct ? '\u{1F4E6}' : (SKILL_ICONS[skill.skill_type] || '\u{1F4CB}');
   const desc = isProduct ? `Product-specific knowledge` : (SKILL_DESCRIPTIONS[skill.skill_type] || '');
   const age = getTimeAgo(skill.generated_at);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveSkill(storeId, skill.skill_type, editContent, skill.product_name || null);
+      toast.success('Skill saved');
+      setEditing(false);
+      onSaved?.();
+    } catch (err) {
+      toast.error(`Save failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="bk-card">
@@ -205,6 +224,9 @@ function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onEx
         </div>
         <div className="bk-card-actions">
           <button className="bk-card-btn" onClick={onToggle}>{expanded ? 'Close' : 'View'}</button>
+          {expanded && !editing && <button className="bk-card-btn" onClick={() => { setEditContent(skill.content || ''); setEditing(true); }}>Edit</button>}
+          {editing && <button className="bk-card-btn bk-card-btn--save" onClick={handleSave} disabled={saving}>{saving ? '...' : 'Save'}</button>}
+          {editing && <button className="bk-card-btn" onClick={() => setEditing(false)}>Cancel</button>}
           <button className="bk-card-btn" onClick={onRegenerate} disabled={regenerating}>{regenerating ? '...' : 'Regen'}</button>
           <button className="bk-card-btn" onClick={onExport}>MD</button>
         </div>
@@ -215,7 +237,12 @@ function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onEx
       </div>
       {expanded && (
         <div className="bk-card-content">
-          <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
+          {editing ? (
+            <textarea className="bk-edit-textarea" value={editContent} onChange={(e) => setEditContent(e.target.value)}
+              rows={Math.max(10, editContent.split('\n').length + 2)} />
+          ) : (
+            <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
+          )}
         </div>
       )}
     </div>
