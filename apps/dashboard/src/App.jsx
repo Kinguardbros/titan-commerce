@@ -5,7 +5,7 @@ import Login from './pages/Login';
 import Tooltip from './components/Tooltip';
 import './App.css';
 
-const Overview = lazy(() => import('./pages/Overview'));
+const Cockpit = lazy(() => import('./pages/Cockpit'));
 const Shopify = lazy(() => import('./pages/Shopify'));
 const Products = lazy(() => import('./pages/Products'));
 const ProductWorkspace = lazy(() => import('./pages/ProductWorkspace'));
@@ -13,7 +13,7 @@ const Studio = lazy(() => import('./pages/Studio'));
 const Profit = lazy(() => import('./pages/Profit'));
 const Avatars = lazy(() => import('./pages/Avatars'));
 
-const TABS = ['Overview', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
+const TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
 
 function isTokenValid() {
   const token = localStorage.getItem('auth_token');
@@ -28,7 +28,7 @@ function AppContent() {
   const { stores, activeStore, switchStore, refreshStores } = useActiveStore();
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return params.get('tab') || 'Overview';
+    return params.get('tab') || 'Cockpit';
   });
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [studioProductId, setStudioProductId] = useState(null);
@@ -193,7 +193,7 @@ function AppContent() {
       <div className="layout">
         <main className="main">
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Loading...</div>}>
-            {activeTab === 'Overview' && <Overview onNavigateToProduct={handleNavigateToProduct} onNavigateToStudio={handleNavigateToStudio} onNavigateToShopify={() => { setActiveTab('Shopify'); setTimeout(() => document.getElementById('pricing-section')?.scrollIntoView({ behavior: 'smooth' }), 300); }} storeId={storeId} />}
+            {activeTab === 'Cockpit' && <Cockpit storeId={storeId} store={activeStore} onNavigateToProduct={handleNavigateToProduct} onNavigateToStudio={handleNavigateToStudio} />}
             {activeTab === 'Shopify' && <Shopify onNavigateToProduct={handleNavigateToProduct} storeId={storeId} store={activeStore} />}
             {activeTab === 'Studio' && <Studio storeId={storeId} store={activeStore} initialProductId={studioProductId} onNavigateToProduct={handleNavigateToProduct} />}
             {activeTab === 'Avatars' && <Avatars storeId={storeId} store={activeStore} />}
