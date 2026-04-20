@@ -84,8 +84,35 @@
 .studio-gcard {
   background: var(--bg-card); border: 1px solid var(--border-subtle);
   border-radius: 12px; overflow: hidden; cursor: pointer; transition: all 200ms;
+  position: relative;
 }
 .studio-gcard:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: var(--shadow-card-hover); }
+.studio-gcard--selected { border-color: var(--accent-success, #22c55e); box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+.studio-gcard-check {
+  position: absolute; top: 6px; left: 6px; z-index: 2;
+  cursor: pointer;
+}
+.studio-gcard-check input {
+  width: 18px; height: 18px; accent-color: var(--accent-success, #22c55e); cursor: pointer;
+}
+
+/* Bulk approve toolbar */
+.studio-bulk-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; margin-bottom: 12px;
+  background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.2);
+  border-radius: 10px; font-size: 12px; color: var(--text-primary);
+}
+.studio-bulk-btn {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 6px; padding: 5px 12px; font-size: 11px; cursor: pointer;
+  color: var(--text-primary); transition: all .15s;
+}
+.studio-bulk-btn:hover { border-color: var(--border-hover); }
+.studio-bulk-btn--approve {
+  background: var(--accent-success, #22c55e); color: #fff; border-color: transparent;
+}
+.studio-bulk-btn--approve:hover { filter: brightness(1.1); }
 .studio-gcard-img {
   height: 180px; position: relative;
   display: flex; align-items: flex-start; justify-content: flex-end; padding: 6px;

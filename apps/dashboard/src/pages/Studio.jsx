@@ -62,6 +62,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [showGeneratePanel, setShowGeneratePanel] = useState(false);
   const [generateProduct, setGenerateProduct] = useState(null);
   const [editingCreative, setEditingCreative] = useState(null);
+  const [selectedForApproval, setSelectedForApproval] = useState(new Set());
 
   // Panels
   const [showBulk, setShowBulk] = useState(false);
@@ -194,6 +195,20 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const handleSave = async (id, updates) => {
     try { await updateCreative(id, updates); } catch (e) { console.error(e); toast.error(`Save failed: ${e.message}`); }
     setCreatives((prev) => prev.map((c) => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const toggleApprovalSelect = (id) => {
+    setSelectedForApproval((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const handleBulkApprove = async () => {
+    if (selectedForApproval.size === 0) return;
+    toast.info(`Approving ${selectedForApproval.size} creatives...`);
+    try {
+      await Promise.all([...selectedForApproval].map((id) => approveAd(id, 'Team')));
+      setCreatives((prev) => prev.map((c) => selectedForApproval.has(c.id) ? { ...c, status: 'approved' } : c));
+      toast.success(`${selectedForApproval.size} creatives approved!`);
+      setSelectedForApproval(new Set());
+    } catch (e) { toast.error(`Bulk approve failed: ${e.message}`); }
   };
 
   const openGenerate = (product) => {
@@ -406,6 +421,15 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
         </div>
       )}
 
+      {/* Bulk approve toolbar */}
+      {selectedForApproval.size > 0 && (
+        <div className="studio-bulk-bar">
+          <span>{selectedForApproval.size} selected</span>
+          <button className="studio-bulk-btn studio-bulk-btn--approve" onClick={handleBulkApprove}>Approve Selected</button>
+          <button className="studio-bulk-btn" onClick={() => setSelectedForApproval(new Set())}>Clear</button>
+        </div>
+      )}
+
       {/* Creative Gallery */}
       {loading ? (
         <div className="studio-loading">Loading creatives...</div>
@@ -417,10 +441,15 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
       ) : (
         <div className="studio-grid">
           {filtered.map((c) => (
-            <GalleryCard key={c.id} creative={c} onClick={() => setEditingCreative(c)} onGenerate={() => {
-              const prod = products.find((p) => p.id === c.product_id);
-              if (prod) openGenerate(prod);
-            }} />
+            <GalleryCard key={c.id} creative={c}
+              onClick={() => setEditingCreative(c)}
+              selectable={c.status === 'pending'}
+              selected={selectedForApproval.has(c.id)}
+              onToggleSelect={() => toggleApprovalSelect(c.id)}
+              onGenerate={() => {
+                const prod = products.find((p) => p.id === c.product_id);
+                if (prod) openGenerate(prod);
+              }} />
           ))}
         </div>
       )}
@@ -502,7 +531,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   );
 }
 
-function GalleryCard({ creative: c, onClick }) {
+function GalleryCard({ creative: c, onClick, selectable, selected, onToggleSelect }) {
   const isVideo = c.format === 'video';
   const metadata = isVideo && c.metadata ? (typeof c.metadata === 'string' ? JSON.parse(c.metadata) : c.metadata) : {};
   const thumbUrl = isVideo ? metadata.source_image_url || c.file_url : c.file_url;
@@ -510,7 +539,12 @@ function GalleryCard({ creative: c, onClick }) {
   const styleName = STYLE_OPTIONS.find((s) => s.key === (c.style || 'ad_creative'))?.label || c.style;
 
   return (
-    <div className="studio-gcard" onClick={onClick}>
+    <div className={`studio-gcard${selected ? ' studio-gcard--selected' : ''}`} onClick={onClick}>
+      {selectable && (
+        <label className="studio-gcard-check" onClick={(e) => e.stopPropagation()}>
+          <input type="checkbox" checked={selected} onChange={onToggleSelect} />
+        </label>
+      )}
       <div className="studio-gcard-img" style={thumbUrl ? { backgroundImage: `url(${thumbUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
         {isVideo && <span className="studio-play-icon">▶</span>}
         <div className="studio-gcard-badges">
