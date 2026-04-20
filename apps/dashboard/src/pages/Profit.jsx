@@ -13,6 +13,7 @@ const PERIODS = [
 ];
 
 export default function Profit({ storeId, store }) {
+  const currency = store?.currency === 'USD' ? '$' : '€';
   const toast = useToast();
   const [days, setDays] = useState(7);
   const { data, loading, refresh } = useProfit(days, storeId);
@@ -31,12 +32,28 @@ export default function Profit({ storeId, store }) {
     getAllProducts(storeId).then(setProducts).catch(() => {});
   }, []);
 
+  const [expandedVariantCogs, setExpandedVariantCogs] = useState(null);
+  const [variantCogsEdit, setVariantCogsEdit] = useState({});
+
   const handleSaveCogs = async () => {
     if (!editingCogs || !cogsValue) return;
     await updateCogs(editingCogs, parseFloat(cogsValue));
     setEditingCogs(null);
     setCogsValue('');
     toast.success('COGS updated!');
+    refresh();
+  };
+
+  const handleSaveVariantCogs = async (productId) => {
+    const cleaned = {};
+    for (const [k, v] of Object.entries(variantCogsEdit)) {
+      if (v !== '' && !isNaN(parseFloat(v))) cleaned[k] = parseFloat(v);
+    }
+    await updateCogs(productId, undefined, cleaned);
+    setExpandedVariantCogs(null);
+    setVariantCogsEdit({});
+    toast.success('Variant COGS saved!');
+    getAllProducts(storeId).then(setProducts).catch(() => {});
     refresh();
   };
 
@@ -214,22 +231,59 @@ export default function Profit({ storeId, store }) {
               </div>
               {showCogs && (
                 <div className="profit-panel-body">
-                  {products.map((p) => (
-                    <div key={p.id} className="profit-cogs-row">
-                      <span className="profit-cogs-name">{p.title}</span>
-                      {editingCogs === p.id ? (
-                        <div className="profit-cogs-edit">
-                          <input type="number" step="0.01" value={cogsValue} onChange={(e) => setCogsValue(e.target.value)} className="profit-cogs-input" placeholder="0.00" autoFocus />
-                          <button className="profit-cogs-save" onClick={handleSaveCogs}>Save</button>
-                          <button className="profit-cogs-cancel" onClick={() => setEditingCogs(null)}>✕</button>
+                  {products.map((p) => {
+                    const vc = p.variant_cogs && typeof p.variant_cogs === 'object' ? p.variant_cogs : {};
+                    const hasVariants = Object.keys(vc).length > 0;
+                    const isExpanded = expandedVariantCogs === p.id;
+                    return (
+                      <div key={p.id}>
+                        <div className="profit-cogs-row">
+                          <span className="profit-cogs-name">
+                            {p.title}
+                            {hasVariants && <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 6 }}>{Object.keys(vc).length} variants</span>}
+                          </span>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            {editingCogs === p.id ? (
+                              <div className="profit-cogs-edit">
+                                <input type="number" step="0.01" value={cogsValue} onChange={(e) => setCogsValue(e.target.value)} className="profit-cogs-input" placeholder="Default" autoFocus />
+                                <button className="profit-cogs-save" onClick={handleSaveCogs}>Save</button>
+                                <button className="profit-cogs-cancel" onClick={() => setEditingCogs(null)}>✕</button>
+                              </div>
+                            ) : (
+                              <button className="profit-cogs-btn" onClick={() => { setEditingCogs(p.id); setCogsValue(p.cogs || ''); }}>
+                                {p.cogs ? `${currency}${p.cogs}` : 'Set'}
+                              </button>
+                            )}
+                            <button className="profit-cogs-btn" style={{ fontSize: 9 }} onClick={() => {
+                              if (isExpanded) { setExpandedVariantCogs(null); } else {
+                                setExpandedVariantCogs(p.id);
+                                setVariantCogsEdit({ ...vc });
+                              }
+                            }}>{isExpanded ? '▾ Variants' : '▸ Variants'}</button>
+                          </div>
                         </div>
-                      ) : (
-                        <button className="profit-cogs-btn" onClick={() => { setEditingCogs(p.id); setCogsValue(p.cogs || ''); }}>
-                          {p.cogs ? `$${p.cogs}` : 'Set'}
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        {isExpanded && (
+                          <div style={{ paddingLeft: 24, paddingBottom: 8 }}>
+                            {Object.entries(variantCogsEdit).map(([variant, cost]) => (
+                              <div key={variant} className="profit-cogs-row" style={{ borderBottom: 'none', padding: '3px 0' }}>
+                                <span className="profit-cogs-name" style={{ fontSize: 11 }}>{variant}</span>
+                                <input type="number" step="0.01" value={cost} onChange={(e) => setVariantCogsEdit((prev) => ({ ...prev, [variant]: e.target.value }))}
+                                  className="profit-cogs-input" style={{ width: 70 }} placeholder={p.cogs || '0'} />
+                              </div>
+                            ))}
+                            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                              <input className="profit-cogs-input" style={{ width: 90 }} placeholder="New variant..." id={`new-var-${p.id}`} />
+                              <button className="profit-cogs-btn" style={{ fontSize: 9 }} onClick={() => {
+                                const inp = document.getElementById(`new-var-${p.id}`);
+                                if (inp?.value.trim()) { setVariantCogsEdit((prev) => ({ ...prev, [inp.value.trim()]: '' })); inp.value = ''; }
+                              }}>+ Add</button>
+                              <button className="profit-cogs-save" onClick={() => handleSaveVariantCogs(p.id)}>Save Variants</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
