@@ -408,11 +408,11 @@ async function handler(req, res) {
     };
     const matchingProposalType = STYLE_TO_PROPOSAL_TYPE[style];
     if (matchingProposalType && product_id) {
-      supabase.from('proposals')
+      const { error: resolveErr, count: resolveCount } = await supabase.from('proposals')
         .update({ status: 'executed' })
-        .eq('product_id', product_id).eq('type', matchingProposalType).eq('status', 'pending')
-        .then(() => console.log(`[generate] Auto-resolved ${matchingProposalType} proposal for ${product.title}`))
-        .catch(() => {});
+        .eq('product_id', product_id).eq('type', matchingProposalType).eq('status', 'pending');
+      if (resolveErr) console.error(`[generate] Failed to resolve ${matchingProposalType} proposal:`, resolveErr.message);
+      else console.log(`[generate] Auto-resolved ${matchingProposalType} proposal for ${product.title} (matched: ${resolveCount ?? '?'})`);
     }
 
     await supabase.from('pipeline_log').insert({
