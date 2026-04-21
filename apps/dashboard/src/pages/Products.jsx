@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { getProducts, syncProducts, refreshSizeCharts } from '../lib/api';
+import { getProducts, getAllProducts, syncProducts, refreshSizeCharts } from '../lib/api';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import './Products.css';
@@ -76,6 +76,15 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
 
   useEffect(() => { setAllProducts([]); setCurrentPage(1); setLoading(true); fetchProducts(1); }, [fetchProducts]);
 
+  // When searching, load all products so we search the full catalog (not just page 1)
+  useEffect(() => {
+    if (search && search.length >= 2 && hasMore) {
+      getAllProducts(storeId).then((products) => {
+        if (products?.length) { setAllProducts(products); setHasMore(false); setTotalProducts(products.length); }
+      }).catch(() => {});
+    }
+  }, [search, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleLoadMore = () => {
     setLoadingMore(true);
     fetchProducts(currentPage + 1, true);
@@ -96,8 +105,14 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     let list = allProducts;
 
     if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((p) => p.title.toLowerCase().includes(q) || p.handle?.includes(q));
+      const q = search.toLowerCase().trim();
+      // Split search into words for flexible matching — "Flowy Tankini" matches "Tie Knot Flowy Tankini Set"
+      const words = q.split(/\s+/).filter(Boolean);
+      list = list.filter((p) => {
+        const title = p.title.toLowerCase();
+        const handle = (p.handle || '').toLowerCase();
+        return words.every((w) => title.includes(w) || handle.includes(w));
+      });
     }
 
     if (collectionFilter !== 'all') {
