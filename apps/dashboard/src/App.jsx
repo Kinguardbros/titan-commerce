@@ -3,6 +3,7 @@ import { StoreProvider, useActiveStore } from './hooks/useActiveStore.jsx';
 import { ToastProvider, useToast } from './hooks/useToast.jsx';
 import Login from './pages/Login';
 import Tooltip from './components/Tooltip';
+import NotificationBell from './components/NotificationBell';
 import './App.css';
 
 const Cockpit = lazy(() => import('./pages/Cockpit'));
@@ -182,6 +183,7 @@ function AppContent() {
         {mobileMenuOpen && <div className="nav-backdrop" onClick={() => setMobileMenuOpen(false)} />}
         <div className="hdr-right">
           <Tooltip text="System is connected and monitoring"><div className="live-pill"><span className="live-dot" /><span className="live-text">Pipeline Live</span></div></Tooltip>
+          <NotificationBell storeId={storeId} />
           <div className="clock">{clock}</div>
           <button className="logout-btn" onClick={handleLogout} aria-label="Sign out">
             <span className="logout-text">Sign out</span>
