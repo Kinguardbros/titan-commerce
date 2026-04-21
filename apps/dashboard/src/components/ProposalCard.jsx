@@ -45,7 +45,11 @@ export default function ProposalCard({ proposal, onApprove, onDismiss, onNavigat
         )}
       </div>
       <div className="pc-actions">
-        <button className="pc-btn pc-btn--approve" aria-label={`Approve: ${proposal.title}`} onClick={() => onApprove(proposal.id)}>Approve</button>
+        {proposal.type === 'generate_beach_photo' ? (
+          <button className="pc-btn pc-btn--approve" aria-label={`View product: ${proposal.title}`} onClick={() => onNavigate?.(proposal.product_id)}>View Product →</button>
+        ) : (
+          <button className="pc-btn pc-btn--approve" aria-label={`Approve: ${proposal.title}`} onClick={() => onApprove(proposal.id)}>Approve</button>
+        )}
         <button className="pc-btn pc-btn--dismiss" aria-label={`Dismiss: ${proposal.title}`} onClick={() => onDismiss(proposal.id)}>Dismiss</button>
       </div>
     </div>
