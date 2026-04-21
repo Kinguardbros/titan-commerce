@@ -104,7 +104,14 @@ function AppContent() {
       const { getAllProducts } = await import('./lib/api');
       const products = await getAllProducts(storeId);
       const p = products?.find((x) => x.id === productId);
-      if (p) { setActiveTab('Products'); setSelectedProduct(p); }
+      if (p) {
+        setActiveTab('Products');
+        setSelectedProduct(p);
+        const url = new URL(window.location);
+        url.searchParams.set('tab', 'Products');
+        url.searchParams.set('product', p.id);
+        window.history.replaceState({}, '', url);
+      }
     } catch { setActiveTab('Products'); }
   }, [storeId]);
 
