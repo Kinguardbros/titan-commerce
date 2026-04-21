@@ -9,12 +9,14 @@ const SEVERITY_COLORS = {
 
 const TYPE_ICONS = {
   generate_creatives: '🎨',
+  generate_beach_photo: '🏖',
   optimize_listing: '✨',
   try_different_style: '🔄',
   generate_variations: '📈',
   pause_ad: '⏸',
   scale_ad: '🚀',
   restock_alert: '📦',
+  process_inbox: '📥',
 };
 
 export default function ProposalCard({ proposal, onApprove, onDismiss, onNavigate }) {

@@ -192,7 +192,7 @@ export default function Cockpit({ storeId, store, onNavigateToProduct, onNavigat
             <div key={severity} className="ck-proposal-group">
               <div className="ck-proposal-sev">{SEVERITY_LABELS[severity] || severity}</div>
               {items.map((p) => (
-                <ProposalCard key={p.id} proposal={p} onApprove={handleApprove} onDismiss={handleDismiss} onNavigate={onNavigateToStudio} />
+                <ProposalCard key={p.id} proposal={p} onApprove={handleApprove} onDismiss={handleDismiss} onNavigate={onNavigateToProduct} />
               ))}
             </div>
           ))
