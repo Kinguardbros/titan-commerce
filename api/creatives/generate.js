@@ -401,6 +401,20 @@ async function handler(req, res) {
       })();
     }
 
+    // Auto-resolve matching proposals when a creative is generated
+    // e.g. beach photo proposal gets resolved when a beach photo is generated for the same product
+    const STYLE_TO_PROPOSAL_TYPE = {
+      'product_photo_beach': 'generate_beach_photo',
+    };
+    const matchingProposalType = STYLE_TO_PROPOSAL_TYPE[style];
+    if (matchingProposalType && product_id) {
+      supabase.from('proposals')
+        .update({ status: 'executed' })
+        .eq('product_id', product_id).eq('type', matchingProposalType).eq('status', 'pending')
+        .then(() => console.log(`[generate] Auto-resolved ${matchingProposalType} proposal for ${product.title}`))
+        .catch(() => {});
+    }
+
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info', store_id: effectiveStoreId,
       message: isPending ? `Queued ${style} generation for ${product.title}` : `Generated ${style} creative for ${product.title}`,
