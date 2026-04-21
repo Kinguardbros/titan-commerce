@@ -418,6 +418,7 @@ async function handler(req, res) {
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info', store_id: effectiveStoreId,
       message: isPending ? `Queued ${style} generation for ${product.title}` : `Generated ${style} creative for ${product.title}`,
+      metadata: { product_id, creative_id: creative.id, style },
     });
 
     return res.status(200).json({

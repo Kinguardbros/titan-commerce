@@ -190,7 +190,7 @@ function AppContent() {
         {mobileMenuOpen && <div className="nav-backdrop" onClick={() => setMobileMenuOpen(false)} />}
         <div className="hdr-right">
           <Tooltip text="System is connected and monitoring"><div className="live-pill"><span className="live-dot" /><span className="live-text">Pipeline Live</span></div></Tooltip>
-          <NotificationBell storeId={storeId} />
+          <NotificationBell storeId={storeId} onNavigateToProduct={handleNavigateToProduct} />
           <div className="clock">{clock}</div>
           <button className="logout-btn" onClick={handleLogout} aria-label="Sign out">
             <span className="logout-text">Sign out</span>

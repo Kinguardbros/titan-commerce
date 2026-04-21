@@ -46,7 +46,14 @@
   transition: background .15s;
 }
 .nb-item:hover { background: rgba(255,255,255,.02); }
+.nb-item--clickable { cursor: pointer; }
+.nb-item--clickable:hover { background: rgba(212,168,83,.06); }
 .nb-item--unread { background: rgba(212,168,83,.04); }
+.nb-item-arrow {
+  flex-shrink: 0; color: var(--gold, #d4a853); font-size: 12px;
+  opacity: 0; transition: opacity .15s;
+}
+.nb-item--clickable:hover .nb-item-arrow { opacity: 1; }
 .nb-item-icon {
   flex-shrink: 0; width: 16px; font-size: 11px; margin-top: 2px;
   font-weight: 700;

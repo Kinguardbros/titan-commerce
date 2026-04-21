@@ -21,7 +21,7 @@ function timeAgo(iso) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-export default function NotificationBell({ storeId }) {
+export default function NotificationBell({ storeId, onNavigateToProduct }) {
   const [open, setOpen] = useState(false);
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -96,14 +96,19 @@ export default function NotificationBell({ storeId }) {
               filtered.map((log) => {
                 const level = log.level || 'info';
                 const isUnread = lastSeen ? log.created_at > lastSeen : true;
+                const meta = log.metadata ? (typeof log.metadata === 'string' ? (() => { try { return JSON.parse(log.metadata); } catch { return {}; } })() : log.metadata) : {};
+                const clickable = !!(meta.product_id && onNavigateToProduct);
                 return (
-                  <div key={log.id} className={`nb-item${isUnread ? ' nb-item--unread' : ''}`}>
+                  <div key={log.id}
+                    className={`nb-item${isUnread ? ' nb-item--unread' : ''}${clickable ? ' nb-item--clickable' : ''}`}
+                    onClick={clickable ? () => { onNavigateToProduct(meta.product_id); setOpen(false); } : undefined}>
                     <span className="nb-item-icon" style={{ color: LEVEL_COLORS[level] }}>{LEVEL_ICONS[level] || '●'}</span>
                     <div className="nb-item-body">
                       <div className="nb-item-agent">{AGENT_LABELS[log.agent] || log.agent}</div>
                       <div className="nb-item-msg">{log.message}</div>
                     </div>
                     <span className="nb-item-time">{timeAgo(log.created_at)}</span>
+                    {clickable && <span className="nb-item-arrow">→</span>}
                   </div>
                 );
               })
