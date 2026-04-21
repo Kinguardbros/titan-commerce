@@ -171,7 +171,7 @@ async function handler(req, res) {
       }
     }
 
-    const prompt = await buildStyledPrompt({
+    let prompt = await buildStyledPrompt({
       product_name: product.title,
       price: product.price ? `$${product.price}` : '',
       style, custom_prompt, showModel: show_model, feedback,
