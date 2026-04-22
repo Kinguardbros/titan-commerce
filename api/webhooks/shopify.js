@@ -78,9 +78,15 @@ export default async function handler(req, res) {
 
   try {
     const result = await fn(store, payload);
+    const isCreate = result.action === 'created';
+    const friendlyMessage = isCreate
+      ? `New product imported: "${result.title || 'Unknown'}"`
+      : result.action === 'updated'
+      ? `Product updated: "${result.title || 'Unknown'}"`
+      : `Product ${result.action} (shopify_id=${result.shopify_id})`;
     await supabase.from('pipeline_log').insert({
-      store_id: store.id, agent: 'SCRAPER', level: 'info',
-      message: `Webhook ${topic} → ${result.action} (shopify_id=${result.shopify_id})`,
+      store_id: store.id, agent: 'SCRAPER', level: isCreate ? 'success' : 'info',
+      message: friendlyMessage,
       metadata: { topic, webhook_id: wId, ...result },
     });
     return res.status(200).json({ ok: true });
