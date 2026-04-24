@@ -74,14 +74,12 @@ export default function ImageManager({ images, editing, onChange }) {
               onDrop={editing ? handleDrop(i) : undefined}
               onDragEnd={editing ? handleDragEnd : undefined}
             >
-              <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false}
-                onClick={() => openLightbox(i)} style={{ cursor: 'zoom-in' }} />
+              <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false} />
               {i === 0 && <span className="imgm-badge">Cover</span>}
-              {editing && (
-                <div className="imgm-actions">
-                  <button className="imgm-action imgm-action--delete" onClick={() => handleDelete(i)} title="Remove">x</button>
-                </div>
-              )}
+              <div className="imgm-actions">
+                <button className="imgm-action" onClick={(e) => { e.stopPropagation(); openLightbox(i); }} title="Zoom">⛶</button>
+                {editing && <button className="imgm-action imgm-action--delete" onClick={(e) => { e.stopPropagation(); handleDelete(i); }} title="Remove">x</button>}
+              </div>
             </div>
           );
         })}
