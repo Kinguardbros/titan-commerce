@@ -136,6 +136,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       list = list.filter((p) => p.creative_count > 0);
     } else if (creativesFilter === 'none') {
       list = list.filter((p) => !p.creative_count);
+    } else if (creativesFilter === 'published') {
+      list = list.filter((p) => p.published_count > 0);
+    } else if (creativesFilter === 'not_published') {
+      list = list.filter((p) => !p.published_count);
     }
 
     list = [...list].sort((a, b) => {
@@ -254,6 +258,8 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
               { key: 'all', label: 'All' },
               { key: 'has', label: 'Has creatives' },
               { key: 'none', label: 'No creatives' },
+              { key: 'published', label: 'On Shopify' },
+              { key: 'not_published', label: 'Not on Shopify' },
             ].map((o) => (
               <button
                 key={o.key}
@@ -297,6 +303,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                     {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : <span className="product-card-no-img">No image</span>}
                     {isNew(p) && <span className="product-card-badge product-card-badge--new">New</span>}
                     {p.creative_count > 0 && <span className="product-card-badge">{p.creative_count} creatives</span>}
+                    {p.published_count > 0 && <span className="product-card-badge product-card-badge--published">On Shopify</span>}
                   </div>
                   <div className="product-card-body">
                     <div className="product-card-title">{p.title}</div>

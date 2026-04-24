@@ -54,10 +54,10 @@ async function handler(req, res) {
 
     if (error) throw error;
 
-    // Get creative counts per product in one query
+    // Get creative counts + published counts per product in one query
     let countsQuery = supabase
       .from('creatives')
-      .select('product_id')
+      .select('product_id, status')
       .not('product_id', 'is', null);
 
     if (storeId) {
@@ -67,15 +67,18 @@ async function handler(req, res) {
     const { data: counts } = await countsQuery;
 
     const countMap = {};
+    const publishedMap = {};
     if (counts) {
       for (const c of counts) {
         countMap[c.product_id] = (countMap[c.product_id] || 0) + 1;
+        if (c.status === 'published') publishedMap[c.product_id] = (publishedMap[c.product_id] || 0) + 1;
       }
     }
 
     const enriched = products.map((p) => ({
       ...p,
       creative_count: countMap[p.id] || 0,
+      published_count: publishedMap[p.id] || 0,
     }));
 
     return res.status(200).json({

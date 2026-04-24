@@ -92,6 +92,11 @@
   background: var(--emerald-glow); border: 1px solid rgba(78,173,122,.15);
   padding: 2px 7px; border-radius: 10px; letter-spacing: .3px;
 }
+.product-card-badge--published {
+  top: auto; bottom: 6px; right: 6px;
+  color: var(--accent-success, #22c55e); background: rgba(34,197,94,.1);
+  border-color: rgba(34,197,94,.2);
+}
 .product-card-badge--new {
   top: 6px; left: 6px; right: auto;
   color: var(--violet); background: var(--violet-glow);
