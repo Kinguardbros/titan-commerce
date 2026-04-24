@@ -46,11 +46,18 @@ export default function Avatars({ storeId, store }) {
     }).finally(() => setLoading(false));
   }, [storeId]);
 
-  // Merge personas with existing avatars
-  const mergedPersonas = personas.map(p => {
-    const avatar = avatars.find(a => a.persona_name === p.name);
-    return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '' };
-  });
+  // Merge personas with existing avatars + include custom avatars not in audience-personas skill
+  const personaNames = new Set(personas.map(p => p.name));
+  const mergedPersonas = [
+    ...personas.map(p => {
+      const avatar = avatars.find(a => a.persona_name === p.name);
+      return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '' };
+    }),
+    ...avatars.filter(a => !personaNames.has(a.persona_name)).map(a => ({
+      name: a.persona_name, age: '', label: 'Custom avatar',
+      reference_url: a.reference_url, variants: a.variants || [], description: a.description || '',
+    })),
+  ];
 
   const refresh = useCallback(() => {
     Promise.all([
