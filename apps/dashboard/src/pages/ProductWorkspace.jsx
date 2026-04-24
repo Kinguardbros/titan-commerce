@@ -37,6 +37,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   const [showOptimize, setShowOptimize] = useState(false);
   const [showPhotoStory, setShowPhotoStory] = useState(false);
   const [detailKey, setDetailKey] = useState(0);
+  const [lightbox, setLightbox] = useState(null); // { images: string[], index: number }
 
   const fetchCreatives = useCallback(async () => {
     try {
@@ -165,7 +166,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
                 <div className="pw-section-title">Shopify Images<span className="pw-section-count">{shopifyImages.length}</span></div>
                 <div className="pw-grid">
                   {shopifyImages.map((src, i) => (
-                    <div key={`shopify-${i}`} className="pw-card" onClick={() => window.open(src, '_blank')}>
+                    <div key={`shopify-${i}`} className="pw-card" onClick={() => setLightbox({ images: shopifyImages, index: i })} style={{ cursor: 'zoom-in' }}>
                       <div className="pw-card-img" style={{ backgroundImage: `url(${src})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
                         <span className="pill" style={{ position: 'absolute', top: 6, left: 6, fontSize: 9, padding: '2px 7px', background: 'rgba(0,0,0,.6)', color: '#fff' }}>Shopify</span>
                       </div>
@@ -269,6 +270,27 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           onCompleted={() => { setShowPhotoStory(false); fetchCreatives(); }}
         />
       )}
+
+      {/* Lightbox for Shopify images */}
+      {lightbox && (() => {
+        const { images: lbImages, index: lbIdx } = lightbox;
+        const src = lbImages[lbIdx];
+        const prev = () => setLightbox((lb) => lb ? { ...lb, index: lb.index > 0 ? lb.index - 1 : lb.images.length - 1 } : null);
+        const next = () => setLightbox((lb) => lb ? { ...lb, index: lb.index < lb.images.length - 1 ? lb.index + 1 : 0 } : null);
+        return (
+          <div className="pw-lightbox" onClick={() => setLightbox(null)} onKeyDown={(e) => { if (e.key === 'Escape') setLightbox(null); if (e.key === 'ArrowLeft') prev(); if (e.key === 'ArrowRight') next(); }} tabIndex={0} ref={(el) => el?.focus()}>
+            <img src={src} alt="" className="pw-lightbox-img" onClick={(e) => e.stopPropagation()} />
+            {lbImages.length > 1 && (
+              <>
+                <button className="pw-lightbox-nav pw-lightbox-nav--prev" onClick={(e) => { e.stopPropagation(); prev(); }}>&#8249;</button>
+                <button className="pw-lightbox-nav pw-lightbox-nav--next" onClick={(e) => { e.stopPropagation(); next(); }}>&#8250;</button>
+              </>
+            )}
+            <button className="pw-lightbox-close" onClick={() => setLightbox(null)}>&times;</button>
+            <div className="pw-lightbox-counter">{lbIdx + 1} / {lbImages.length}</div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
