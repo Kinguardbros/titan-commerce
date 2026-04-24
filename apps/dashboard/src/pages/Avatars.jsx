@@ -54,7 +54,7 @@ export default function Avatars({ storeId, store }) {
       return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '' };
     }),
     ...avatars.filter(a => !personaNames.has(a.persona_name)).map(a => ({
-      name: a.persona_name, age: '', label: 'Custom avatar',
+      name: a.persona_name, age: '', label: a.description || a.persona_name,
       reference_url: a.reference_url, variants: a.variants || [], description: a.description || '',
     })),
   ];
