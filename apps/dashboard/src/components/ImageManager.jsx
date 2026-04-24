@@ -10,7 +10,7 @@ export default function ImageManager({ images, editing, onChange }) {
   const [lightbox, setLightbox] = useState(null);
 
   const allImages = images || [];
-  const openLightbox = useCallback((idx) => { if (!editing) setLightbox(idx); }, [editing]);
+  const openLightbox = useCallback((idx) => { setLightbox(idx); }, []);
   const closeLightbox = useCallback(() => setLightbox(null), []);
   const prevImage = useCallback(() => setLightbox((i) => i > 0 ? i - 1 : allImages.length - 1), [allImages.length]);
   const nextImage = useCallback(() => setLightbox((i) => i < allImages.length - 1 ? i + 1 : 0), [allImages.length]);
@@ -75,7 +75,7 @@ export default function ImageManager({ images, editing, onChange }) {
               onDragEnd={editing ? handleDragEnd : undefined}
             >
               <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false}
-                onClick={() => openLightbox(i)} style={!editing ? { cursor: 'zoom-in' } : undefined} />
+                onClick={() => openLightbox(i)} style={{ cursor: 'zoom-in' }} />
               {i === 0 && <span className="imgm-badge">Cover</span>}
               {editing && (
                 <div className="imgm-actions">
