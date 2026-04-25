@@ -54,10 +54,10 @@ async function handler(req, res) {
 
     if (error) throw error;
 
-    // Get creative counts + published counts per product in one query
+    // Get creative counts + published counts + audiences per product in one query
     let countsQuery = supabase
       .from('creatives')
-      .select('product_id, status')
+      .select('product_id, status, metadata')
       .not('product_id', 'is', null);
 
     if (storeId) {
@@ -68,10 +68,16 @@ async function handler(req, res) {
 
     const countMap = {};
     const publishedMap = {};
+    const audienceMap = {};
     if (counts) {
       for (const c of counts) {
         countMap[c.product_id] = (countMap[c.product_id] || 0) + 1;
         if (c.status === 'published') publishedMap[c.product_id] = (publishedMap[c.product_id] || 0) + 1;
+        const meta = c.metadata ? (typeof c.metadata === 'string' ? (() => { try { return JSON.parse(c.metadata); } catch { return {}; } })() : c.metadata) : {};
+        if (meta.audience) {
+          if (!audienceMap[c.product_id]) audienceMap[c.product_id] = new Set();
+          audienceMap[c.product_id].add(meta.audience);
+        }
       }
     }
 
@@ -79,6 +85,7 @@ async function handler(req, res) {
       ...p,
       creative_count: countMap[p.id] || 0,
       published_count: publishedMap[p.id] || 0,
+      audiences: audienceMap[p.id] ? [...audienceMap[p.id]] : [],
     }));
 
     return res.status(200).json({

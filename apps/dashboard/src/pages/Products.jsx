@@ -51,6 +51,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [priceFilter, setPriceFilter] = useState('all');
   const [creativesFilter, setCreativesFilter] = useState('all');
+  const [audienceFilter, setAudienceFilter] = useState('all');
   const [sortBy, setSortBy] = useState('name_asc');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('products_view') || 'list');
   const [totalProducts, setTotalProducts] = useState(0);
@@ -100,6 +101,13 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     return ['all', ...Array.from(set).sort()];
   }, [allProducts]);
 
+  // Extract unique audiences from product creative metadata
+  const audiences = useMemo(() => {
+    const set = new Set();
+    allProducts.forEach((p) => { (p.audiences || []).forEach((a) => set.add(a)); });
+    return ['all', ...Array.from(set).sort()];
+  }, [allProducts]);
+
   // Apply filters + sort
   const filtered = useMemo(() => {
     let list = allProducts;
@@ -142,6 +150,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       list = list.filter((p) => !p.published_count);
     }
 
+    if (audienceFilter !== 'all') {
+      list = list.filter((p) => (p.audiences || []).includes(audienceFilter));
+    }
+
     list = [...list].sort((a, b) => {
       switch (sortBy) {
         case 'name_asc': return a.title.localeCompare(b.title);
@@ -154,7 +166,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     });
 
     return list;
-  }, [allProducts, search, collectionFilter, priceFilter, creativesFilter, sortBy]);
+  }, [allProducts, search, collectionFilter, priceFilter, creativesFilter, audienceFilter, sortBy]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -272,6 +284,20 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           </div>
         </div>
 
+        {audiences.length > 1 && (
+          <div className="pf-group">
+            <div className="pf-label">Audience</div>
+            <div className="pf-chips">
+              {audiences.map((a) => (
+                <button key={a} className={`pf-chip${audienceFilter === a ? ' pf-chip--active' : ''}`}
+                  onClick={() => setAudienceFilter(a)}>
+                  {a === 'all' ? 'All' : a}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="pf-group">
           <div className="pf-label">Sort</div>
           <select className="pf-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
@@ -287,9 +313,9 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       ) : filtered.length === 0 ? (
         <div className="products-empty">
           <div className="products-empty-icon">📦</div>
-          <div className="products-empty-title">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' ? 'No products match filters' : 'No products yet'}</div>
-          <div className="products-empty-desc">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' ? 'Try adjusting your filters or search query.' : 'Sync your Shopify products to get started.'}</div>
-          {!(search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all') && (
+          <div className="products-empty-title">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all' ? 'No products match filters' : 'No products yet'}</div>
+          <div className="products-empty-desc">{search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all' ? 'Try adjusting your filters or search query.' : 'Sync your Shopify products to get started.'}</div>
+          {!(search || collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all') && (
             <button className="products-empty-cta" onClick={handleSync} disabled={syncing}>{syncing ? 'Syncing...' : 'Sync Shopify →'}</button>
           )}
         </div>
