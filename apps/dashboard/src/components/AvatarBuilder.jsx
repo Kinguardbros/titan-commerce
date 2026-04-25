@@ -4,6 +4,10 @@ import { useToast } from '../hooks/useToast.jsx';
 import './AvatarBuilder.css';
 
 const BODY_TYPES = ['Slim', 'Athletic', 'Average', 'Curvy', 'Plus-size'];
+const ATTRACTIVENESS = ['Plain', 'Natural', 'Pretty', 'Beautiful'];
+const FACE_SHAPES = ['Round', 'Oval', 'Heart', 'Square'];
+const NOSE_SIZES = ['Small', 'Medium', 'Large'];
+const LIP_FULLNESS = ['Thin', 'Medium', 'Full'];
 const EXPRESSIONS = ['Confident', 'Relaxed', 'Smiling', 'Serious'];
 const HAIR_COLORS = ['Blonde', 'Brunette', 'Black', 'Auburn', 'Red', 'Gray', 'White'];
 const HAIR_LENGTHS = ['Short', 'Medium', 'Long', 'Very long'];
@@ -35,7 +39,17 @@ function buildAvatarPrompt(p) {
   const weightStr = p.weight ? `She weighs approximately ${p.weight} kg — her body proportions MUST clearly reflect this weight.` : '';
   const heightStr = p.height ? `She is approximately ${p.height} cm tall.` : '';
 
-  return `Full body reference photograph of a ${p.age}-year-old woman standing in front of a plain wall at home. Natural amateur photo, not a professional shoot. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${heightStr} ${weightStr} FULL BODY shot — head to bare feet fully visible, feet at the bottom of the frame. Do NOT crop at the knees or waist. She is a regular ${p.age}-year-old woman, neither a model nor particularly photogenic. CLOTHING: She is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — NOT black, NOT white. Bare feet, no shoes. Arms relaxed at sides. ${p.expression} expression. Neutral indoor lighting, plain beige wall background. ${ageDetails} No makeup or minimal natural makeup, no styled hair. Imperfect real skin texture with pores, uneven tone. ${impStr} ${p.extraNotes || ''} Snapshot quality, plain and unremarkable. Do NOT make her look like a model, influencer, or professional photo. FINAL CHECK: age ${p.age}, underwear is BEIGE/NUDE not black.`.replace(/\s{2,}/g, ' ').trim();
+  // Face detail descriptors
+  const attractivenessDesc = {
+    'Plain': 'Plain, below-average looking face — very ordinary, unremarkable features, asymmetric, wide nose, thin lips. NOT attractive.',
+    'Natural': 'Average everyday face — neither ugly nor pretty, normal proportions, the kind of face you see on the street and forget.',
+    'Pretty': 'Attractive but approachable face — girl-next-door pretty, pleasant features, warm and likeable but NOT model-perfect.',
+    'Beautiful': 'Classically beautiful face — striking symmetrical features, high cheekbones, clear skin, attractive but still realistic and natural.',
+  }[p.attractiveness] || '';
+
+  const faceDesc = `FACE: ${attractivenessDesc} ${p.faceShape} face shape, ${p.noseSize.toLowerCase()} nose, ${p.lipFullness.toLowerCase()} lips.`;
+
+  return `Full body reference photograph of a ${p.age}-year-old woman standing in front of a plain wall at home. Natural amateur photo, not a professional shoot. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${heightStr} ${weightStr} ${faceDesc} FULL BODY shot — head to bare feet fully visible, feet at the bottom of the frame. Do NOT crop at the knees or waist. She is a regular ${p.age}-year-old woman. CLOTHING: She is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — NOT black, NOT white. Bare feet, no shoes. Arms relaxed at sides. ${p.expression} expression. Neutral indoor lighting, plain beige wall background. ${ageDetails} No makeup or minimal natural makeup, no styled hair. Imperfect real skin texture with pores, uneven tone. ${impStr} ${p.extraNotes || ''} Snapshot quality, plain and unremarkable. Do NOT make her look like a model, influencer, or professional photo. FINAL CHECK: age ${p.age}, underwear is BEIGE/NUDE not black.`.replace(/\s{2,}/g, ' ').trim();
 }
 
 export default function AvatarBuilder({ storeId, onClose, onCreated }) {
@@ -45,6 +59,10 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
   const [bodyType, setBodyType] = useState('Average');
+  const [attractiveness, setAttractiveness] = useState('Natural');
+  const [faceShape, setFaceShape] = useState('Oval');
+  const [noseSize, setNoseSize] = useState('Medium');
+  const [lipFullness, setLipFullness] = useState('Medium');
   const [skinTone, setSkinTone] = useState(SKIN_TONES[2].label);
   const [hairColor, setHairColor] = useState('Brunette');
   const [hairLength, setHairLength] = useState('Long');
@@ -67,7 +85,7 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
     setVariants([]);
     setSelectedVariant(null);
     try {
-      const prompt = buildAvatarPrompt({ age, weight, height, bodyType, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
+      const prompt = buildAvatarPrompt({ age, weight, height, bodyType, attractiveness, faceShape, noseSize, lipFullness, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
       const result = await generateAvatar(storeId, name.trim(), prompt);
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
       setVariants(urls);
@@ -146,6 +164,30 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
                   <button key={st.label} className={`ab-swatch${skinTone === st.label ? ' ab-swatch--active' : ''}`}
                     style={{ background: st.hex }} title={st.label} onClick={() => setSkinTone(st.label)} />
                 ))}
+              </div>
+            </div>
+
+            <div className="ab-field">
+              <label className="ab-label">Attractiveness</label>
+              <div className="ab-pills">
+                {ATTRACTIVENESS.map(a => (
+                  <button key={a} className={`ab-pill${attractiveness === a ? ' ab-pill--active' : ''}`} onClick={() => setAttractiveness(a)}>{a}</button>
+                ))}
+              </div>
+            </div>
+
+            <div className="ab-field">
+              <label className="ab-label">Face</label>
+              <div className="ab-hair-row">
+                <select className="ab-select" value={faceShape} onChange={e => setFaceShape(e.target.value)}>
+                  {FACE_SHAPES.map(f => <option key={f}>{f}</option>)}
+                </select>
+                <select className="ab-select" value={noseSize} onChange={e => setNoseSize(e.target.value)}>
+                  {NOSE_SIZES.map(n => <option key={n}>{n} nose</option>)}
+                </select>
+                <select className="ab-select" value={lipFullness} onChange={e => setLipFullness(e.target.value)}>
+                  {LIP_FULLNESS.map(l => <option key={l}>{l} lips</option>)}
+                </select>
               </div>
             </div>
 
