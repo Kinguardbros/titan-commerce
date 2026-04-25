@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { generateCreatives, convertToVideo, getSkills, getProductDetail, getCustomStyles, createCustomStyle } from "../lib/api";
+import { generateCreatives, convertToVideo, getSkills, getProductDetail, getCustomStyles, createCustomStyle, getAvatars } from "../lib/api";
 import { useToast } from "../hooks/useToast.jsx";
 import StyleBuilder from "./StyleBuilder";
 
@@ -365,10 +365,13 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
       if (colorSet.size > 0) setColors(["All colors", ...colorSet]);
       setColorToImage(mapping);
     }).catch(() => {});
-    getSkills(sid).then((data) => {
-      const as = (data.skills || []).find((s) => s.skill_type === "audience-personas");
+    Promise.all([
+      getSkills(sid),
+      getAvatars(sid),
+    ]).then(([skillsData, avatarData]) => {
+      const parsed = [];
+      const as = (skillsData.skills || []).find((s) => s.skill_type === "audience-personas");
       if (as?.content) {
-        const parsed = [];
         // Format 1: "Name (Age) — Label"
         const rx1 = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
         let m; while ((m = rx1.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, "") });
@@ -377,8 +380,15 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           const rx2 = /###\s*Persona\s*\d+:\s*(\w+)\s*"([^"]+)"\s*\n[^]*?(?:\*\*Age\*\*|Age):\s*(\d+)/g;
           while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
         }
-        if (parsed.length) setPersonas(parsed);
       }
+      // Add custom avatars not in audience-personas skill
+      const skillNames = new Set(parsed.map((p) => p.name));
+      for (const av of avatarData || []) {
+        if (!skillNames.has(av.persona_name) && av.reference_url) {
+          parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom avatar' });
+        }
+      }
+      if (parsed.length) setPersonas(parsed);
     }).catch(() => {});
   }, [storeId, product?.id]);
   const [tab, setTab] = useState("image");
