@@ -431,9 +431,26 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
               <div className="studio-field-label" style={{ margin: 0 }}>Products ({bulkSelected.size}/{products.length})</div>
-              <button className="studio-pill studio-pill--sm" onClick={toggleBulkAll} style={{ cursor: 'pointer' }}>
-                {bulkSelected.size === products.length ? 'Deselect all' : 'Select all'}
-              </button>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button className="studio-pill studio-pill--sm" onClick={toggleBulkAll} style={{ cursor: 'pointer' }}>
+                  {bulkSelected.size === products.length ? 'Deselect all' : 'Select all'}
+                </button>
+                {personas.map((p) => {
+                  const pidsWithAudience = new Set(
+                    creatives.filter((c) => {
+                      const meta = c.metadata ? (typeof c.metadata === 'string' ? (() => { try { return JSON.parse(c.metadata); } catch { return {}; } })() : c.metadata) : {};
+                      return meta.audience === p.name && ['pending', 'approved', 'published'].includes(c.status);
+                    }).map((c) => c.product_id)
+                  );
+                  if (pidsWithAudience.size === 0) return null;
+                  return (
+                    <button key={p.name} className="studio-pill studio-pill--sm" style={{ cursor: 'pointer' }}
+                      onClick={() => setBulkSelected(pidsWithAudience)}>
+                      {p.name} ({pidsWithAudience.size})
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div className="studio-bulk-products">
