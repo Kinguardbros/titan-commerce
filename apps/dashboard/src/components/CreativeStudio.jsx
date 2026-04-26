@@ -5,6 +5,7 @@ import StyleBuilder from "./StyleBuilder";
 
 // Map V2 style IDs → backend style keys
 const STYLE_MAP = {
+  "realistic-beach": "realistic_beach",
   "ad-creative": "ad_creative",
   "product-shot": "product_shot",
   "beach-photo": "product_photo_beach",
@@ -76,6 +77,7 @@ const STYLE_CATEGORIES = [
   {
     id: "product-photos", label: "Product photos", icon: "◉",
     styles: [
+      { id: "realistic-beach", title: "Realistic Beach", desc: "Ultra-real curvy model, golden hour, no AI look", icon: "🏖" },
       { id: "product-shot", title: "Product shot", desc: "Clean white bg, detail focus", icon: "◉" },
       { id: "beach-photo", title: "Beach photo", desc: "Warm golden, ocean bokeh", icon: "◐" },
       { id: "clean-minimal", title: "Clean minimal", desc: "White bg, Apple-style", icon: "□" },
@@ -694,7 +696,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                 <Select value={selectedColor} onChange={setSelectedColor} options={colors} />
               </div>
             )}
-            {personas.length > 0 && subject === "On model" && (
+            {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "0.75rem" }}>
                   <button onClick={() => setUseAudience(!useAudience)} style={{
@@ -736,7 +738,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           </div>
 
           {/* Model pose — conditional */}
-          {subject === "On model" && !abMode && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
             <div>
               <SectionLabel>Model pose</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -747,8 +749,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Body type — conditional on model, disabled when persona audience is active */}
-          {subject === "On model" && !abMode && (
+          {/* Body type — hidden for realistic-beach (hardcoded in prompt) */}
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
             <div>
               <SectionLabel>Body type</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -759,8 +761,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Framing — conditional on model */}
-          {subject === "On model" && !abMode && (
+          {/* Framing — hidden for realistic-beach */}
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
             <div>
               <SectionLabel>Framing</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

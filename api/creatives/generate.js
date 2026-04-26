@@ -53,7 +53,8 @@ async function handler(req, res) {
   }
 
   // Auto-inject persona reference if audience selected and no explicit reference
-  if (audience && !reference_url && store_id) {
+  // Skip for realistic_beach — standalone style, no avatar injection
+  if (audience && !reference_url && store_id && style !== 'realistic_beach') {
     try {
       const { data: avatar } = await supabase.from('persona_avatars')
         .select('reference_url')
@@ -178,17 +179,45 @@ async function handler(req, res) {
       }
     }
 
-    let prompt = await buildStyledPrompt({
-      product_name: product.title,
-      price: product.price ? `$${product.price}` : '',
-      style, custom_prompt, showModel: show_model, feedback,
-      textOverlay: text_overlay, overlayText: overlay_text, audience,
-      storeId: store_id,
-    });
+    // Realistic Beach — standalone style that bypasses all audience/age/tummy/skill systems.
+    // Pure prompt from product reference images + hardcoded body/environment description.
+    const isRealisticBeach = style === 'realistic_beach';
+    let prompt;
+    if (isRealisticBeach) {
+      prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
+
+Full body portrait of a naturally beautiful woman, early-to-mid 40s, warm approachable face with visible smile lines around the eyes, soft defined cheekbones, natural brows, sun-kissed skin with visible freckles and real skin texture. Shoulder-length wavy hair with natural highlights, slightly tousled, effortlessly undone.
+
+Body type: real, curvy, feminine, US size 14-16. Visibly soft rounded belly that is naturally prominent, wider hips with natural fullness, full bust, thick thighs that touch. Arms with natural softness, not toned. This is NOT a slim woman, NOT an athletic body, NOT a model body. Think: a real 42-year-old mother of two who enjoys life and doesn't work out daily. Her body carries weight in the midsection, hips, and thighs naturally. Visible skin texture on arms, subtle stretch marks on hips and lower belly, natural cellulite on upper thighs and backs of arms. Soft fleshy upper arms. Zero airbrushing, zero slimming, zero body manipulation.
+
+Expression is warm, self-assured, quietly confident. Soft genuine smile, relaxed eye contact with camera. Energy: the woman your customer wants to see herself as.
+
+Wearing the EXACT swimsuit shown in the attached image. Recreate the swimsuit precisely as it appears: same colors, same pattern, same construction details, same trim, same fit. Swimsuit sitting smoothly on the body, waistband flat with zero rolling, fabric hugging without squeezing, shaping the midsection naturally. The swimsuit should look like it's doing its job: smoothing and supporting the belly area while the model's natural curves are still clearly visible underneath.
+
+Product: ${product.title}
+
+Recreate a beach environment. Sandy beach, ocean in background, golden hour warmth and lighting. Match warm color temperature with soft directional light.
+
+Full body shot, head to just above the knees visible, model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
+
+Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: golden hour directional light.
+${custom_prompt ? `\nAdditional instructions: ${custom_prompt}` : ''}
+
+NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+    } else {
+      prompt = await buildStyledPrompt({
+        product_name: product.title,
+        price: product.price ? `$${product.price}` : '',
+        style, custom_prompt, showModel: show_model, feedback,
+        textOverlay: text_overlay, overlayText: overlay_text, audience,
+        storeId: store_id,
+      });
+    }
 
     // Auto-detect tummy control / high-waist swimwear → inject coverage instructions into prompt
+    // Skip for realistic_beach — standalone style handles everything internally
     const titleLower = (product.title || '').toLowerCase();
-    const isTummyControl = /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
+    const isTummyControl = !isRealisticBeach && /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
     let coverageReminder = '';
     if (isTummyControl && show_model) {
       const coverageInstr = `\n\nCRITICAL PRODUCT COVERAGE RULES — THIS SWIMSUIT IS TUMMY CONTROL:\n` +
