@@ -26,6 +26,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [scene, setScene] = useState('Auto');
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState('auto');
+  const [realisticMode, setRealisticMode] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
 
@@ -103,11 +104,11 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
 
       // Build scene + audience context to append to each prompt
       const sceneCtx = scene !== 'Auto' ? `\nScene/Environment: ${scene}. Set the photo in this specific environment.` : '';
-      const selectedPersona = audience !== 'auto' ? personas.find(p => p.name === audience) : null;
-      const audienceCtx = selectedPersona ? selectedPersona.name : undefined;
-      const ageCtx = selectedPersona
+      const selectedPersona = !realisticMode && audience !== 'auto' ? personas.find(p => p.name === audience) : null;
+      const audienceCtx = realisticMode ? undefined : (selectedPersona ? selectedPersona.name : undefined);
+      const ageCtx = realisticMode ? '' : (selectedPersona
         ? `\nIMPORTANT: The model MUST be a real ${selectedPersona.age}-year-old woman. She clearly looks ${selectedPersona.age} years old — visible smile lines, age-appropriate skin, NOT a young model. ${parseInt(selectedPersona.age) > 45 ? 'Crow\'s feet, mature skin texture.' : 'Natural expression lines.'}`
-        : '\nThe model must be a real woman age 30-55, NOT a young fashion model.';
+        : '\nThe model must be a real woman age 30-55, NOT a young fashion model.');
 
       // 1. Hero shot FIRST (sequential) — becomes visual reference for all others
       const heroShot = shots.find(s => s.key === 'hero');
@@ -118,7 +119,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
         setProgress({ current: 0, total, label: 'Hero Shot (anchor)...' });
         try {
           const result = await generateCreatives({
-            product_id: product.id, store_id: storeId, style: heroShot.suggestedStyle,
+            product_id: product.id, store_id: storeId, style: realisticMode ? 'realistic_beach' : heroShot.suggestedStyle,
             custom_prompt: heroShot.buildPrompt(product, heroColor) + sceneCtx + ageCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: 'hero',
@@ -136,7 +137,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
         ...otherShots.map(shot => ({
           label: shot.label,
           fn: () => generateCreatives({
-            product_id: product.id, store_id: storeId, style: shot.suggestedStyle,
+            product_id: product.id, store_id: storeId, style: realisticMode ? 'realistic_beach' : shot.suggestedStyle,
             custom_prompt: shot.buildPrompt(product, heroColor) + sceneCtx + ageCtx,
             show_model: true, text_overlay: 'none', ai_model: aiModel, aspect_ratio: aspectRatio,
             audience: audienceCtx, story_id: storyId, story_shot: shot.key,
@@ -269,9 +270,29 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
               </div>
             )}
 
+            {/* Realistic Beach toggle */}
+            <div className="ps-row">
+              <div className="ps-section" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <label className="ps-label" style={{ margin: 0 }}>Realistic Beach</label>
+                <button onClick={() => setRealisticMode(p => !p)} style={{
+                  width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer',
+                  background: realisticMode ? 'var(--accent-success, #22c55e)' : 'var(--surface, #333)',
+                  position: 'relative', transition: 'background 0.2s',
+                }}>
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 8, background: '#fff',
+                    position: 'absolute', top: 3, left: realisticMode ? 20 : 3, transition: 'left 0.2s',
+                  }} />
+                </button>
+                <span style={{ fontSize: 10, color: 'var(--text3)', fontFamily: 'var(--mono)' }}>
+                  {realisticMode ? 'Ultra-real curvy model, standalone prompt' : 'Off — uses standard styles'}
+                </span>
+              </div>
+            </div>
+
             {/* Audience + Scene */}
             <div className="ps-row">
-              {personas.length > 0 && (
+              {personas.length > 0 && !realisticMode && (
                 <div className="ps-section ps-section--half">
                   <label className="ps-label">Audience</label>
                   <select className="ps-select" value={audience} onChange={e => setAudience(e.target.value)}>
