@@ -83,6 +83,14 @@ async function handler(req, res) {
     }
 
     let images = JSON.parse(product.images || '[]');
+    // When audience is set, filter out AI-generated images that were pushed to Shopify
+    // (they contain another persona's face stored in Supabase Storage and would override
+    // the selected avatar — e.g. picking Chloe but product images have Jennifer pushed)
+    if (audience && images.length > 0) {
+      const originalImages = images.filter((url) => !url.includes('supabase.co/storage'));
+      if (originalImages.length > 0) images = originalImages;
+      // If ALL images are pushed creatives, keep them as fallback (better than nothing)
+    }
     // Prepend reference_url to product images ONLY for non-audience flows (color variant, etc.).
     // For audience/persona flows, the avatar reference is added separately in the Nano Banana
     // routing below — prepending here would duplicate it in refImages.
