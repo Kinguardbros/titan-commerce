@@ -76,6 +76,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [bulkBodyType, setBulkBodyType] = useState('Auto');
   const [bulkFraming, setBulkFraming] = useState('Full body');
   const [bulkRatio, setBulkRatio] = useState('1:1');
+  const [bulkAudience, setBulkAudience] = useState('auto');
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkCompleted, setBulkCompleted] = useState(0);
   const [bulkTotal, setBulkTotal] = useState(0);
@@ -245,6 +246,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
           product_id: job.productId, store_id: storeId, style: bulkStyle,
           ai_model: bulkModel, show_model: bulkSubject, text_overlay: 'none',
           aspect_ratio: bulkRatio, custom_prompt: customPrompt || undefined,
+          audience: bulkAudience !== 'auto' ? bulkAudience : undefined,
         }).then(() => setBulkCompleted((p) => p + 1))
           .catch((err) => { console.error(`Bulk gen failed:`, err); setBulkCompleted((p) => p + 1); })
       ));
@@ -390,6 +392,16 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
                       <button key={f} className={`studio-pill${bulkFraming === f ? ' studio-pill--active' : ''}`} onClick={() => setBulkFraming(f)}>{f}</button>
                     ))}</div>
                   </div>
+                  {personas.length > 0 && (
+                    <div>
+                      <div className="studio-field-label">Audience</div>
+                      <div className="studio-pills">{['auto', ...personas.map((p) => p.name)].map((a) => (
+                        <button key={a} className={`studio-pill${bulkAudience === a ? ' studio-pill--active' : ''}`} onClick={() => setBulkAudience(a)}>
+                          {a === 'auto' ? 'Auto' : `${a}${personas.find((p) => p.name === a)?.age ? ` (${personas.find((p) => p.name === a).age})` : ''}`}
+                        </button>
+                      ))}</div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
