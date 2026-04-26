@@ -36,6 +36,7 @@ const FORMAT_OPTIONS = [
 ];
 
 const BULK_STYLES = [
+  { key: 'realistic_beach', label: 'Realistic Beach' },
   { key: 'ad_creative', label: 'Ad Creative' },
   { key: 'product_photo_beach', label: 'Beach Photo' },
   { key: 'lifestyle', label: 'Lifestyle' },
@@ -415,7 +416,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
                       <button key={f} className={`studio-pill${bulkFraming === f ? ' studio-pill--active' : ''}`} onClick={() => setBulkFraming(f)}>{f}</button>
                     ))}</div>
                   </div>
-                  {personas.length > 0 && (
+                  {personas.length > 0 && bulkStyle !== 'realistic_beach' && (
                     <div>
                       <div className="studio-field-label">Audience</div>
                       <div className="studio-pills">{['auto', ...personas.map((p) => p.name)].map((a) => (
