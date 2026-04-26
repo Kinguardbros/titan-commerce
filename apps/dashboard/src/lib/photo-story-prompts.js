@@ -109,7 +109,9 @@ LEFT HALF — BEFORE: Woman wearing a cheap, ill-fitting generic black one-piece
 
 RIGHT HALF — AFTER: SAME woman, DRAMATIC transformation. Standing tall, shoulders back, beaming confident smile, direct eye contact with camera. Wearing ${p.title} in ${color}. The difference is STRIKING: waistband completely flat and smooth, tummy visibly sculpted and held, fabric draping beautifully with zero bunching, straps sitting comfortably with no digging. She looks 10 pounds slimmer. Warm flattering golden-hour style lighting. Her whole body language screams confidence — hands on hips, chin up, radiating joy.
 
-A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing. NO text, NO labels, NO arrows — just the two images side by side.${MODEL_CONSISTENCY}`,
+A clean thin vertical divider line separates the two halves. Both sides shot from head to mid-thigh with identical framing.
+
+ADD TEXT LABELS: The word "BEFORE" in clean white sans-serif font (like Montserrat or Helvetica) at the top center of the LEFT half. The word "AFTER" in the same font at the top center of the RIGHT half. Text should be subtle, elegant, not too large — just clear enough to read. No other text, no arrows, no badges.${MODEL_CONSISTENCY}`,
   },
   {
     key: 'feature_callout',
