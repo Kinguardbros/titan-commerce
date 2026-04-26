@@ -3,7 +3,7 @@ import { getAllProducts, getStudioCreatives, generateBranded, generateCreatives,
 import CreativeStudio from '../components/CreativeStudio';
 import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
-import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify, pollGenerations } from '../lib/api';
+import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify, pollGenerations, getSkills, getAvatars } from '../lib/api';
 import supabase from '../lib/supabase';
 import { useToast } from '../hooks/useToast.jsx';
 import './Studio.css';
@@ -66,6 +66,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
 
   // Panels
   const [showBulk, setShowBulk] = useState(false);
+  const [personas, setPersonas] = useState([]);
 
   // Bulk generate state
   const [bulkSelected, setBulkSelected] = useState(new Set());
@@ -106,6 +107,28 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   useEffect(() => { fetchCreatives(); }, [fetchCreatives]);
   useEffect(() => {
     if (storeId) getAllProducts(storeId).then(setProducts).catch(() => {});
+  }, [storeId]);
+
+  // Load personas for bulk audience selector
+  useEffect(() => {
+    if (!storeId) return;
+    Promise.all([getSkills(storeId), getAvatars(storeId)]).then(([skillsData, avatarData]) => {
+      const parsed = [];
+      const as = (skillsData.skills || []).find((s) => s.skill_type === 'audience-personas');
+      if (as?.content) {
+        const rx1 = /(?:###?\s*|(?:\*\*))?\s*(\w+)\s*\((\d+)\)\s*(?:\*\*)?\s*[—–-]\s*(.+?)(?:\n|$)/g;
+        let m; while ((m = rx1.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[2], label: m[3].trim().replace(/\*+$/, '') });
+        if (!parsed.length) {
+          const rx2 = /###\s*Persona\s*\d+:\s*(\w+)\s*"([^"]+)"\s*\n[^]*?(?:\*\*Age\*\*|Age):\s*(\d+)/g;
+          while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
+        }
+      }
+      const skillNames = new Set(parsed.map((p) => p.name));
+      for (const av of avatarData || []) {
+        if (!skillNames.has(av.persona_name) && av.reference_url) parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom' });
+      }
+      setPersonas(parsed);
+    }).catch(() => {});
   }, [storeId]);
 
   // Pre-select product filter from navigation
