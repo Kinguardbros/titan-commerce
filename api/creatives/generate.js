@@ -277,8 +277,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       // Smart routing: reference → fal.ai Nano Banana 2 (fire-and-forget)
       //                 no reference → HF Flux Kontext Max (synchronous, text-to-image)
       if (reference_url || images.length > 0) {
-        // With persona avatar: 1 avatar + up to 3 product images (more angles = better accuracy).
-        const refImages = reference_url ? [reference_url, ...images.slice(0, 3)] : images.slice(0, 4);
+        // With persona avatar: sandwich pattern — avatar FIRST + product images + avatar LAST
+        // This doubles the identity signal so AI doesn't lose the face among headless crop product shots.
+        const productImages = images.slice(0, 2);
+        const refImages = reference_url
+          ? [reference_url, ...productImages, reference_url]  // avatar → products → avatar (sandwich)
+          : images.slice(0, 4);
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
@@ -287,7 +291,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // Identity-locked prompt when persona avatar is present
         const productRefRange = refImages.length > 2 ? '2-' + refImages.length : '2';
         const identityLock = reference_url
-          ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nREFERENCE IMAGE ROLES — READ CAREFULLY:\n- Image 1 (FIRST reference): THE MODEL/PERSON — use this woman's EXACT face, hair, skin tone, body shape, and identity. The woman in the final image MUST be this exact person.\n- Image ${productRefRange} (remaining references): THE PRODUCT — these show the SAME product garment from different angles. Study every detail: exact color ratios, exact stripe widths, exact trim sizes, exact waistband height, exact neckline shape. Do NOT invent a new product. Do NOT copy the face, hair, or body of any model shown in product images — only the garment.\n\nTASK: Dress the woman from image 1 in the exact product shown across images ${productRefRange}. Same woman (image 1) + same product (images ${productRefRange}) = final photograph.\n\nIDENTITY LOCK: If the product reference images show a different-looking woman, IGNORE her face and body entirely. Keep ONLY image 1's identity.\nPRODUCT LOCK — PROPORTION-ACCURATE:\n- The garment color ratio must EXACTLY match the reference (e.g. if 80% black and 20% pink, keep that exact ratio)\n- Every stripe, band, and trim must be the EXACT same width as in the reference\n- Waistband height, neckline depth, and strap width must match precisely\n- Decorative elements (zigzag trim, stitching) must be the same size and density\n- Do NOT enlarge, shrink, simplify, or reinterpret ANY design element\n━━━━━━━━━━━━━━━━━━━━━━━━`
+          ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nREFERENCE IMAGE ROLES — READ CAREFULLY:\n- Image 1 AND the LAST image: THE MODEL/PERSON — this is the SAME woman shown twice. Use her EXACT face, hair, skin tone, body shape, and identity. The woman in the final image MUST be this exact person. Her face is the ONLY face to use.\n- Middle images (${productRefRange}): THE PRODUCT — these are cropped product shots (may not show a face or full body). Use ONLY the garment/swimsuit from these images. Study the product details: exact color ratios, exact stripe widths, exact trim sizes, exact waistband height, exact neckline shape.\n\nTASK: Put the woman from image 1 into the exact product from the middle images. Her face + their garment = final photograph.\n\nIDENTITY LOCK: The generated woman's face MUST match image 1 exactly. Product images may show cropped bodies without heads — do NOT let them influence the face. The face comes ONLY from image 1.\nPRODUCT LOCK — PROPORTION-ACCURATE:\n- The garment color ratio must EXACTLY match the reference\n- Every stripe, band, and trim must be the EXACT same width\n- Waistband height, neckline depth, and strap width must match precisely\n- Do NOT enlarge, shrink, simplify, or reinterpret ANY design element\n━━━━━━━━━━━━━━━━━━━━━━━━`
           : '';
         const productInstr = reference_url
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
