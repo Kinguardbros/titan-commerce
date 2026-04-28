@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { generateAvatar, setAvatarReference } from '../lib/api';
+import { useState, useRef } from 'react';
+import { generateAvatar, setAvatarReference, uploadAvatar } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './AvatarBuilder.css';
 
@@ -52,8 +52,28 @@ function buildAvatarPrompt(p) {
   return `Full body reference photograph of a ${p.age}-year-old woman standing in front of a plain wall at home. Natural amateur photo, not a professional shoot. ${p.bodyType} body type, ${p.skinTone} skin tone. ${p.hairColor} ${p.hairLength} ${p.hairStyle} hair. ${heightStr} ${weightStr} ${faceDesc} FULL BODY shot — head to bare feet fully visible, feet at the bottom of the frame. Do NOT crop at the knees or waist. She is a regular ${p.age}-year-old woman. CLOTHING: She is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — NOT black, NOT white. Bare feet, no shoes. Arms relaxed at sides. ${p.expression} expression. Neutral indoor lighting, plain beige wall background. ${ageDetails} No makeup or minimal natural makeup, no styled hair. Imperfect real skin texture with pores, uneven tone. ${impStr} ${p.extraNotes || ''} Snapshot quality, plain and unremarkable. Do NOT make her look like a model, influencer, or professional photo. FINAL CHECK: age ${p.age}, underwear is BEIGE/NUDE not black.`.replace(/\s{2,}/g, ' ').trim();
 }
 
+const MAX_SIZE = 1024;
+const resizeAndEncode = (file) => new Promise((resolve, reject) => {
+  const img = new Image();
+  img.onload = () => {
+    let { width, height } = img;
+    if (width > MAX_SIZE || height > MAX_SIZE) {
+      const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+  };
+  img.onerror = reject;
+  img.src = URL.createObjectURL(file);
+});
+
 export default function AvatarBuilder({ storeId, onClose, onCreated }) {
   const toast = useToast();
+  const fileRef = useRef(null);
   const [name, setName] = useState('');
   const [age, setAge] = useState(40);
   const [weight, setWeight] = useState('');
@@ -72,6 +92,8 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
   const [extraNotes, setExtraNotes] = useState('');
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedPreview, setUploadedPreview] = useState(null);
   const [variants, setVariants] = useState([]);
   const [selectedVariant, setSelectedVariant] = useState(null);
 
@@ -96,6 +118,34 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
       toast.error(`Generation failed: ${err.message}`);
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const handleUploadAndGenerate = async (file) => {
+    if (!name.trim()) { toast.error('Name is required'); return; }
+    const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.type)) { toast.error('Only PNG, JPEG, or WebP'); return; }
+    setUploading(true);
+    setVariants([]);
+    setSelectedVariant(null);
+    try {
+      // 1. Upload photo as reference
+      const base64 = await resizeAndEncode(file);
+      const uploadResult = await uploadAvatar(storeId, name.trim(), base64, 'image/jpeg');
+      setUploadedPreview(uploadResult.reference_url);
+      toast.info('Photo uploaded — generating avatar from it...');
+
+      // 2. Generate avatar using uploaded photo as reference (identity preservation)
+      const result = await generateAvatar(storeId, name.trim(), 'From uploaded photo');
+      const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
+      setVariants(urls);
+      if (urls.length > 0) setSelectedVariant(urls[0]);
+      toast.success(`Generated ${urls.length} variant(s) from your photo`);
+    } catch (err) {
+      console.error('[AvatarBuilder] Upload+Generate failed:', { error: err.message });
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -233,12 +283,17 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
             </div>
 
             <div className="ab-toolbar-actions">
-              <button className="ab-btn ab-btn--primary" onClick={handleGenerate} disabled={generating || !name.trim()}>
+              <button className="ab-btn ab-btn--primary" onClick={handleGenerate} disabled={generating || uploading || !name.trim()}>
                 {generating ? 'Generating...' : 'Generate Preview'}
+              </button>
+              <button className="ab-btn" onClick={() => fileRef.current?.click()} disabled={generating || uploading || !name.trim()}>
+                {uploading ? 'Processing...' : '📷 From Photo'}
               </button>
               <button className="ab-btn ab-btn--save" onClick={handleSave} disabled={saving || !selectedVariant}>
                 {saving ? 'Saving...' : 'Save Avatar'}
               </button>
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden
+                onChange={(e) => { if (e.target.files?.[0]) handleUploadAndGenerate(e.target.files[0]); e.target.value = ''; }} />
             </div>
           </div>
 
