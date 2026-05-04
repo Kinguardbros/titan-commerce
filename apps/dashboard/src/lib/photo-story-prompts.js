@@ -131,6 +131,121 @@ Leave clear space on both sides of the model for callout labels in post-producti
   },
 ];
 
+// ─── STUDIO SHOTS — clean white studio, e-commerce product photography ───
+const STUDIO_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: The FIRST reference image shows the EXACT model to use — match her face, hair color and style, skin tone, body type, and age PRECISELY. She must be recognizable as the same person across ALL shots. Do NOT change the model. Clean white/light grey seamless studio backdrop. Flat even diffused lighting, zero harsh shadows. Professional e-commerce photography quality.`;
+
+export const STUDIO_SHOTS = [
+  {
+    key: 'studio_hero',
+    label: 'Hero Front',
+    order: 1,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Full body front view in clean white studio. Model standing straight, slight weight shift to right hip creating natural S-curve. Both hands relaxed at sides or one hand lightly on hip. GAZE: Direct confident eye contact with camera. Neutral confident expression — not smiling, editorial fashion look. Head to bare feet visible, model fills ~70% of vertical frame.
+
+Swimsuit: ${p.title} in ${color}.
+${p.description ? `Product details: ${p.description}` : ''}
+Fabric sitting smoothly on body, zero bunching, zero rolling at waistband. Product is the star — clean, sharp, every detail visible.
+
+This is the ANCHOR image for the studio set. All subsequent shots must match this model exactly.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_34_front',
+    label: '3/4 Angle',
+    order: 2,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Three-quarter angle view in clean white studio. SAME MODEL as hero. Model positioned at 30-degree angle to camera, facing slightly left. One hand on hip, other relaxed. GAZE: Looking directly at camera with warm confident eye contact. Natural S-curve silhouette visible. Head to bare feet.
+
+Swimsuit: ${p.title} in ${color}.
+Shows side profile of the fit — how waistband sits, how top contours the body. Fabric smooth and flat.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_back',
+    label: 'Back View',
+    order: 3,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Full body back view in clean white studio. SAME MODEL. Standing straight, arms relaxed at sides. GAZE: Looking slightly over right shoulder. Head to bare feet visible.
+
+Swimsuit: ${p.title} in ${color}.
+Shows back construction: strap design, back coverage, waistband from behind. Every strap and seam clearly visible.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_back_34',
+    label: 'Back 3/4',
+    order: 4,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Three-quarter back view in clean white studio. SAME MODEL. Hands behind back or one hand touching opposite shoulder. GAZE: Looking over shoulder toward camera. Body at 30-degree angle showing back strap architecture.
+
+Swimsuit: ${p.title} in ${color}.
+Cross-back straps, back band detail, and rear fit clearly visible.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_arms_up',
+    label: 'Arms Up',
+    order: 5,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Full body front view, arms raised above head in clean white studio. SAME MODEL. Both arms up, hands touching or near hair. GAZE: Direct eye contact, confident expression. Shows underarm fit, how top moves with body, strap behavior when arms are raised.
+
+Swimsuit: ${p.title} in ${color}.
+Demonstrates freedom of movement — no riding up, no gaps, straps stay in place.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_detail_top',
+    label: 'Detail: Top',
+    order: 6,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Close-up crop from shoulders to waist in clean white studio. SAME MODEL. Front view showing top construction detail: twist/knot front detail, neckline shape, strap width, elastic trim pattern, fabric texture. Hands relaxed at sides. Sharp focus on product construction.
+
+Swimsuit: ${p.title} in ${color}.
+Individual thread weave visible on trim. Show the quality and craftsmanship.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_detail_back_straps',
+    label: 'Detail: Back Straps',
+    order: 7,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Close-up crop of upper back in clean white studio. SAME MODEL from behind. Focus on strap architecture — cross-back design, adjustable straps, how they connect to the band. Sharp macro-level detail. Back band with ethnic/striped elastic trim visible.
+
+Swimsuit: ${p.title} in ${color}.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_detail_waistband',
+    label: 'Detail: Waistband',
+    order: 8,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Close-up crop of midsection in clean white studio. SAME MODEL. Model's hands pulling/stretching the waistband slightly outward to demonstrate elasticity and tummy control. Shows how the high-waist band sits flat, smooths the midsection, and how the elastic trim stretches.
+
+Swimsuit: ${p.title} in ${color}.
+Demonstrates the fit and stretch of the shapewear waistband.${STUDIO_CONSISTENCY}`,
+  },
+  {
+    key: 'studio_detail_bottom_back',
+    label: 'Detail: Bottom Back',
+    order: 9,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Close-up crop from waist to mid-thigh, back view in clean white studio. SAME MODEL. Shows rear coverage, how the high-waist bottom fits from behind, seam construction, fabric smoothness. No face visible in this crop.
+
+Swimsuit: ${p.title} in ${color}.${STUDIO_CONSISTENCY}`,
+  },
+];
+
 export function buildColorVariantPrompt(product, color) {
   return `Three-quarter angle full body shot. SAME MODEL as the hero shot — IDENTICAL face, hair, skin tone, body type. IDENTICAL POSE — 30-degree angle to left, weight on right hip, relaxed arms. Model fills 70% of frame.
 

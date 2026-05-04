@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { generateCreatives, getProductDetail, getSkills } from '../lib/api';
 const genStoryId = () => crypto.randomUUID();
-import { STORY_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
+import { STORY_SHOTS, STUDIO_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
 import { useToast } from '../hooks/useToast.jsx';
 import './PhotoStoryModal.css';
 
@@ -19,6 +19,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [colors, setColors] = useState([]);
   const [heroColor, setHeroColor] = useState('');
   const [variantColors, setVariantColors] = useState(new Set());
+  const activeShots = storyMode === 'studio' ? STUDIO_SHOTS : STORY_SHOTS;
   const [selectedShots, setSelectedShots] = useState(() => new Set(STORY_SHOTS.filter(s => s.defaultOn).map(s => s.key)));
   const [includeUGC, setIncludeUGC] = useState(false);
   const [aiModel, setAiModel] = useState('fal_nano_banana');
@@ -27,8 +28,15 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState('auto');
   const [realisticMode, setRealisticMode] = useState(false);
+  const [storyMode, setStoryMode] = useState('beach'); // 'beach' | 'studio'
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
+
+  // Reset selected shots when story mode changes
+  useEffect(() => {
+    const shots = storyMode === 'studio' ? STUDIO_SHOTS : STORY_SHOTS;
+    setSelectedShots(new Set(shots.filter(s => s.defaultOn).map(s => s.key)));
+  }, [storyMode]);
 
   // Load product colors from Shopify variants
   useEffect(() => {
@@ -99,7 +107,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
 
     try {
       const storyId = genStoryId();
-      const shots = (STORY_SHOTS || []).filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
+      const shots = (activeShots || []).filter(s => selectedShots.has(s.key)).sort((a, b) => a.order - b.order);
       if (!shots.length && !variantColors.size) { toast.error('No shots selected'); setGenerating(false); return; }
 
       // Build scene + audience context to append to each prompt
@@ -236,11 +244,26 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
               )}
             </div>
 
+            {/* Story mode selector */}
+            <div className="ps-section">
+              <label className="ps-label">Story Type</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                <button className={`ps-mode-btn${storyMode === 'beach' ? ' ps-mode-btn--active' : ''}`} onClick={() => setStoryMode('beach')}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${storyMode === 'beach' ? 'var(--gold, #d4a853)' : 'var(--edge, #333)'}`, background: storyMode === 'beach' ? 'rgba(212,168,83,.1)' : 'transparent', color: storyMode === 'beach' ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  🏖 Beach Story
+                </button>
+                <button className={`ps-mode-btn${storyMode === 'studio' ? ' ps-mode-btn--active' : ''}`} onClick={() => setStoryMode('studio')}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${storyMode === 'studio' ? 'var(--gold, #d4a853)' : 'var(--edge, #333)'}`, background: storyMode === 'studio' ? 'rgba(212,168,83,.1)' : 'transparent', color: storyMode === 'studio' ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  📷 Studio Story
+                </button>
+              </div>
+            </div>
+
             {/* Shot selection */}
             <div className="ps-section">
               <label className="ps-label">Shots to generate</label>
               <div className="ps-checks">
-                {STORY_SHOTS.map(s => (
+                {activeShots.map(s => (
                   <label key={s.key} className="ps-check">
                     <input type="checkbox" checked={selectedShots.has(s.key)} onChange={() => toggleShot(s.key)} />
                     <span>{s.label}</span>
