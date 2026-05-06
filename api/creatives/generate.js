@@ -196,11 +196,11 @@ Wearing the EXACT swimsuit shown in the attached image. Recreate the swimsuit pr
 
 Product: ${product.title}
 
-Recreate a beach environment. Sandy beach, ocean in background, golden hour warmth and lighting. Match warm color temperature with soft directional light.
+Recreate a beach environment. Sandy beach, ocean in background, warm golden hour color temperature. LIGHTING: Sun is BEHIND the camera, illuminating the model FROM THE FRONT. The product and model's face are fully lit, bright, and clearly visible — NOT backlit, NOT silhouetted, NOT dark against the sky. Warm front-facing light that shows every detail of the product.
 
 Full body shot, head to just above the knees visible, model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
 
-Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: golden hour directional light.
+Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: warm front-facing light from camera direction — product fully illuminated, zero backlighting.
 ${custom_prompt ? `\nAdditional instructions: ${custom_prompt}` : ''}
 
 NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
