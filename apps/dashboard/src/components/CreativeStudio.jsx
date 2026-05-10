@@ -4,6 +4,12 @@ import { useToast } from "../hooks/useToast.jsx";
 import StyleBuilder from "./StyleBuilder";
 
 // Map V2 style IDs → backend style keys
+const CATALOG_MODELS = [
+  { id: 'everyday38', label: 'Everyday (38)', prompt: 'A 38-year-old woman, US size 12-14, mid-size natural body with soft curves, real-looking belly and thighs, apple-shaped silhouette with weight carried in the midsection, full bust, soft arms. Shoulder-length warm brunette hair with subtle natural waves and slight golden undertones, slightly windswept. Fair-to-medium skin with a hint of natural warmth, light freckles on cheeks and shoulders, no tattoos. Soft round face with warm brown eyes, soft natural eyebrows, full cheeks, gentle smile lines. Calm warm expression with a soft genuine smile, approachable and grounded, looks like a real mid-30s mom who takes care of herself. Minimal natural makeup, no jewelry. North American or Northern European appearance, evokes the relatable everyday woman, not a model. Confident in her body, comfortable presence.' },
+  { id: 'coastal28', label: 'Coastal (28)', prompt: 'A 28-year-old woman, US size 4-6, slim athletic build with natural soft curves, not muscular and not skinny, healthy and toned. Long wavy chestnut brown hair with subtle natural highlights, falling past her shoulders, slightly windswept. Warm olive-toned skin with a light natural tan, no visible tattoos, minimal freckles across the nose. Soft oval face with high cheekbones, full natural eyebrows, hazel-green eyes, full lips, straight nose. Warm genuine smile that reaches her eyes, approachable and confident. No makeup or extremely minimal natural makeup. No jewelry. Mediterranean or Southern European appearance, evokes Italian or Spanish coastal beauty. Natural unposed energy, looks like a real woman on vacation, not a professional model.' },
+  { id: 'confident48', label: 'Confident (48)', prompt: 'A 48-year-old woman, US size 16-18, full plus-size natural body with generous curves, soft fuller belly, fuller hips and thighs, supportive bust, soft upper arms. Shoulder-length dark blonde or warm light-brown hair with subtle natural lowlights and a few silver-grey strands at the temples (showing real age, not aged), softly tousled and slightly windswept. Fair skin with a warm undertone, light sun-kissed glow, soft natural laugh lines around the eyes and mouth, no tattoos. Soft heart-shaped face with warm blue-grey eyes, soft natural eyebrows, full lips with a relaxed natural smile, gentle smile lines that show character not aging. Warm confident expression, secure and self-assured, looks like a real woman in her late 40s who has earned her presence. Minimal natural makeup, no jewelry. North American or Northern European appearance, evokes the confident mature woman who is finally buying for herself. Calm grounded energy.' },
+];
+
 const CATALOG_POSES = [
   { id: 'hero', label: 'Hero Front', prompt: 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.' },
   { id: '34angle', label: '3/4 Angle', prompt: 'POSE: Body turned 30 degrees to the left, one hand resting lightly on hip, other arm relaxed. Looking directly at camera with warm confident expression. Shows side profile of the garment fit.' },
@@ -420,6 +426,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [scene, setScene] = useState("Auto");
   const [negPrompt, setNegPrompt] = useState("");
   const [catalogPose, setCatalogPose] = useState("hero");
+  const [catalogModel, setCatalogModel] = useState("everyday38");
   const [showNegPrompt, setShowNegPrompt] = useState(false);
   // A/B test
   const [abMode, setAbMode] = useState(false);
@@ -528,8 +535,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
     const isProductCatalogStyle = imgStyle === 'product-catalog';
     const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
+    const catalogModelPrompt = isProductCatalogStyle ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
     const customInstr = isProductCatalogStyle
-      ? catalogPosePrompt + (imgInstructions ? `\n${imgInstructions}` : '')
+      ? `MODEL: ${catalogModelPrompt}\n\n${catalogPosePrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
@@ -791,16 +799,26 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Catalog Pose — only for product-catalog style */}
+          {/* Catalog controls — only for product-catalog style */}
           {imgStyle === "product-catalog" && (
-            <div>
-              <SectionLabel>Pose</SectionLabel>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {CATALOG_POSES.map((p) => (
-                  <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
-                ))}
+            <>
+              <div>
+                <SectionLabel>Model</SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {CATALOG_MODELS.map((m) => (
+                    <Pill key={m.id} active={catalogModel === m.id} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
+                  ))}
+                </div>
               </div>
-            </div>
+              <div>
+                <SectionLabel>Pose</SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {CATALOG_POSES.map((p) => (
+                    <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
           {/* Scene — conditional on style, hidden for product-catalog */}

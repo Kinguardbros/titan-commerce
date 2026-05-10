@@ -187,7 +187,7 @@ async function handler(req, res) {
     if (isProductCatalog) {
       prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage. Do not redesign, restyle, or reinterpret the swimsuit. The garment in the attached image is the product, replicate it exactly.
 
-Professional e-commerce swimwear product photography. Mid-size woman, US size 12-14, natural soft body with visible curves, apple-shaped silhouette, real-looking belly and thighs (not athletic, not slim), late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no accessories, no tattoos.
+Professional e-commerce swimwear product photography.
 
 She is barefoot on a quiet beach at golden hour, ocean and sky softly out of focus in the background.
 
