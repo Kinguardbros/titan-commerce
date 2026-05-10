@@ -10,6 +10,13 @@ const CATALOG_MODELS = [
   { id: 'confident48', label: 'Confident (48)', prompt: 'A 48-year-old woman, US size 16-18, full plus-size natural body with generous curves, soft fuller belly, fuller hips and thighs, supportive bust, soft upper arms. Shoulder-length dark blonde or warm light-brown hair with subtle natural lowlights and a few silver-grey strands at the temples (showing real age, not aged), softly tousled and slightly windswept. Fair skin with a warm undertone, light sun-kissed glow, soft natural laugh lines around the eyes and mouth, no tattoos. Soft heart-shaped face with warm blue-grey eyes, soft natural eyebrows, full lips with a relaxed natural smile, gentle smile lines that show character not aging. Warm confident expression, secure and self-assured, looks like a real woman in her late 40s who has earned her presence. Minimal natural makeup, no jewelry. North American or Northern European appearance, evokes the confident mature woman who is finally buying for herself. Calm grounded energy.' },
 ];
 
+const CATALOG_FRAMINGS = [
+  { id: 'full', label: 'Full body', prompt: 'FRAMING: Full body shot from head to feet, model fills ~70% of vertical frame.' },
+  { id: 'three-quarter', label: '3/4 body', prompt: 'FRAMING: Three-quarter body crop from head to mid-calf. Do NOT show feet. Model fills ~80% of vertical frame.' },
+  { id: 'waist-up', label: 'Waist up', prompt: 'FRAMING: Crop from head to waist/hip level. Upper body portrait showing the top/bust area of the garment in detail. Model fills ~90% of vertical frame.' },
+  { id: 'detail', label: 'Detail crop', prompt: 'FRAMING: Close-up crop from chest to upper thigh. Focus on the garment midsection — waistband, fabric texture, construction details. No face visible.' },
+];
+
 const CATALOG_POSES = [
   { id: 'hero', label: 'Hero Front', prompt: 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.' },
   { id: '34angle', label: '3/4 Angle', prompt: 'POSE: Body turned 30 degrees to the left, one hand resting lightly on hip, other arm relaxed. Looking directly at camera with warm confident expression. Shows side profile of the garment fit.' },
@@ -427,6 +434,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [negPrompt, setNegPrompt] = useState("");
   const [catalogPose, setCatalogPose] = useState("hero");
   const [catalogModel, setCatalogModel] = useState("everyday38");
+  const [catalogFraming, setCatalogFraming] = useState("three-quarter");
   const [showNegPrompt, setShowNegPrompt] = useState(false);
   // A/B test
   const [abMode, setAbMode] = useState(false);
@@ -536,8 +544,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const isProductCatalogStyle = imgStyle === 'product-catalog';
     const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
     const catalogModelPrompt = isProductCatalogStyle ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
+    const catalogFramingPrompt = isProductCatalogStyle ? (CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.prompt || '') : '';
     const customInstr = isProductCatalogStyle
-      ? `MODEL: ${catalogModelPrompt}\n\n${catalogPosePrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
+      ? `MODEL: ${catalogModelPrompt}\n\n${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
@@ -815,6 +824,14 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {CATALOG_POSES.map((p) => (
                     <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <SectionLabel>Framing</SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {CATALOG_FRAMINGS.map((f) => (
+                    <Pill key={f.id} active={catalogFraming === f.id} onClick={() => setCatalogFraming(f.id)}>{f.label}</Pill>
                   ))}
                 </div>
               </div>
