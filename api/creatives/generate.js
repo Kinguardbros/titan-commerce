@@ -194,8 +194,12 @@ async function handler(req, res) {
       // Extract pose + framing (everything from POSE: onwards)
       const poseAndFraming = catalogCustom.includes('POSE:') ? catalogCustom.slice(catalogCustom.indexOf('POSE:')) : 'POSE: Standing facing camera, weight on right hip, arms relaxed, warm genuine smile.';
       // Extract framing reminder for end of prompt (recency bias)
-      const framingMatch2 = poseAndFraming.match(/FRAMING:\s*([^.]+\.)/);
-      const framingReminder = framingMatch2 ? `\nCROP: ${framingMatch2[1].trim()}` : '';
+      // Extract full framing text (all sentences after FRAMING:)
+      const framingSection = poseAndFraming.match(/FRAMING:\s*([\s\S]*?)$/);
+      const framingText = framingSection ? framingSection[1].trim() : '';
+      const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet');
+      const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
+      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
 
       prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
 
@@ -213,7 +217,7 @@ Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspe
 
 ${framingReminder}
 
-NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks.`.trim();
+NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
