@@ -288,9 +288,28 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
     setBulkSelected((prev) => prev.size === products.length ? new Set() : new Set(products.map((p) => p.id)));
   };
 
+  const [bulkCollection, setBulkCollection] = useState('all');
+
+  const bulkCollections = useMemo(() => {
+    const set = new Set();
+    products.forEach((p) => {
+      const tags = typeof p.tags === 'string' ? (() => { try { return JSON.parse(p.tags); } catch { return []; } })() : (p.tags || []);
+      tags.forEach((t) => set.add(t));
+    });
+    return ['all', ...Array.from(set).sort()];
+  }, [products]);
+
   const bulkProducts = useMemo(() => {
-    return products.filter((p) => !productSearch || p.title.toLowerCase().includes(productSearch.toLowerCase())).slice(0, 200);
-  }, [products, productSearch]);
+    let list = products;
+    if (productSearch) list = list.filter((p) => p.title.toLowerCase().includes(productSearch.toLowerCase()));
+    if (bulkCollection !== 'all') {
+      list = list.filter((p) => {
+        const tags = typeof p.tags === 'string' ? (() => { try { return JSON.parse(p.tags); } catch { return []; } })() : (p.tags || []);
+        return tags.includes(bulkCollection);
+      });
+    }
+    return list.slice(0, 200);
+  }, [products, productSearch, bulkCollection]);
 
   return (
     <div className="studio">
@@ -431,8 +450,22 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
               )}
             </div>
 
+            {bulkCollections.length > 1 && (
+              <div style={{ marginBottom: 8 }}>
+                <div className="studio-field-label">Collection</div>
+                <div className="studio-pills" style={{ flexWrap: 'wrap' }}>
+                  {bulkCollections.map((c) => (
+                    <button key={c} className={`studio-pill studio-pill--sm${bulkCollection === c ? ' studio-pill--active' : ''}`}
+                      onClick={() => setBulkCollection(c)}>
+                      {c === 'all' ? 'All' : c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <div className="studio-field-label" style={{ margin: 0 }}>Products ({bulkSelected.size}/{products.length})</div>
+              <div className="studio-field-label" style={{ margin: 0 }}>Products ({bulkSelected.size}/{bulkProducts.length})</div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                 <button className="studio-pill studio-pill--sm" onClick={toggleBulkAll} style={{ cursor: 'pointer' }}>
                   {bulkSelected.size === products.length ? 'Deselect all' : 'Select all'}
