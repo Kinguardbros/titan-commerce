@@ -193,6 +193,9 @@ async function handler(req, res) {
       const modelDesc = modelDescMatch ? modelDescMatch[1].trim() : 'Mid-size woman, US size 12-14, natural soft body with visible curves, late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no tattoos.';
       // Extract pose + framing (everything from POSE: onwards)
       const poseAndFraming = catalogCustom.includes('POSE:') ? catalogCustom.slice(catalogCustom.indexOf('POSE:')) : 'POSE: Standing facing camera, weight on right hip, arms relaxed, warm genuine smile.';
+      // Extract framing reminder for end of prompt (recency bias)
+      const framingMatch2 = poseAndFraming.match(/FRAMING:\s*([^.]+\.)/);
+      const framingReminder = framingMatch2 ? `\nCROP: ${framingMatch2[1].trim()}` : '';
 
       prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
 
@@ -207,6 +210,8 @@ ${poseAndFraming}
 Garment: High-waisted bottoms cover navel. Fabric smooth, zero bunching. Match reference exactly.
 
 Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspect_ratio || '4:5'} format.
+
+${framingReminder}
 
 NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks.`.trim();
     } else if (isRealisticBeach) {
