@@ -204,7 +204,7 @@ LIGHTING (critical, do not alter):
 
 COMPOSITION:
 - Vertical 4:5 framing
-- Full body or three-quarter body crop, model centered, framing emphasizes the torso and the garment construction
+- Crop from head to mid-calf or just below the knees — do NOT show full feet. Model centered, framing emphasizes the torso and the garment construction
 - Shallow depth of field, background softly out of focus
 - Sharp focus on the garment fabric, fit, seaming, and texture
 - Dry sand under her feet, clean uncluttered foreground
@@ -236,7 +236,7 @@ Product: ${product.title}
 
 Recreate a beach environment. Sandy beach, ocean in background, bright afternoon daylight. LIGHTING: Sun high in the sky, bright natural daylight. Sun is BEHIND the camera, illuminating the model FROM THE FRONT. The product and model's face are fully lit, bright, high-key, and clearly visible — NOT backlit, NOT silhouetted, NOT dark. No golden hour, no warm orange tones, no sunset — clean bright daylight.
 
-Full body shot, head to just above the knees visible, model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
+Crop from head to mid-calf — do NOT show full feet, cut off at mid-shin or just below knees. Model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
 
 Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: bright natural afternoon daylight from front — product fully illuminated, high-key, zero backlighting, no golden hour warmth.
 ${custom_prompt ? `\nAdditional instructions: ${custom_prompt}` : ''}
