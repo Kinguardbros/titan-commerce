@@ -189,16 +189,18 @@ async function handler(req, res) {
 
 Professional e-commerce swimwear product photography.
 
-She is barefoot on a quiet beach at golden hour, ocean and sky softly out of focus in the background.
+She is barefoot on a quiet beach in bright afternoon sunlight, ocean and sky softly out of focus in the background.
 
 Product: ${product.title}
 
 LIGHTING (critical, do not alter):
-- Warm directional golden-hour sunlight hitting the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
-- The model's skin and the garment must be the brightest, most exposed elements in the frame
-- Background (ocean, sky, sand) is exposed approximately one stop darker than the model, slightly desaturated, slightly cooler in tone, so the subject pops forward
+- Bright natural afternoon sunlight, sun high in the sky, full daylight — NOT golden hour, NOT sunset, NOT warm orange tones
+- Clean bright even illumination on the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
+- The model's skin and the garment must be the brightest, most exposed elements in the frame — well-lit, high-key, no dark shadows on the product
+- Background (ocean, sky, sand) bright and airy, slightly softer than the model but NOT dark
+- No golden/orange color cast, no warm tint — clean neutral daylight white balance
 - No flat side-lighting, no overcast diffusion, no backlit silhouette
-- Subtle warm rim light along her hair and shoulder for separation from background
+- Subtle natural rim light along her hair for separation from background
 
 COMPOSITION:
 - Vertical 4:5 framing
@@ -232,11 +234,11 @@ Wearing the EXACT swimsuit shown in the attached image. Recreate the swimsuit pr
 
 Product: ${product.title}
 
-Recreate a beach environment. Sandy beach, ocean in background, warm golden hour color temperature. LIGHTING: Sun is BEHIND the camera, illuminating the model FROM THE FRONT. The product and model's face are fully lit, bright, and clearly visible — NOT backlit, NOT silhouetted, NOT dark against the sky. Warm front-facing light that shows every detail of the product.
+Recreate a beach environment. Sandy beach, ocean in background, bright afternoon daylight. LIGHTING: Sun high in the sky, bright natural daylight. Sun is BEHIND the camera, illuminating the model FROM THE FRONT. The product and model's face are fully lit, bright, high-key, and clearly visible — NOT backlit, NOT silhouetted, NOT dark. No golden hour, no warm orange tones, no sunset — clean bright daylight.
 
 Full body shot, head to just above the knees visible, model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
 
-Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: warm front-facing light from camera direction — product fully illuminated, zero backlighting.
+Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: bright natural afternoon daylight from front — product fully illuminated, high-key, zero backlighting, no golden hour warmth.
 ${custom_prompt ? `\nAdditional instructions: ${custom_prompt}` : ''}
 
 NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
