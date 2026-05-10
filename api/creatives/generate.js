@@ -186,18 +186,27 @@ async function handler(req, res) {
     // Pure prompt from product reference images + hardcoded body/environment description.
     let prompt;
     if (isProductCatalog) {
+      // Parse catalog config from custom_prompt (model desc, pose, framing)
       const catalogCustom = custom_prompt ? custom_prompt.replace(/\[catalog_[^\]]+\]/g, '').trim() : '';
-      prompt = `Swimwear product photo. The reference image shows ONLY the garment to copy — match its color, cut, fabric, and pattern. The WOMAN must match the description below, NOT the person in the reference. Generate a completely different woman.
+      // Extract model description (everything before POSE:)
+      const modelDescMatch = catalogCustom.match(/^([\s\S]*?)(?=POSE:|$)/);
+      const modelDesc = modelDescMatch ? modelDescMatch[1].trim() : 'Mid-size woman, US size 12-14, natural soft body with visible curves, late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no tattoos.';
+      // Extract pose + framing (everything from POSE: onwards)
+      const poseAndFraming = catalogCustom.includes('POSE:') ? catalogCustom.slice(catalogCustom.indexOf('POSE:')) : 'POSE: Standing facing camera, weight on right hip, arms relaxed, warm genuine smile.';
+
+      prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+
+Professional e-commerce swimwear product photography. ${modelDesc}
+
+She is barefoot on a quiet beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly out of focus in the background. Front-lit, high-key, zero shadows on product. Clean neutral white balance.
 
 Product: ${product.title}
 
-${catalogCustom || 'MODEL: Mid-size woman, US 12-14, natural curves, late 30s, warm smile.\n\nPOSE: Standing on beach, weight on right hip, arms relaxed, looking at camera.'}
+${poseAndFraming}
 
-Setting: Beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly blurred behind. Sun directly in front of the model, lighting her face and garment evenly with ZERO shadows on the product. Flat frontal light, no side shadows, no under-chin shadows, high-key bright exposure. Clean neutral white balance.
+Garment: High-waisted bottoms cover navel. Fabric smooth, zero bunching. Match reference exactly.
 
-Garment rules: Recreate reference garment exactly. High-waisted bottoms must cover navel. Fabric smooth, zero bunching.
-
-Hyperrealistic, 85mm f/2.8, Canon R5, sharp face with visible pores and eye detail. ${aspect_ratio || '4:5'} format.
+Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspect_ratio || '4:5'} format.
 
 NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks.`.trim();
     } else if (isRealisticBeach) {
