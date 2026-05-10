@@ -688,24 +688,26 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "1rem 0" }} />
 
-          {/* Model + Subject */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div>
-              <SectionLabel style={{ marginTop: 0 }}>Model</SectionLabel>
-              <Select value={imgModel} onChange={setImgModel} options={IMG_MODELS} renderOption={(m) => `${m.label} — ${m.detail}`} />
-            </div>
-            <div>
-              <SectionLabel style={{ marginTop: 0 }}>Subject</SectionLabel>
-              <div style={{ display: "flex", gap: 6 }}>
-                {["On model", "Product only"].map((s) => (
-                  <Pill key={s} active={subject === s} onClick={() => setSubject(s)}>{s}</Pill>
-                ))}
+          {/* Model + Subject — hidden for product-catalog (everything hardcoded) */}
+          {imgStyle !== "product-catalog" && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+              <div>
+                <SectionLabel style={{ marginTop: 0 }}>Model</SectionLabel>
+                <Select value={imgModel} onChange={setImgModel} options={IMG_MODELS} renderOption={(m) => `${m.label} — ${m.detail}`} />
+              </div>
+              <div>
+                <SectionLabel style={{ marginTop: 0 }}>Subject</SectionLabel>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {["On model", "Product only"].map((s) => (
+                    <Pill key={s} active={subject === s} onClick={() => setSubject(s)}>{s}</Pill>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* Color + Audience */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* Color + Audience — hidden for product-catalog */}
+          {imgStyle !== "product-catalog" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {colors.length > 1 && (
               <div>
                 <SectionLabel style={{ marginTop: "0.75rem" }}>Color</SectionLabel>
@@ -751,7 +753,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                 )}
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Model pose — conditional */}
           {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
@@ -801,8 +803,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Scene — conditional on style */}
-          {showSceneForStyle && !abMode && (
+          {/* Scene — conditional on style, hidden for product-catalog */}
+          {showSceneForStyle && !abMode && imgStyle !== "product-catalog" && (
             <div>
               <SectionLabel>Scene / environment</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -813,6 +815,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
+          {imgStyle !== "product-catalog" && (<>
           {/* ─── A/B TEST MODE ─── */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "1.25rem" }}>
             <SectionLabel style={{ margin: 0, flex: 1 }}>A/B test mode</SectionLabel>
@@ -916,6 +919,31 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             <textarea value={negPrompt} onChange={(e) => setNegPrompt(e.target.value)}
               placeholder="e.g. 'no text, no watermark, no busy background, no hands cut off'"
               style={{ ...inputStyle, minHeight: 56, resize: "vertical", marginTop: 4 }} />
+          )}
+          </>)}
+
+          {/* Count + Ratio for product-catalog (shown separately since the block above is hidden) */}
+          {imgStyle === "product-catalog" && (
+            <>
+              <div style={{ display: "flex", gap: 16, alignItems: "end", marginTop: "1rem" }}>
+                <div>
+                  <SectionLabel>Count</SectionLabel>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[1, 2, 3, 4].map((n) => (
+                      <NumBtn key={n} active={imgCount === n} onClick={() => setImgCount(n)}>{n}</NumBtn>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <SectionLabel>Aspect ratio</SectionLabel>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    {IMG_RATIOS.map((r) => (
+                      <RatioBox key={r.label} {...r} active={imgRatio === r.label} onClick={() => setImgRatio(r.label)} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Cost + Generate */}
