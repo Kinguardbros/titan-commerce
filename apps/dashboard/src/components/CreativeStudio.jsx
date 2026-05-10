@@ -4,7 +4,17 @@ import { useToast } from "../hooks/useToast.jsx";
 import StyleBuilder from "./StyleBuilder";
 
 // Map V2 style IDs → backend style keys
+const CATALOG_POSES = [
+  { id: 'hero', label: 'Hero Front', prompt: 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.' },
+  { id: '34angle', label: '3/4 Angle', prompt: 'POSE: Body turned 30 degrees to the left, one hand resting lightly on hip, other arm relaxed. Looking directly at camera with warm confident expression. Shows side profile of the garment fit.' },
+  { id: 'walking', label: 'Walking', prompt: 'POSE: Walking slowly toward camera at slight angle, one foot ahead of other in natural stride, arms swinging gently. Looking slightly past camera to the right as if noticing something. Genuine relaxed smile, wind catching hair slightly.' },
+  { id: 'back', label: 'Back View', prompt: 'POSE: Full back view, standing naturally, looking over right shoulder toward camera with soft smile. Arms relaxed at sides. Shows back construction of the garment — straps, seaming, rear coverage.' },
+  { id: 'armsup', label: 'Arms Up', prompt: 'POSE: Arms raised above head, hands touching or near hair. Direct eye contact, confident expression. Shows underarm fit, how top moves with body, strap behavior when arms are raised. Demonstrates freedom of movement.' },
+  { id: 'profile', label: 'Side Profile', prompt: 'POSE: Full side profile view, body perpendicular to camera. Looking straight ahead or slightly toward camera. Shows silhouette, garment cut from the side, waistband height, leg opening. One foot slightly ahead of other.' },
+];
+
 const STYLE_MAP = {
+  "product-catalog": "product_catalog",
   "realistic-beach": "realistic_beach",
   "ad-creative": "ad_creative",
   "product-shot": "product_shot",
@@ -77,6 +87,7 @@ const STYLE_CATEGORIES = [
   {
     id: "product-photos", label: "Product photos", icon: "◉",
     styles: [
+      { id: "product-catalog", title: "Product Catalog", desc: "Pro e-commerce, golden hour beach, editorial", icon: "📸" },
       { id: "realistic-beach", title: "Realistic Beach", desc: "Ultra-real curvy model, golden hour, no AI look", icon: "🏖" },
       { id: "product-shot", title: "Product shot", desc: "Clean white bg, detail focus", icon: "◉" },
       { id: "beach-photo", title: "Beach photo", desc: "Warm golden, ocean bokeh", icon: "◐" },
@@ -408,6 +419,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [framing, setFraming] = useState("Full body");
   const [scene, setScene] = useState("Auto");
   const [negPrompt, setNegPrompt] = useState("");
+  const [catalogPose, setCatalogPose] = useState("hero");
   const [showNegPrompt, setShowNegPrompt] = useState(false);
   // A/B test
   const [abMode, setAbMode] = useState(false);
@@ -514,7 +526,11 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     ) : "";
     const sceneHint = SCENE_STYLES.has(imgStyle) && scene !== "Auto" ? `Scene: ${scene}. ` : "";
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
-    const customInstr = `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
+    const isProductCatalogStyle = imgStyle === 'product-catalog';
+    const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
+    const customInstr = isProductCatalogStyle
+      ? catalogPosePrompt + (imgInstructions ? `\n${imgInstructions}` : '')
+      : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
     const jobs = [];
@@ -696,7 +712,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                 <Select value={selectedColor} onChange={setSelectedColor} options={colors} />
               </div>
             )}
-            {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && (
+            {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "0.75rem" }}>
                   <button onClick={() => setUseAudience(!useAudience)} style={{
@@ -738,7 +754,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           </div>
 
           {/* Model pose — conditional */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
             <div>
               <SectionLabel>Model pose</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -750,7 +766,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
 
           {/* Body type — hidden for realistic-beach (hardcoded in prompt) */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
             <div>
               <SectionLabel>Body type</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -762,12 +778,24 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
 
           {/* Framing — hidden for realistic-beach */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
             <div>
               <SectionLabel>Framing</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {FRAMINGS.map((f) => (
                   <Pill key={f} active={framing === f} onClick={() => setFraming(f)}>{f}</Pill>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Catalog Pose — only for product-catalog style */}
+          {imgStyle === "product-catalog" && (
+            <div>
+              <SectionLabel>Pose</SectionLabel>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {CATALOG_POSES.map((p) => (
+                  <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
                 ))}
               </div>
             </div>

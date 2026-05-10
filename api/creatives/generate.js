@@ -54,7 +54,7 @@ async function handler(req, res) {
 
   // Auto-inject persona reference if audience selected and no explicit reference
   // Skip for realistic_beach — standalone style, no avatar injection
-  if (audience && !reference_url && store_id && style !== 'realistic_beach') {
+  if (audience && !reference_url && store_id && style !== 'realistic_beach' && style !== 'product_catalog') {
     try {
       const { data: avatar } = await supabase.from('persona_avatars')
         .select('reference_url')
@@ -182,8 +182,44 @@ async function handler(req, res) {
     // Realistic Beach — standalone style that bypasses all audience/age/tummy/skill systems.
     // Pure prompt from product reference images + hardcoded body/environment description.
     const isRealisticBeach = style === 'realistic_beach';
+    const isProductCatalog = style === 'product_catalog';
     let prompt;
-    if (isRealisticBeach) {
+    if (isProductCatalog) {
+      prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage. Do not redesign, restyle, or reinterpret the swimsuit. The garment in the attached image is the product, replicate it exactly.
+
+Professional e-commerce swimwear product photography. Mid-size woman, US size 12-14, natural soft body with visible curves, apple-shaped silhouette, real-looking belly and thighs (not athletic, not slim), late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no accessories, no tattoos.
+
+She is barefoot on a quiet beach at golden hour, ocean and sky softly out of focus in the background.
+
+Product: ${product.title}
+
+LIGHTING (critical, do not alter):
+- Warm directional golden-hour sunlight hitting the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
+- The model's skin and the garment must be the brightest, most exposed elements in the frame
+- Background (ocean, sky, sand) is exposed approximately one stop darker than the model, slightly desaturated, slightly cooler in tone, so the subject pops forward
+- No flat side-lighting, no overcast diffusion, no backlit silhouette
+- Subtle warm rim light along her hair and shoulder for separation from background
+
+COMPOSITION:
+- Vertical 4:5 framing
+- Full body or three-quarter body crop, model centered, framing emphasizes the torso and the garment construction
+- Shallow depth of field, background softly out of focus
+- Sharp focus on the garment fabric, fit, seaming, and texture
+- Dry sand under her feet, clean uncluttered foreground
+
+GARMENT RULES (non-negotiable):
+- For one-piece swimsuits: full coverage from bust to upper hip, moderate leg opening (not high-cut), the suit covers the body as designed in the reference image
+- For two-piece swimsuits: bikini bottoms must be high-waisted, sit well above the belly button, and fully cover the navel
+- Bikini bottoms must have moderate leg opening, not high-cut, with full coverage across the hips and upper thighs
+- Repeat: high-waisted bottoms, navel fully covered, moderate leg cut
+- Garment fabric texture, color, and structural details must match the attached reference exactly
+
+${custom_prompt ? custom_prompt : 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera.'}
+
+Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture.
+
+NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+    } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
 Full body portrait of a naturally beautiful woman, early-to-mid 40s, warm approachable face with visible smile lines around the eyes, soft defined cheekbones, natural brows, sun-kissed skin with visible freckles and real skin texture. Shoulder-length wavy hair with natural highlights, slightly tousled, effortlessly undone.
@@ -217,7 +253,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     // Auto-detect tummy control / high-waist swimwear → inject coverage instructions into prompt
     // Skip for realistic_beach — standalone style handles everything internally
     const titleLower = (product.title || '').toLowerCase();
-    const isTummyControl = !isRealisticBeach && /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
+    const isTummyControl = !isRealisticBeach && !isProductCatalog && /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
     let coverageReminder = '';
     if (isTummyControl && show_model) {
       const coverageInstr = `\n\nCRITICAL PRODUCT COVERAGE RULES — THIS SWIMSUIT IS TUMMY CONTROL:\n` +
