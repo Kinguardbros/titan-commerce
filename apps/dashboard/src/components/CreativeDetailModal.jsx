@@ -216,7 +216,7 @@ export default function CreativeDetailModal({ data, onClose, onAction, onPrev, o
                 </button>
               </div>
               <div className="cdm-footer-divider" />
-              <DropdownBtn icon="↻" label="Generate" items={[
+              <DropdownBtn icon="⋯" label="" items={[
                 { id: 'regenerate', icon: '↻', label: 'Regenerate image' },
                 { id: 'convert-video', icon: '▶', label: 'Convert to video' },
                 { id: 'regenerate-variant', icon: '◫', label: 'New variant' },

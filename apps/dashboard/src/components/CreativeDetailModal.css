@@ -122,16 +122,16 @@
 .cdm-footer-inner { display: flex; gap: 10px; align-items: center; }
 .cdm-footer-actions { display: flex; gap: 6px; flex: 1; }
 .cdm-btn-approve {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 0; border-radius: 10px; border: none;
-  background: #10B981; color: #fff; font-size: 11px; font-weight: 600;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 0; border-radius: 12px; border: none;
+  background: #10B981; color: #fff; font-size: 14px; font-weight: 600;
   font-family: 'General Sans', sans-serif; cursor: pointer;
 }
 .cdm-btn-reject {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 0; border-radius: 10px;
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 0; border-radius: 12px;
   border: 1.5px solid rgba(239,68,68,0.2); background: rgba(239,68,68,0.08); color: #EF4444;
-  font-size: 11px; font-weight: 600; font-family: 'General Sans', sans-serif; cursor: pointer;
+  font-size: 14px; font-weight: 600; font-family: 'General Sans', sans-serif; cursor: pointer;
 }
 .cdm-footer-divider { width: 1px; height: 36px; background: rgba(0,0,0,0.07); flex-shrink: 0; }
 
