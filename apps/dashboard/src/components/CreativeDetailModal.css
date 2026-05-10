@@ -19,7 +19,7 @@
 
 /* ─── Left: Image ─── */
 .cdm-image-pane {
-  flex: 1 1 auto; position: relative; background: #0a0a0a;
+  flex: 1 1 50%; position: relative; background: #0a0a0a;
   display: flex; align-items: center; justify-content: center; overflow: hidden;
   min-width: 0;
 }
@@ -51,7 +51,7 @@
 }
 
 /* ─── Right: Panel ─── */
-.cdm-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.cdm-panel { flex: 0 0 340px; display: flex; flex-direction: column; overflow: hidden; }
 
 /* Fixed header */
 .cdm-header { padding: 24px 28px 0; flex-shrink: 0; }
