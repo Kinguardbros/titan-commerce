@@ -203,7 +203,7 @@ LIGHTING (critical, do not alter):
 - Subtle natural rim light along her hair for separation from background
 
 COMPOSITION:
-- Vertical 4:5 framing
+- ${aspect_ratio || '4:5'} framing
 - Full body or three-quarter body crop, model centered, framing emphasizes the torso and the garment construction
 - Shallow depth of field, background softly out of focus
 - Sharp focus on the garment fabric, fit, seaming, and texture
