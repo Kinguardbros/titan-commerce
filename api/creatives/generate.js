@@ -218,9 +218,17 @@ GARMENT RULES (non-negotiable):
 
 ${custom_prompt ? custom_prompt : 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera.'}
 
-Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture.
+FACE QUALITY (critical):
+- Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
+- Eyes must have realistic catchlight reflections, visible iris detail, individual eyelashes
+- Natural lip texture, not glossy or plastic
+- Face must be the sharpest element in the image — tack sharp focus on eyes
+- Realistic facial proportions, no uncanny valley, no doll-like smoothing
+- If the face looks AI-generated, blurry, or plastic — the image is WRONG
 
-NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture. 8K resolution, ultra-sharp.
+
+NEGATIVE: No plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -238,7 +246,7 @@ Recreate a beach environment. Sandy beach, ocean in background, bright afternoon
 
 Full body shot, head to just above the knees visible, model standing centered with slight natural weight shift to right hip creating a soft S-curve. One hand relaxed at side, the other lightly touching hair or resting on hip.
 
-Match photographic quality: Ultra high resolution, 8K detail. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: bright natural afternoon daylight from front — product fully illuminated, high-key, zero backlighting, no golden hour warmth.
+Match photographic quality: Ultra high resolution, 8K detail. FACE: tack sharp focus on eyes, visible skin pores on face, realistic catchlight in eyes, individual eyelashes, natural lip texture — face must be the sharpest most detailed element. Skin texture: visible pores, natural sun freckles, real skin. Fabric texture: individual thread weave visible. Hair: individual strands visible, natural beach wave texture. Depth of field: model tack sharp, background in gentle soft bokeh. Lighting: bright natural afternoon daylight from front — product fully illuminated, high-key, zero backlighting, no golden hour warmth.
 ${custom_prompt ? `\nAdditional instructions: ${custom_prompt}` : ''}
 
 NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
