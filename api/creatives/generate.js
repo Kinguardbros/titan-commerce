@@ -185,7 +185,7 @@ async function handler(req, res) {
     const isProductCatalog = style === 'product_catalog';
     let prompt;
     if (isProductCatalog) {
-      prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage. Do not redesign, restyle, or reinterpret the swimsuit. The garment in the attached image is the product, replicate it exactly.
+      prompt = `REFERENCE IMAGE RULES: The attached image(s) show the PRODUCT GARMENT ONLY. Use ONLY the swimsuit/garment from the reference — copy its exact color, cut, neckline, strap style, fabric texture, seaming, construction details, and coverage. Do NOT copy the model/woman shown in the reference. COMPLETELY IGNORE her face, hair, skin tone, body shape, and identity. Generate a COMPLETELY DIFFERENT woman as described below. The reference is for the GARMENT only, not the person wearing it.
 
 Professional e-commerce swimwear product photography.
 
@@ -228,7 +228,12 @@ FACE QUALITY (critical):
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture. 8K resolution, ultra-sharp.
 
-NEGATIVE: No golden hour lighting, no sunset lighting, no warm orange tones, no amber light, no low sun angle, no plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+FINAL CHECK — READ LAST:
+- The woman in this image must match the MODEL description above — NOT the woman in the reference photo
+- If the generated woman looks like the woman in the product reference image, the result is WRONG
+- Generate a COMPLETELY DIFFERENT person. The reference is for the GARMENT only.
+
+NEGATIVE: No golden hour lighting, no sunset lighting, no warm orange tones, no amber light, no low sun angle, no copying the reference model's face, no copying the reference model's hair, no plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
