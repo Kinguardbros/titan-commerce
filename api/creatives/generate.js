@@ -187,7 +187,7 @@ async function handler(req, res) {
     let prompt;
     if (isProductCatalog) {
       const catalogCustom = custom_prompt ? custom_prompt.replace(/\[catalog_[^\]]+\]/g, '').trim() : '';
-      prompt = `Swimwear product photo. The reference images show the garment to recreate — match its exact color, cut, fabric, pattern, and construction on a new model described below.
+      prompt = `Swimwear product photo. The reference image shows ONLY the garment to copy — match its color, cut, fabric, and pattern. The WOMAN must match the description below, NOT the person in the reference. Generate a completely different woman.
 
 Product: ${product.title}
 
@@ -317,8 +317,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const falPrompt = isProductCatalog
           ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
+        // Product Catalog: send only 1 reference image (garment reference) to minimize
+        // model face copying. Edit models always try to preserve identity from references —
+        // fewer references = less face influence, more prompt influence.
+        const finalRefImages = isProductCatalog ? refImages.slice(0, 1) : refImages;
         falModelUsed = bananaModel;
-        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
+        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: finalRefImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
         pollBase = job.pollBase;
         if (job.completed && job.url) imageUrl = job.url;  // some models return sync
