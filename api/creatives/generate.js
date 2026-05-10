@@ -186,55 +186,20 @@ async function handler(req, res) {
     // Pure prompt from product reference images + hardcoded body/environment description.
     let prompt;
     if (isProductCatalog) {
-      prompt = `REFERENCE IMAGE RULES: The attached image(s) show the PRODUCT GARMENT ONLY. Use ONLY the swimsuit/garment from the reference — copy its exact color, cut, neckline, strap style, fabric texture, seaming, construction details, and coverage. Do NOT copy the model/woman shown in the reference. COMPLETELY IGNORE her face, hair, skin tone, body shape, and identity. Generate a COMPLETELY DIFFERENT woman as described below. The reference is for the GARMENT only, not the person wearing it.
-
-Professional e-commerce swimwear product photography.
-
-She is barefoot on a quiet beach at MIDDAY in bright overhead sunlight (NOT golden hour, NOT sunset), ocean and sky softly out of focus in the background.
+      const catalogCustom = custom_prompt ? custom_prompt.replace(/\[catalog_[^\]]+\]/g, '').trim() : '';
+      prompt = `Swimwear product photo. The reference images show the garment to recreate — match its exact color, cut, fabric, pattern, and construction on a new model described below.
 
 Product: ${product.title}
 
-LIGHTING (critical, do not alter):
-- MIDDAY sunlight, sun directly overhead or slightly forward, full bright daylight — absolutely NOT golden hour, NOT sunset, NOT warm orange/amber tones, NOT low-angle sun
-- Clean bright even illumination on the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
-- The model's skin and the garment must be the brightest, most exposed elements in the frame — well-lit, high-key, no dark shadows on the product
-- Background (ocean, sky, sand) bright and airy, slightly softer than the model but NOT dark
-- No golden/orange color cast, no warm tint — clean neutral daylight white balance
-- No flat side-lighting, no overcast diffusion, no backlit silhouette
-- Subtle natural rim light along her hair for separation from background
+${catalogCustom || 'MODEL: Mid-size woman, US 12-14, natural curves, late 30s, warm smile.\n\nPOSE: Standing on beach, weight on right hip, arms relaxed, looking at camera.'}
 
-COMPOSITION:
-- ${aspect_ratio || '4:5'} framing
-- Full body or three-quarter body crop, model centered, framing emphasizes the torso and the garment construction
-- Shallow depth of field, background softly out of focus
-- Sharp focus on the garment fabric, fit, seaming, and texture
-- Dry sand under her feet, clean uncluttered foreground
+Setting: Beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly blurred behind. Front-lit, high-key, clean neutral white balance.
 
-GARMENT RULES (non-negotiable):
-- For one-piece swimsuits: full coverage from bust to upper hip, moderate leg opening (not high-cut), the suit covers the body as designed in the reference image
-- For two-piece swimsuits: bikini bottoms must be high-waisted, sit well above the belly button, and fully cover the navel
-- Bikini bottoms must have moderate leg opening, not high-cut, with full coverage across the hips and upper thighs
-- Repeat: high-waisted bottoms, navel fully covered, moderate leg cut
-- Garment fabric texture, color, and structural details must match the attached reference exactly
+Garment rules: Recreate reference garment exactly. High-waisted bottoms must cover navel. Fabric smooth, zero bunching.
 
-${custom_prompt ? custom_prompt : 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera.'}
+Hyperrealistic, 85mm f/2.8, Canon R5, sharp face with visible pores and eye detail. ${aspect_ratio || '4:5'} format.
 
-FACE QUALITY (critical):
-- Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
-- Eyes must have realistic catchlight reflections, visible iris detail, individual eyelashes
-- Natural lip texture, not glossy or plastic
-- Face must be the sharpest element in the image — tack sharp focus on eyes
-- Realistic facial proportions, no uncanny valley, no doll-like smoothing
-- If the face looks AI-generated, blurry, or plastic — the image is WRONG
-
-Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture. 8K resolution, ultra-sharp.
-
-FINAL CHECK — READ LAST:
-- The woman in this image must match the MODEL description above — NOT the woman in the reference photo
-- If the generated woman looks like the woman in the product reference image, the result is WRONG
-- Generate a COMPLETELY DIFFERENT person. The reference is for the GARMENT only.
-
-NEGATIVE: No golden hour lighting, no sunset lighting, no warm orange tones, no amber light, no low sun angle, no copying the reference model's face, no copying the reference model's hair, no plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -348,8 +313,10 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const productInstr = reference_url
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `PRODUCT REPRODUCTION — PIXEL-ACCURATE:\nThe garment in the final image must be an EXACT visual copy of the reference image(s). Match PRECISELY: exact color ratio and placement, exact width of every stripe/trim/band/border, exact neckline shape and depth, exact waistband height and style, exact stitching pattern, exact strap width. Do NOT "improve", simplify, or reinterpret the design. Copy it exactly as shown in the reference.`;
-        const productCheck = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL PRODUCT CHECK: The garment proportions (color ratios, stripe widths, trim sizes, waistband height) must EXACTLY match the product reference images. If any detail looks different from the reference — it is WRONG. The product must be a faithful reproduction, not an interpretation.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-        const falPrompt = `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
+        const productCheck = isProductCatalog ? '' : `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL PRODUCT CHECK: The garment proportions (color ratios, stripe widths, trim sizes, waistband height) must EXACTLY match the product reference images. If any detail looks different from the reference — it is WRONG. The product must be a faithful reproduction, not an interpretation.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+        const falPrompt = isProductCatalog
+          ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
+          : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
         falModelUsed = bananaModel;
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
