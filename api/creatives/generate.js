@@ -427,6 +427,11 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     const sceneMatch = (custom_prompt || '').match(/Scene:\s*([^.]+)\./);
     const colorVariant = (custom_prompt || '').match(/Product color:\s*([^.]+)\./);
     const negMatch = (custom_prompt || '').match(/Negative:\s*(.+)/);
+    // Catalog-specific tags
+    const catalogModelMatch = (custom_prompt || '').match(/\[catalog_model:([^\]]+)\]/);
+    const catalogPoseMatch = (custom_prompt || '').match(/\[catalog_pose:([^\]]+)\]/);
+    const catalogFramingMatch = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/);
+
 
     const MODEL_LABELS = {
       fal_nano_banana: 'Nano Banana 2', fal_nano_banana_pro: 'Nano Banana Pro',
@@ -438,9 +443,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     const configMeta = {
       model: falModelUsed || MODEL_LABELS[ai_model] || ai_model,
       provider: falModelUsed ? 'fal.ai' : 'Higgsfield',
-      ...(poseMatch && { pose: poseMatch[1].trim() }),
+      ...(catalogModelMatch && { catalog_model: catalogModelMatch[1].trim() }),
+      ...(catalogPoseMatch && { pose: catalogPoseMatch[1].trim() }),
+      ...(catalogFramingMatch && { framing: catalogFramingMatch[1].trim() }),
+      ...(!catalogPoseMatch && poseMatch && { pose: poseMatch[1].trim() }),
       ...(bodyMatch && { body_type: bodyMatch[1].trim() }),
-      ...(framingMatch && { framing: framingMatch[1].trim() }),
+      ...(!catalogFramingMatch && framingMatch && { framing: framingMatch[1].trim() }),
       ...(sceneMatch && { scene: sceneMatch[1].trim() }),
       ...(colorVariant && { color: colorVariant[1].trim() }),
       ...(negMatch && { negative_prompt: negMatch[1].trim() }),
