@@ -205,7 +205,7 @@ async function handler(req, res) {
 
 Professional e-commerce swimwear product photography. ${modelDesc}
 
-She is barefoot on a quiet beach, bright overcast or open shade daylight (NOT golden hour, NOT sunset, NOT direct harsh sun), ocean softly out of focus in the background. BRIGHT airy photo — the image should look OVEREXPOSED rather than underexposed. Flat soft light from all directions, ZERO hard shadows on model or garment. Think: cloudy bright day or open shade under blue sky. The skin and fabric must glow with light. Overall exposure: bright, airy, lifted, high-key. Clean neutral white balance.
+She is barefoot on a quiet sunny beach, clear blue sky, bright beautiful sunny day. Soft natural sunlight — bright and warm but NOT harsh. The photo must feel sunny, cheerful, and inviting — like a perfect vacation day. BRIGHT airy exposure — skin and fabric glow with light, no dark areas anywhere. Minimal soft shadows only. Clean neutral white balance. NOT overcast, NOT cloudy, NOT grey sky, NOT golden hour, NOT sunset.
 
 Product: ${product.title}
 
@@ -217,7 +217,7 @@ Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspe
 
 ${framingReminder}
 
-NEGATIVE: dark photo, underexposed, moody lighting, shadows on garment, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
