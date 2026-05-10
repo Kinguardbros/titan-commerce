@@ -193,7 +193,7 @@ Product: ${product.title}
 
 ${catalogCustom || 'MODEL: Mid-size woman, US 12-14, natural curves, late 30s, warm smile.\n\nPOSE: Standing on beach, weight on right hip, arms relaxed, looking at camera.'}
 
-Setting: Beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly blurred behind. Front-lit, high-key, clean neutral white balance.
+Setting: Beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly blurred behind. Sun directly in front of the model, lighting her face and garment evenly with ZERO shadows on the product. Flat frontal light, no side shadows, no under-chin shadows, high-key bright exposure. Clean neutral white balance.
 
 Garment rules: Recreate reference garment exactly. High-waisted bottoms must cover navel. Fabric smooth, zero bunching.
 
