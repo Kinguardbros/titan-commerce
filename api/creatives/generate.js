@@ -84,11 +84,11 @@ async function handler(req, res) {
     }
 
     let images = JSON.parse(product.images || '[]');
-    // When audience is set, limit product images to first 2 only.
-    // Pushed AI creatives (with another persona) get appended to the END of Shopify images,
-    // while original product shots (flat-lay, product-only) are at the BEGINNING.
-    // This prevents a previously pushed Jennifer creative from overriding a Chloe avatar.
-    if (audience && images.length > 2) {
+    // For audience flows AND standalone styles (product_catalog, realistic_beach):
+    // limit to first 2 product images only. Pushed AI creatives (with another model's face)
+    // get appended to the END of Shopify images — taking only the first 2 keeps original
+    // product shots (flat-lay, headless crops) and avoids copying a previous model's face.
+    if ((audience || isProductCatalog || isRealisticBeach) && images.length > 2) {
       images = images.slice(0, 2);
     }
     // Prepend reference_url to product images ONLY for non-audience flows (color variant, etc.).
