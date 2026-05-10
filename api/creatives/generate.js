@@ -205,7 +205,7 @@ async function handler(req, res) {
 
 Professional e-commerce swimwear product photography. ${modelDesc}
 
-She is barefoot on a quiet beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly out of focus in the background. Front-lit, high-key, zero shadows on product. Clean neutral white balance.
+She is barefoot on a quiet beach, midday bright sunlight (NOT golden hour, NOT sunset), ocean softly out of focus in the background. Light source directly in front of model, flat frontal illumination, ZERO shadows anywhere on the swimsuit or body. The entire garment must be evenly lit with no dark areas. High-key exposure, clean neutral white balance.
 
 Product: ${product.title}
 
@@ -217,7 +217,7 @@ Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspe
 
 ${framingReminder}
 
-NEGATIVE: golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: shadows on garment, dark areas on swimsuit, side lighting, dramatic lighting, golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
