@@ -189,12 +189,12 @@ async function handler(req, res) {
 
 Professional e-commerce swimwear product photography.
 
-She is barefoot on a quiet beach in bright afternoon sunlight, ocean and sky softly out of focus in the background.
+She is barefoot on a quiet beach at MIDDAY in bright overhead sunlight (NOT golden hour, NOT sunset), ocean and sky softly out of focus in the background.
 
 Product: ${product.title}
 
 LIGHTING (critical, do not alter):
-- Bright natural afternoon sunlight, sun high in the sky, full daylight — NOT golden hour, NOT sunset, NOT warm orange tones
+- MIDDAY sunlight, sun directly overhead or slightly forward, full bright daylight — absolutely NOT golden hour, NOT sunset, NOT warm orange/amber tones, NOT low-angle sun
 - Clean bright even illumination on the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
 - The model's skin and the garment must be the brightest, most exposed elements in the frame — well-lit, high-key, no dark shadows on the product
 - Background (ocean, sky, sand) bright and airy, slightly softer than the model but NOT dark
@@ -228,7 +228,7 @@ FACE QUALITY (critical):
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture. 8K resolution, ultra-sharp.
 
-NEGATIVE: No plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
+NEGATIVE: No golden hour lighting, no sunset lighting, no warm orange tones, no amber light, no low sun angle, no plastic skin, no porcelain smoothing, no AI face, no blurry face, no smooth featureless skin, no doll eyes, no fitness model body, no slim body, no flat stomach, no toned arms, no thigh gap, no exaggerated curves, no sexual posing, no duck face, no visible logos or text, no watermarks, no oversaturated colors, no glossy wet-look skin, no extra fingers, no distorted hands, no skinny model, no athletic build.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
