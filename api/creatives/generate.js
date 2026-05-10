@@ -83,6 +83,9 @@ async function handler(req, res) {
       if (store) storeShopifyUrl = store.shopify_url;
     }
 
+    const isRealisticBeach = style === 'realistic_beach';
+    const isProductCatalog = style === 'product_catalog';
+
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
     // limit to first 2 product images only. Pushed AI creatives (with another model's face)
@@ -181,8 +184,6 @@ async function handler(req, res) {
 
     // Realistic Beach — standalone style that bypasses all audience/age/tummy/skill systems.
     // Pure prompt from product reference images + hardcoded body/environment description.
-    const isRealisticBeach = style === 'realistic_beach';
-    const isProductCatalog = style === 'product_catalog';
     let prompt;
     if (isProductCatalog) {
       prompt = `REFERENCE IMAGE RULES: The attached image(s) show the PRODUCT GARMENT ONLY. Use ONLY the swimsuit/garment from the reference — copy its exact color, cut, neckline, strap style, fabric texture, seaming, construction details, and coverage. Do NOT copy the model/woman shown in the reference. COMPLETELY IGNORE her face, hair, skin tone, body shape, and identity. Generate a COMPLETELY DIFFERENT woman as described below. The reference is for the GARMENT only, not the person wearing it.
