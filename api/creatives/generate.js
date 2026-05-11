@@ -201,7 +201,7 @@ async function handler(req, res) {
       const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
       const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
 
-      prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+      prompt = `Use the swimsuit shown in the attached reference image(s) as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
 
 Professional e-commerce swimwear product photography. ${modelDesc}
 
@@ -213,11 +213,21 @@ ${poseAndFraming}
 
 Garment: High-waisted bottoms cover navel. Fabric smooth, zero bunching. Match reference exactly.
 
-Hyperrealistic, 85mm f/2.8, sharp face with visible pores and eye detail. ${aspect_ratio || '4:5'} format.
+FACE QUALITY (critical):
+- Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
+- Eyes must have realistic catchlight reflections, visible iris detail, individual eyelashes
+- Natural lip texture, not glossy or plastic
+- Face must be the sharpest, most detailed element in the image — tack sharp focus on the eyes
+- Realistic facial proportions, no uncanny valley, no doll-like smoothing
+- If the face looks AI-generated, blurry, or plastic — the image is WRONG
+
+Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
 ${framingReminder}
 
-NEGATIVE: overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, AI face, blurry face, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+Use ONLY the garment from the reference image(s) — generate a fresh model with the face and body described above. Do NOT copy the face of any person who may appear in the reference image(s).
+
+NEGATIVE: overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -335,12 +345,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const falPrompt = isProductCatalog
           ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
-        // Product Catalog: send only 1 reference image (garment reference) to minimize
-        // model face copying. Edit models always try to preserve identity from references —
-        // fewer references = less face influence, more prompt influence.
-        const finalRefImages = isProductCatalog ? refImages.slice(0, 1) : refImages;
+        // Product Catalog: keep up to 2 product reference images (already trimmed to first 2
+        // by the image filter above, which excludes pushed AI creatives). Edit models need a
+        // visual anchor for realistic face/skin quality — 1 garment-only image is too little;
+        // the prompt's FACE QUALITY section + "do not copy reference face" handle identity.
         falModelUsed = bananaModel;
-        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: finalRefImages, aspectRatio: aspect_ratio });
+        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
         requestId = job.requestId;
         pollBase = job.pollBase;
         if (job.completed && job.url) imageUrl = job.url;  // some models return sync

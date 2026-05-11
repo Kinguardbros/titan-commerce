@@ -529,7 +529,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     toast.info("Generating...");
 
     const backendStyle = imgStyle.startsWith('cs_') ? imgStyle : (STYLE_MAP[imgStyle] || "ad_creative");
-    const backendModel = MODEL_MAP[imgModel] || "fal_nano_banana";
+    // Product Catalog hides the model picker — force Nano Banana Pro (best identity preservation)
+    const backendModel = imgStyle === 'product-catalog' ? "fal_nano_banana_pro" : (MODEL_MAP[imgModel] || "fal_nano_banana");
     const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
