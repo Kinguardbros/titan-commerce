@@ -223,7 +223,7 @@ Recreate the swimsuit faithfully on the model: same color, same cut, same neckli
 
 ${catalogModelLine}
 
-She is barefoot on a quiet beach, ocean and bright sky behind her. The LIGHT is soft and diffused — like a bright overcast day, or as if a huge silk diffuser / studio softbox is spread across the whole sky in front of her, wrapping her in even, shadowless light. Bright but NOT harsh: no direct hard sun, no strong cast shadows. The light comes from the front (sun/sky in front of her, not behind), so her face, body and the swimsuit are evenly lit head-on. The SWIMSUIT is the hero of this photo and must be evenly, fully lit — every part of it clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. ZERO hard shadows on the swimsuit — not under the bust, not at the waistband, not in the folds, not cast by her arms; only the faintest soft gradient at most. The garment is fully and evenly exposed and bright; if any part of it sinks into dark shadow or is hard to read, the lighting is WRONG. Clean neutral white balance, true blacks that still show fabric detail (not crushed to pure black). NOT a gloomy grey day, NOT dark, NOT moody — bright, clean, soft, even.
+She is barefoot on a quiet beach, ocean behind her, the sky a soft blue fading to pale near the horizon. The LIGHT is warm golden-hour light — late afternoon, the sun low and warm in front of her (sun/sky in front, never behind), wrapping her face, body and the swimsuit in a soft warm glow. Soft and flattering: gentle, long, soft shadows on the sand only — NOT hard contrasty midday sun, NOT deep dark shadows. The light comes from the front, so her face and the swimsuit are evenly lit head-on. The SWIMSUIT is the hero of this photo and must be evenly, fully lit — every part of it clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. ZERO hard shadows on the swimsuit — not under the bust, not at the waistband, not in the folds, not cast by her arms; only the faintest soft warm gradient at most. The garment is fully exposed, bright and readable; if any part of it sinks into dark shadow, the lighting is WRONG. Warm but natural color (a gentle golden warmth, NOT a heavy orange filter), true blacks that still show fabric detail (not crushed to pure black). NOT a gloomy grey day, NOT dark, NOT moody, NOT high-noon harsh — soft, warm, glowing, evenly lit.
 
 Product: ${product.title}
 
@@ -241,13 +241,13 @@ FACE QUALITY (critical):
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
-LIGHTING: soft, even, diffused light from the front (bright overcast / big softbox spread across the sky in front of her) — never hard direct sun, never side or back light. The swimsuit is evenly and fully lit, bright, with every detail readable and NO hard shadows on it.
+LIGHTING: warm soft golden-hour light from the front (low late-afternoon sun in front of her, gentle warm glow) — never hard high-noon sun, never side or back light. The swimsuit is evenly and fully lit, bright, with every detail readable and NO hard shadows on it.
 
 ${framingReminder}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}hard direct sunlight, harsh sun, hard cast shadows, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, backlit, side lighting only, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}harsh high-noon sun, hard direct overhead sun, hard cast shadows, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, backlit, silhouette, side lighting only, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
