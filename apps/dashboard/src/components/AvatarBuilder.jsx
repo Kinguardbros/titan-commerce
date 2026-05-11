@@ -108,11 +108,13 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
     setVariants([]);
     setSelectedVariant(null);
     try {
-      // Free-text override: when filled, ignore the structured builder. Prefix "Full body
-      // reference photograph:" so generate_avatar treats it as a passthrough prompt
-      // (it rewrites prompts that don't start with "Professional" or "Full body").
+      // Free-text override: when filled, ignore the structured builder. Wrap the user's
+      // model description in a standard reference-photo shell — clean white studio, neutral
+      // nude/beige underwear, full body, sharp face. Starting with "Full body reference
+      // photograph" makes generate_avatar treat it as a passthrough prompt (it rewrites
+      // prompts that don't start with "Professional" or "Full body").
       const prompt = freeText.trim()
-        ? `Full body reference photograph: ${freeText.trim()}`
+        ? `Full body reference photograph of a woman against a clean white seamless studio background, evenly lit, soft professional studio lighting. THE MODEL: ${freeText.trim()} FULL BODY shot — head to bare feet fully visible, feet at the bottom of the frame. Do NOT crop at the knees or waist. She is standing facing the camera, arms relaxed at sides, neutral natural expression. CLOTHING IS CRITICAL: she is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — the underwear color MUST match her skin tone, NOT black, NOT white, NOT grey, NOT any dark or bright color. Simple plain nude-colored underwear, no patterns, no lace, no logos. Bare feet, no shoes. Sharp detailed face — visible skin pores, individual eyelashes, realistic eye catchlight, true-to-life skin texture, not plastic, not airbrushed. Photorealistic, high resolution. FINAL CHECK: clean white studio background; underwear is BEIGE/NUDE colored, NOT black; full body with feet visible.`
         : buildAvatarPrompt({ age, weight, height, bodyType, attractiveness, faceShape, noseSize, lipFullness, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
       const result = await generateAvatar(storeId, name.trim(), prompt);
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
@@ -291,10 +293,10 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
             <div className="ab-field">
               <label className="ab-label">Free-text description (overrides options above)</label>
               <textarea className="ab-textarea" value={freeText} onChange={e => setFreeText(e.target.value)} rows={4}
-                placeholder="e.g. A 38-year-old woman, US size 12-14, warm brunette, apple-shaped, fair skin with freckles, gentle natural smile..." />
+                placeholder="Describe ONLY the model — age, body, hair, face, skin, vibe. e.g. A 38-year-old woman, US size 12-14, warm brunette shoulder-length wavy hair, apple-shaped, fair skin with light freckles, soft round face, gentle natural smile, North American look. (The studio background + neutral underwear are added automatically.)" />
               {freeText.trim() && (
                 <div style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 4 }}>
-                  When filled, the options above are ignored.
+                  When filled, the options above are ignored. Generated in a clean white studio in neutral nude underwear.
                 </div>
               )}
             </div>
