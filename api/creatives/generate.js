@@ -56,7 +56,7 @@ async function handler(req, res) {
 
   // Auto-inject persona reference if audience selected and no explicit reference
   // Skip for realistic_beach — standalone style, no avatar injection
-  if (audience && !reference_url && store_id && style !== 'realistic_beach' && style !== 'product_catalog') {
+  if (audience && !reference_url && store_id && style !== 'realistic_beach') {
     try {
       const { data: avatar } = await supabase.from('persona_avatars')
         .select('reference_url')
@@ -203,11 +203,25 @@ async function handler(req, res) {
       const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
       const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
 
-      prompt = `The attached reference image shows the SWIMSUIT/GARMENT ONLY — use it solely to copy the garment (color, cut, neckline, strap style, fabric texture, seaming, construction, coverage). If a person appears in the reference, COMPLETELY IGNORE that person — do not copy her face, hair, body, age, or skin tone. The woman in the final image is a NEW model described below, not the person in the reference.
+      // When a persona avatar is the reference, the model comes FROM that image (sandwich:
+      // image 1 + last image). Otherwise the model is generated from the modelDesc text and
+      // the reference is garment-only.
+      const catalogReferenceRules = reference_url
+        ? `Reference image roles: image 1 AND the last image = THE MODEL (the SAME woman, shown twice — use her exact face, hair, skin tone, body shape, and age). Any image in between = THE GARMENT (cropped product shots — copy the swimsuit's color, cut, neckline, strap style, fabric texture, seaming, construction, coverage exactly; do NOT let it influence the model's face).`
+        : `The attached reference image shows the SWIMSUIT/GARMENT ONLY — use it solely to copy the garment (color, cut, neckline, strap style, fabric texture, seaming, construction, coverage). If a person appears in the reference, COMPLETELY IGNORE that person — do not copy her face, hair, body, age, or skin tone. The woman in the final image is a NEW model described below, not the person in the reference.`;
+      const catalogModelLine = reference_url
+        ? `Professional e-commerce swimwear product photography. THE MODEL — use the woman shown in reference image 1 AND the last reference image (the SAME woman, twice): her exact face, hair, skin tone, body shape, and age. She is the ONLY person; do not invent a different face.`
+        : `Professional e-commerce swimwear product photography. THE MODEL — generate exactly this woman: ${modelDesc}`;
+      const catalogFinalCheck = reference_url
+        ? `FINAL CHECK — READ LAST: The model in this image MUST be the exact woman from reference image 1 / the last reference image. If she looks like a different person, the result is WRONG.`
+        : `FINAL CHECK — READ LAST: The model in this image MUST be the exact woman described above ("${modelDesc.slice(0, 80)}..."). If the generated woman looks like a person from the reference image instead of the described model, the result is WRONG — generate the described woman.`;
+      const catalogNegativePrefix = reference_url ? '' : "copying the reference model's face, copying the reference person's identity, ";
 
-Recreate the swimsuit faithfully on the new model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+      prompt = `${catalogReferenceRules}
 
-Professional e-commerce swimwear product photography. THE MODEL — generate exactly this woman: ${modelDesc}
+Recreate the swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+
+${catalogModelLine}
 
 She is barefoot on a quiet sunny beach, clear blue sky, bright beautiful sunny day. Soft natural sunlight — bright and warm but NOT harsh. The photo must feel sunny, cheerful, and inviting — like a perfect vacation day. BRIGHT airy exposure — skin and fabric glow with light, no dark areas anywhere. Minimal soft shadows only. Clean neutral white balance. NOT overcast, NOT cloudy, NOT grey sky, NOT golden hour, NOT sunset.
 
@@ -229,9 +243,9 @@ Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm l
 
 ${framingReminder}
 
-FINAL CHECK — READ LAST: The model in this image MUST be the exact woman described above ("THE MODEL — generate exactly this woman: ${modelDesc.slice(0, 80)}..."). The reference image is the GARMENT ONLY. If the generated woman looks like a person from the reference image instead of the described model, the result is WRONG — generate the described woman.
+${catalogFinalCheck}
 
-NEGATIVE: copying the reference model's face, copying the reference person's identity, overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -329,13 +343,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // With persona avatar: sandwich pattern — avatar FIRST + product images + avatar LAST
         // This doubles the identity signal so AI doesn't lose the face among headless crop product shots.
         const productImages = images.slice(0, 2);
-        const refImages = reference_url
-          ? [reference_url, ...productImages, reference_url]  // avatar → products → avatar (sandwich)
-          : isProductCatalog
-            ? images.slice(0, 1)   // Product Catalog: only the first product image (usually a packshot/
-                                   // flat-lay, not a lifestyle shot of a model) — fewer reference faces
-                                   // for the edit model to copy, so the prompt's model description wins
-            : images.slice(0, 4);
+        // Product Catalog: with a persona avatar → sandwich [avatar, 1 product image, avatar]
+        //                  without an avatar     → 1 product image only (packshot/flat-lay,
+        //                                          not a model shot), model comes from the prompt's modelDesc
+        const refImages = isProductCatalog
+          ? (reference_url ? [reference_url, ...images.slice(0, 1), reference_url] : images.slice(0, 1))
+          : (reference_url ? [reference_url, ...productImages, reference_url] : images.slice(0, 4));
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
