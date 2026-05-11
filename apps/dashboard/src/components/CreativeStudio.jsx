@@ -409,14 +409,21 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
         }
       }
+      // Attach avatar metadata (reference photo + active flag) to skill-derived personas by name
+      const avByName = new Map((avatarData || []).map((av) => [av.persona_name, av]));
+      for (const p of parsed) {
+        const av = avByName.get(p.name);
+        if (av) { p.reference_url = av.reference_url || null; p.is_active = av.is_active !== false; }
+        else { p.is_active = true; }
+      }
       // Add custom avatars not in audience-personas skill
       const skillNames = new Set(parsed.map((p) => p.name));
       for (const av of avatarData || []) {
         if (!skillNames.has(av.persona_name) && av.reference_url) {
-          parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom avatar' });
+          parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom avatar', reference_url: av.reference_url, is_active: av.is_active !== false });
         }
       }
-      if (parsed.length) setPersonas(parsed);
+      if (parsed.length) setPersonas(parsed.filter((p) => p.is_active !== false));
     }).catch(() => {});
   }, [storeId, product?.id]);
   const [tab, setTab] = useState("image");

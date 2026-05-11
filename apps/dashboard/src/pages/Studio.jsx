@@ -126,11 +126,13 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
           while ((m = rx2.exec(as.content)) !== null) parsed.push({ name: m[1], age: m[3], label: m[2].trim() });
         }
       }
+      const avByName = new Map((avatarData || []).map((av) => [av.persona_name, av]));
+      for (const p of parsed) { const av = avByName.get(p.name); p.is_active = av ? av.is_active !== false : true; }
       const skillNames = new Set(parsed.map((p) => p.name));
       for (const av of avatarData || []) {
-        if (!skillNames.has(av.persona_name) && av.reference_url) parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom' });
+        if (!skillNames.has(av.persona_name) && av.reference_url) parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom', is_active: av.is_active !== false });
       }
-      setPersonas(parsed);
+      setPersonas(parsed.filter((p) => p.is_active !== false));
     }).catch(() => {});
   }, [storeId]);
 
