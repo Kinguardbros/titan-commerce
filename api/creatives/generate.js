@@ -225,7 +225,7 @@ ${catalogModelLine}
 
 She is barefoot on a quiet sunny beach, clear blue sky, bright beautiful sunny day. Soft natural sunlight — bright and warm but NOT harsh. The photo must feel sunny, cheerful, and inviting — like a perfect vacation day. BRIGHT airy exposure — skin and fabric glow with light, no dark areas anywhere. Minimal soft shadows only. Clean neutral white balance. NOT overcast, NOT cloudy, NOT grey sky, NOT golden hour, NOT sunset.
 
-PRODUCT LIGHTING (critical): The SWIMSUIT is the hero of this photo and MUST be 100% evenly lit — full, bright, frontal illumination falling directly onto the garment so every part of it is clearly visible. ZERO shadows on the swimsuit: no shadow under the bust, no shadow at the waistband, no shadow in the folds or seams, no dark side of the garment, no part of the swimsuit falling into shade. The fabric texture, the exact color and pattern, the trims, the stitching, the seams, the waistband — all of it crisply lit and readable. Treat the lighting like a professional e-commerce product shoot: the product is fully and evenly exposed first, the rest of the scene second. If any portion of the swimsuit is in shadow or hard to see, the lighting is WRONG.
+PRODUCT LIGHTING (critical): Imagine a large professional photography softbox / studio light placed RIGHT IN FRONT of the model, just off-camera, aimed directly at her — a strong frontal key light blasting bright, even illumination straight onto the swimsuit and her face. The light is hitting the garment head-on. The SWIMSUIT is the hero of this photo and MUST be 100% evenly lit — every part clearly visible. ZERO shadows on the swimsuit: no shadow under the bust, no shadow at the waistband, no shadow in the folds or seams, no dark side of the garment, no part of the swimsuit falling into shade. The fabric texture, the exact color and pattern, the trims, the stitching, the seams, the waistband — all of it crisply lit and readable. Treat the lighting like a professional e-commerce product shoot with a front-facing key light: the product is fully and evenly exposed first, the rest of the scene second. If any portion of the swimsuit is in shadow or hard to see, the lighting is WRONG.
 
 Product: ${product.title}
 
@@ -247,7 +247,9 @@ ${framingReminder}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}shadows on the swimsuit, shadow under the bust, shadow at the waistband, dark areas on the garment, garment in shade, half-lit product, underlit swimsuit, overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+LIGHTING CHECK — READ LAST: There is a powerful frontal key light (studio softbox) right in front of the model, aimed directly at her, lighting the swimsuit head-on. The garment is fully, brightly, evenly lit — every detail clearly visible, ZERO shadows anywhere on it. If the swimsuit is even partially in shadow, the result is WRONG.
+
+NEGATIVE: ${catalogNegativePrefix}shadows on the swimsuit, shadow under the bust, shadow at the waistband, dark areas on the garment, garment in shade, half-lit product, underlit swimsuit, side lighting, rim lighting only, backlit, overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
