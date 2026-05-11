@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { generateAvatar, uploadAvatar, setAvatarReference, deleteAvatar } from '../lib/api';
+import { generateAvatar, uploadAvatar, setAvatarReference, setAvatarActive, deleteAvatar } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './AvatarDetail.css';
 
@@ -36,6 +36,8 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
   const [referenceUrl, setReferenceUrl] = useState(persona.reference_url);
   const [showEdit, setShowEdit] = useState(false);
   const [descText, setDescText] = useState(persona.description || '');
+  const [isActive, setIsActive] = useState(persona.is_active !== false); // default true when undefined
+  const [togglingActive, setTogglingActive] = useState(false);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -104,6 +106,22 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
     }
   };
 
+  const handleToggleActive = async () => {
+    const next = !isActive;
+    setTogglingActive(true);
+    try {
+      await setAvatarActive(storeId, persona.name, next);
+      setIsActive(next);
+      toast.success(next ? `${persona.name} activated` : `${persona.name} deactivated — hidden from pickers`);
+      onUpdated?.();
+    } catch (err) {
+      console.error('[AvatarDetail] Toggle active failed:', { error: err.message, persona: persona.name });
+      toast.error(`Failed: ${err.message}`);
+    } finally {
+      setTogglingActive(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!window.confirm(`Delete all avatar data for ${persona.name}? This cannot be undone.`)) return;
     try {
@@ -141,6 +159,10 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
             </button>
             <button onClick={() => setShowEdit(p => !p)} title="Edit description">
               ✏️ Edit
+            </button>
+            <button onClick={handleToggleActive} disabled={togglingActive}
+              title={isActive ? 'Deactivate — hide from pickers' : 'Activate — show in pickers'}>
+              {togglingActive ? '...' : isActive ? '👁 Active' : '🚫 Inactive'}
             </button>
             <button onClick={handleDelete} title="Delete avatar" className="avd-tool--danger">
               🗑 Delete

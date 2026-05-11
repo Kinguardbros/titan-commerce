@@ -455,6 +455,13 @@ export function setAvatarReference(storeId, personaName, url) {
   });
 }
 
+export function setAvatarActive(storeId, personaName, isActive) {
+  return fetchJSON('/api/system?action=set_avatar_active', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, persona_name: personaName, is_active: isActive }),
+  });
+}
+
 export function deleteAvatar(storeId, personaName) {
   return fetchJSON('/api/system?action=delete_avatar', {
     method: 'POST',

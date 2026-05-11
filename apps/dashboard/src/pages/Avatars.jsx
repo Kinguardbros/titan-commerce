@@ -51,11 +51,11 @@ export default function Avatars({ storeId, store }) {
   const mergedPersonas = [
     ...personas.map(p => {
       const avatar = avatars.find(a => a.persona_name === p.name);
-      return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '' };
+      return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '', is_active: avatar ? avatar.is_active !== false : true };
     }),
     ...avatars.filter(a => !personaNames.has(a.persona_name)).map(a => ({
       name: a.persona_name, age: '', label: a.description || a.persona_name,
-      reference_url: a.reference_url, variants: a.variants || [], description: a.description || '',
+      reference_url: a.reference_url, variants: a.variants || [], description: a.description || '', is_active: a.is_active !== false,
     })),
   ];
 
@@ -125,12 +125,18 @@ export default function Avatars({ storeId, store }) {
 
       <div className="av-grid">
         {mergedPersonas.map(p => (
-          <div key={p.name} className="av-card" onClick={() => setSelectedPersona(p)}>
-            <div className="av-card-img">
+          <div key={p.name} className="av-card" onClick={() => setSelectedPersona(p)}
+            style={p.is_active === false ? { opacity: 0.45 } : undefined}>
+            <div className="av-card-img" style={{ position: 'relative' }}>
               {p.reference_url ? (
                 <img src={p.reference_url} alt={p.name} />
               ) : (
                 <div className="av-card-placeholder">?</div>
+              )}
+              {p.is_active === false && (
+                <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                  Inactive
+                </div>
               )}
               {!p.reference_url && (
                 <button
