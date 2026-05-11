@@ -438,6 +438,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [catalogPose, setCatalogPose] = useState("hero");
   const [catalogModel, setCatalogModel] = useState("everyday38");
   const [catalogFraming, setCatalogFraming] = useState("three-quarter");
+  const [catalogAvatar, setCatalogAvatar] = useState(null); // persona name, or null = use text preset
   const [showNegPrompt, setShowNegPrompt] = useState(false);
   // A/B test
   const [abMode, setAbMode] = useState(false);
@@ -518,6 +519,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const sName = sObj?.title || "image";
     let msg = `Generate ${imgCount} ${sName.toLowerCase()}(s), ${subject}, ${imgRatio}, model: ${model}`;
     if (imgModel.startsWith("nano-banana")) msg += `, ${imgResolution}`;
+    if (styleId === "product-catalog" && catalogAvatar) msg += `, avatar: ${catalogAvatar}`;
     if (subject === "On model") msg += `, pose: ${pose}`;
     if (SCENE_STYLES.has(styleId) && scn !== "Auto") msg += `, scene: ${scn}`;
     if (sObj?.prompt) msg += `, style prompt: ${sObj.prompt}`;
@@ -525,7 +527,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     if (textMode === "Custom" && customText) msg += `, text overlay: "${customText}"`;
     if (negPrompt.trim()) msg += `, negative: ${negPrompt.trim()}`;
     return msg;
-  }, [imgModel, imgCount, subject, imgRatio, imgResolution, imgInstructions, textMode, customText, negPrompt, allStyles]);
+  }, [imgModel, imgCount, subject, imgRatio, imgResolution, catalogAvatar, imgInstructions, textMode, customText, negPrompt, allStyles]);
 
   const handleGenImage = useCallback(async () => {
     if (!product?.id || generating) return;
@@ -550,11 +552,14 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
     const catalogModelPrompt = isProductCatalogStyle ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
     const catalogFramingPrompt = isProductCatalogStyle ? (CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.prompt || '') : '';
-    const catalogModelLabel = CATALOG_MODELS.find(m => m.id === catalogModel)?.label || '';
+    const catalogModelLabel = catalogAvatar || (CATALOG_MODELS.find(m => m.id === catalogModel)?.label || '');
     const catalogPoseLabel = CATALOG_POSES.find(p => p.id === catalogPose)?.label || '';
     const catalogFramingLabel = CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.label || '';
+    // When an avatar is chosen, the model comes from the avatar reference (sent via `audience`),
+    // so leave the model description out of custom_prompt.
+    const catalogModelBlock = isProductCatalogStyle && !catalogAvatar ? `${catalogModelPrompt}\n\n` : '';
     const customInstr = isProductCatalogStyle
-      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogModelPrompt}\n\n${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
+      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogModelBlock}${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
@@ -569,7 +574,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             show_model: subject === "On model",
             text_overlay: textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom",
             overlay_text: textMode === "Custom" ? customText : "",
-            audience: useAudience && audience !== "auto" ? audience : undefined,
+            audience: isProductCatalogStyle
+              ? (catalogAvatar || undefined)
+              : (useAudience && audience !== "auto" ? audience : undefined),
             aspect_ratio: imgRatio,
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
             reference_url: colorRef,
@@ -582,7 +589,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -821,10 +828,26 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog" && (
             <>
               <div>
-                <SectionLabel>Model</SectionLabel>
+                <SectionLabel>Reference model</SectionLabel>
+                <Select
+                  value={catalogAvatar || "__preset__"}
+                  onChange={(v) => setCatalogAvatar(v === "__preset__" ? null : v)}
+                  options={["__preset__", ...personas.filter((p) => p.reference_url).map((p) => p.name)]}
+                  renderOption={(opt) => opt === "__preset__"
+                    ? "Use text preset below"
+                    : `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
+                />
+                {catalogAvatar && (
+                  <div style={{ fontSize: 11, color: TEXT_MID, marginTop: 4 }}>
+                    Using avatar "{catalogAvatar}" — the model presets below are ignored.
+                  </div>
+                )}
+              </div>
+              <div>
+                <SectionLabel>Model preset</SectionLabel>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {CATALOG_MODELS.map((m) => (
-                    <Pill key={m.id} active={catalogModel === m.id} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
+                    <Pill key={m.id} active={catalogModel === m.id && !catalogAvatar} disabled={!!catalogAvatar} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
                   ))}
                 </div>
               </div>
