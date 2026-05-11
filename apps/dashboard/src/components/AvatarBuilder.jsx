@@ -90,6 +90,7 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
   const [imperfections, setImperfections] = useState([]);
   const [expression, setExpression] = useState('Relaxed');
   const [extraNotes, setExtraNotes] = useState('');
+  const [freeText, setFreeText] = useState('');
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -107,7 +108,12 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
     setVariants([]);
     setSelectedVariant(null);
     try {
-      const prompt = buildAvatarPrompt({ age, weight, height, bodyType, attractiveness, faceShape, noseSize, lipFullness, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
+      // Free-text override: when filled, ignore the structured builder. Prefix "Full body
+      // reference photograph:" so generate_avatar treats it as a passthrough prompt
+      // (it rewrites prompts that don't start with "Professional" or "Full body").
+      const prompt = freeText.trim()
+        ? `Full body reference photograph: ${freeText.trim()}`
+        : buildAvatarPrompt({ age, weight, height, bodyType, attractiveness, faceShape, noseSize, lipFullness, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
       const result = await generateAvatar(storeId, name.trim(), prompt);
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
       setVariants(urls);
@@ -280,6 +286,17 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
             <div className="ab-field">
               <label className="ab-label">Extra notes</label>
               <textarea className="ab-textarea" value={extraNotes} onChange={e => setExtraNotes(e.target.value)} rows={2} placeholder="Specific details..." />
+            </div>
+
+            <div className="ab-field">
+              <label className="ab-label">Free-text description (overrides options above)</label>
+              <textarea className="ab-textarea" value={freeText} onChange={e => setFreeText(e.target.value)} rows={4}
+                placeholder="e.g. A 38-year-old woman, US size 12-14, warm brunette, apple-shaped, fair skin with freckles, gentle natural smile..." />
+              {freeText.trim() && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 4 }}>
+                  When filled, the options above are ignored.
+                </div>
+              )}
             </div>
 
             <div className="ab-toolbar-actions">
