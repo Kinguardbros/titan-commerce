@@ -203,9 +203,11 @@ async function handler(req, res) {
       const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
       const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
 
-      prompt = `Use the swimsuit shown in the attached reference image(s) as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+      prompt = `The attached reference image shows the SWIMSUIT/GARMENT ONLY — use it solely to copy the garment (color, cut, neckline, strap style, fabric texture, seaming, construction, coverage). If a person appears in the reference, COMPLETELY IGNORE that person — do not copy her face, hair, body, age, or skin tone. The woman in the final image is a NEW model described below, not the person in the reference.
 
-Professional e-commerce swimwear product photography. ${modelDesc}
+Recreate the swimsuit faithfully on the new model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+
+Professional e-commerce swimwear product photography. THE MODEL — generate exactly this woman: ${modelDesc}
 
 She is barefoot on a quiet sunny beach, clear blue sky, bright beautiful sunny day. Soft natural sunlight — bright and warm but NOT harsh. The photo must feel sunny, cheerful, and inviting — like a perfect vacation day. BRIGHT airy exposure — skin and fabric glow with light, no dark areas anywhere. Minimal soft shadows only. Clean neutral white balance. NOT overcast, NOT cloudy, NOT grey sky, NOT golden hour, NOT sunset.
 
@@ -227,9 +229,9 @@ Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm l
 
 ${framingReminder}
 
-Use ONLY the garment from the reference image(s) — generate a fresh model with the face and body described above. Do NOT copy the face of any person who may appear in the reference image(s).
+FINAL CHECK — READ LAST: The model in this image MUST be the exact woman described above ("THE MODEL — generate exactly this woman: ${modelDesc.slice(0, 80)}..."). The reference image is the GARMENT ONLY. If the generated woman looks like a person from the reference image instead of the described model, the result is WRONG — generate the described woman.
 
-NEGATIVE: overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: copying the reference model's face, copying the reference person's identity, overcast sky, grey clouds, cloudy weather, dark photo, underexposed, moody lighting, harsh shadows, dramatic lighting, golden hour, sunset, orange tones, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -329,8 +331,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const productImages = images.slice(0, 2);
         const refImages = reference_url
           ? [reference_url, ...productImages, reference_url]  // avatar → products → avatar (sandwich)
-          : images.slice(0, 4);
-        console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}`);
+          : isProductCatalog
+            ? images.slice(0, 1)   // Product Catalog: only the first product image (usually a packshot/
+                                   // flat-lay, not a lifestyle shot of a model) — fewer reference faces
+                                   // for the edit model to copy, so the prompt's model description wins
+            : images.slice(0, 4);
+        console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
           ? `\n\nCRITICAL COLOR OVERRIDE: The final product MUST be rendered in ${colorMatch[1].trim()} color. The reference image shows a different color variant — IGNORE the reference color and recolor the entire product to ${colorMatch[1].trim()}. Keep the design, pattern, cut, and details identical to the reference, but the product color MUST be ${colorMatch[1].trim()}.`
@@ -347,10 +353,8 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const falPrompt = isProductCatalog
           ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
-        // Product Catalog: keep up to 2 product reference images (already trimmed to first 2
-        // by the image filter above, which excludes pushed AI creatives). Edit models need a
-        // visual anchor for realistic face/skin quality — 1 garment-only image is too little;
-        // the prompt's FACE QUALITY section + "do not copy reference face" handle identity.
+        // Product Catalog: 1 product reference image (packshot/flat-lay, not a model shot).
+        // The model is generated from the prompt's description, not copied from the reference.
         falModelUsed = bananaModel;
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio, resolution });
         requestId = job.requestId;
