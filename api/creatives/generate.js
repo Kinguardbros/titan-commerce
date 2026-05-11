@@ -45,8 +45,10 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, story_id, story_shot, reference_url } = req.body;
+  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url } = req.body;
   style = style || 'ad_creative'; ai_model = ai_model || 'fal_nano_banana'; custom_prompt = custom_prompt || ''; show_model = show_model !== false; text_overlay = text_overlay || 'none'; overlay_text = overlay_text || ''; aspect_ratio = aspect_ratio || '1:1';
+  // Nano Banana output resolution — only the nano-banana models honor it
+  resolution = ['1K', '2K', '4K'].includes(resolution) ? resolution : '2K';
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
@@ -350,7 +352,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // visual anchor for realistic face/skin quality — 1 garment-only image is too little;
         // the prompt's FACE QUALITY section + "do not copy reference face" handle identity.
         falModelUsed = bananaModel;
-        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio });
+        const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: aspect_ratio, resolution });
         requestId = job.requestId;
         pollBase = job.pollBase;
         if (job.completed && job.url) imageUrl = job.url;  // some models return sync
@@ -448,6 +450,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     const configMeta = {
       model: falModelUsed || MODEL_LABELS[ai_model] || ai_model,
       provider: falModelUsed ? 'fal.ai' : 'Higgsfield',
+      ...(falModelUsed && falModelUsed.includes('nano-banana') && { resolution }),
       ...(catalogModelMatch && { catalog_model: catalogModelMatch[1].trim() }),
       ...(catalogPoseMatch && { pose: catalogPoseMatch[1].trim() }),
       ...(catalogFramingMatch && { framing: catalogFramingMatch[1].trim() }),

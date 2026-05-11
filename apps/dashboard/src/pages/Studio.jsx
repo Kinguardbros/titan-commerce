@@ -79,6 +79,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
   const [bulkBodyType, setBulkBodyType] = useState('Auto');
   const [bulkFraming, setBulkFraming] = useState('Full body');
   const [bulkRatio, setBulkRatio] = useState('1:1');
+  const [bulkResolution, setBulkResolution] = useState('2K');
   const [bulkAudience, setBulkAudience] = useState('auto');
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkCompleted, setBulkCompleted] = useState(0);
@@ -271,6 +272,7 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
           product_id: job.productId, store_id: storeId, style: bulkStyle,
           ai_model: bulkModel, show_model: bulkSubject, text_overlay: 'none',
           aspect_ratio: bulkRatio, custom_prompt: customPrompt || undefined,
+          resolution: bulkModel.includes('nano_banana') ? bulkResolution : undefined,
           audience: bulkAudience !== 'auto' ? bulkAudience : undefined,
         }).then(() => setBulkCompleted((p) => p + 1))
           .catch((err) => { console.error(`Bulk gen failed:`, err); setBulkCompleted((p) => p + 1); })
@@ -422,6 +424,14 @@ export default function Studio({ storeId, store, initialProductId, onNavigateToP
                   <button key={r} className={`studio-pill studio-pill--sm${bulkRatio === r ? ' studio-pill--active' : ''}`} onClick={() => setBulkRatio(r)}>{r}</button>
                 ))}</div>
               </div>
+              {bulkModel.includes('nano_banana') && (
+                <div>
+                  <div className="studio-field-label">Resolution</div>
+                  <div className="studio-pills">{['1K', '2K', '4K'].map((r) => (
+                    <button key={r} className={`studio-pill studio-pill--sm${bulkResolution === r ? ' studio-pill--active' : ''}`} onClick={() => setBulkResolution(r)}>{r}</button>
+                  ))}</div>
+                </div>
+              )}
               {bulkSubject && (
                 <>
                   <div>

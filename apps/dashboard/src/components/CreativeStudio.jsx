@@ -170,6 +170,8 @@ const IMG_RATIOS = [
   { label: "9:16", w: 28, h: 50 },
   { label: "16:9", w: 50, h: 28 },
 ];
+// Output resolution (Nano Banana models only — others ignore it)
+const IMG_RESOLUTIONS = ["1K", "2K", "4K"];
 const VID_RATIOS = [
   { label: "16:9", w: 50, h: 28 },
   { label: "9:16", w: 28, h: 50 },
@@ -426,6 +428,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [customText, setCustomText] = useState("");
   const [imgCount, setImgCount] = useState(2);
   const [imgRatio, setImgRatio] = useState("1:1");
+  const [imgResolution, setImgResolution] = useState("2K");
   const [imgInstructions, setImgInstructions] = useState("");
   const [modelPose, setModelPose] = useState("Standing");
   const [bodyType, setBodyType] = useState("Auto");
@@ -514,6 +517,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const sObj = allStyles.find((s) => s.id === styleId);
     const sName = sObj?.title || "image";
     let msg = `Generate ${imgCount} ${sName.toLowerCase()}(s), ${subject}, ${imgRatio}, model: ${model}`;
+    if (imgModel.startsWith("nano-banana")) msg += `, ${imgResolution}`;
     if (subject === "On model") msg += `, pose: ${pose}`;
     if (SCENE_STYLES.has(styleId) && scn !== "Auto") msg += `, scene: ${scn}`;
     if (sObj?.prompt) msg += `, style prompt: ${sObj.prompt}`;
@@ -521,7 +525,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     if (textMode === "Custom" && customText) msg += `, text overlay: "${customText}"`;
     if (negPrompt.trim()) msg += `, negative: ${negPrompt.trim()}`;
     return msg;
-  }, [imgModel, imgCount, subject, imgRatio, imgInstructions, textMode, customText, negPrompt, allStyles]);
+  }, [imgModel, imgCount, subject, imgRatio, imgResolution, imgInstructions, textMode, customText, negPrompt, allStyles]);
 
   const handleGenImage = useCallback(async () => {
     if (!product?.id || generating) return;
@@ -567,6 +571,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             overlay_text: textMode === "Custom" ? customText : "",
             audience: useAudience && audience !== "auto" ? audience : undefined,
             aspect_ratio: imgRatio,
+            resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
             reference_url: colorRef,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
@@ -577,7 +582,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -932,6 +937,18 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             ))}
           </div>
 
+          {/* Output resolution — Nano Banana models only */}
+          {imgModel.startsWith("nano-banana") && (
+            <>
+              <SectionLabel>Resolution</SectionLabel>
+              <div style={{ display: "flex", gap: 6 }}>
+                {IMG_RESOLUTIONS.map((r) => (
+                  <Pill key={r} active={imgResolution === r} onClick={() => setImgResolution(r)}>{r}</Pill>
+                ))}
+              </div>
+            </>
+          )}
+
           {/* Instructions */}
           <SectionLabel>Custom instructions</SectionLabel>
           <textarea value={imgInstructions} onChange={(e) => setImgInstructions(e.target.value)}
@@ -961,10 +978,10 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
           </>)}
 
-          {/* Count + Ratio for product-catalog (shown separately since the block above is hidden) */}
+          {/* Count + Ratio + Resolution for product-catalog (shown separately since the block above is hidden) */}
           {imgStyle === "product-catalog" && (
             <>
-              <div style={{ display: "flex", gap: 16, alignItems: "end", marginTop: "1rem" }}>
+              <div style={{ display: "flex", gap: 16, alignItems: "end", marginTop: "1rem", flexWrap: "wrap" }}>
                 <div>
                   <SectionLabel>Count</SectionLabel>
                   <div style={{ display: "flex", gap: 6 }}>
@@ -978,6 +995,14 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                   <div style={{ display: "flex", gap: 10 }}>
                     {IMG_RATIOS.map((r) => (
                       <RatioBox key={r.label} {...r} active={imgRatio === r.label} onClick={() => setImgRatio(r.label)} />
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <SectionLabel>Resolution</SectionLabel>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {IMG_RESOLUTIONS.map((r) => (
+                      <Pill key={r} active={imgResolution === r} onClick={() => setImgResolution(r)}>{r}</Pill>
                     ))}
                   </div>
                 </div>
