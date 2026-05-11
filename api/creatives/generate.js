@@ -90,11 +90,19 @@ async function handler(req, res) {
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
-    // limit to first 2 product images only. Pushed AI creatives (with another model's face)
-    // get appended to the END of Shopify images — taking only the first 2 keeps original
-    // product shots (flat-lay, headless crops) and avoids copying a previous model's face.
-    if ((audience || isProductCatalog || isRealisticBeach) && images.length > 2) {
-      images = images.slice(0, 2);
+    // strip out previously-pushed AI creatives so we only feed the model ORIGINAL product
+    // photos. Pushed creatives are uploaded with deterministic filenames containing the style
+    // tag (_product_photo_beach_, _realistic_beach_, _product_catalog_, etc.) — when one
+    // landed on position 0 in Shopify (e.g. it became the featured image), Nano Banana would
+    // copy its lighting/composition into the new output, undoing any prompt instructions.
+    // Fix at the source: filter them out before slicing.
+    if (audience || isProductCatalog || isRealisticBeach) {
+      const AI_FILENAME = /_(product_photo_beach|realistic_beach|product_catalog|ad_creative|lifestyle|review_ugc|product_shot|beach_photo|static_clean|static_split|static_urgency|cs_[a-z0-9_-]+)_\d/i;
+      const originals = images.filter((u) => !AI_FILENAME.test(u));
+      // Fall back to the original list if a product happens to have only AI images (shouldn't
+      // happen for current data, but keep generation working rather than send empty refs).
+      if (originals.length > 0) images = originals;
+      if (images.length > 2) images = images.slice(0, 2);
     }
     // Prepend reference_url to product images ONLY for non-audience flows (color variant, etc.).
     // For audience/persona flows, the avatar reference is added separately in the Nano Banana
