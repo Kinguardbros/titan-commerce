@@ -77,14 +77,17 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
 
   useEffect(() => { setAllProducts([]); setCurrentPage(1); setLoading(true); fetchProducts(1); }, [fetchProducts]);
 
-  // When searching, load all products so we search the full catalog (not just page 1)
+  // Searching or filtering operates client-side over loaded products only — so load the
+  // full catalog whenever a search query or any filter is active, otherwise results are
+  // limited to page 1 (e.g. a collection chip would only show products from the first 50).
+  const anyFilterActive = collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all';
   useEffect(() => {
-    if (search && search.length >= 2 && hasMore) {
+    if (((search && search.length >= 2) || anyFilterActive) && hasMore) {
       getAllProducts(storeId).then((products) => {
         if (products?.length) { setAllProducts(products); setHasMore(false); setTotalProducts(products.length); }
       }).catch(() => {});
     }
-  }, [search, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, anyFilterActive, storeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLoadMore = () => {
     setLoadingMore(true);
