@@ -28,6 +28,7 @@ const CATALOG_POSES = [
 
 const STYLE_MAP = {
   "product-catalog": "product_catalog",
+  "product-catalog-v2": "product_catalog_v2",
   "realistic-beach": "realistic_beach",
   "ad-creative": "ad_creative",
   "product-shot": "product_shot",
@@ -100,7 +101,8 @@ const STYLE_CATEGORIES = [
   {
     id: "product-photos", label: "Product photos", icon: "◉",
     styles: [
-      { id: "product-catalog", title: "Product Catalog", desc: "Pro e-commerce, golden hour beach, editorial", icon: "📸" },
+      { id: "product-catalog", title: "Product Catalog", desc: "Pro e-commerce, bright beach, editorial", icon: "📸" },
+      { id: "product-catalog-v2", title: "Product Catalog v2", desc: "Golden hour, subject pops, simple controls", icon: "🌅" },
       { id: "realistic-beach", title: "Realistic Beach", desc: "Ultra-real curvy model, golden hour, no AI look", icon: "🏖" },
       { id: "product-shot", title: "Product shot", desc: "Clean white bg, detail focus", icon: "◉" },
       { id: "beach-photo", title: "Beach photo", desc: "Warm golden, ocean bokeh", icon: "◐" },
@@ -507,6 +509,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const styleName = allStyles.find((s) => s.id === imgStyle)?.title || "image";
   const showSceneForStyle = SCENE_STYLES.has(imgStyle);
   const showSceneForAb = SCENE_STYLES.has(abStyle);
+  const isAnyCatalogStyle = imgStyle === "product-catalog" || imgStyle === "product-catalog-v2";
+  const isProductCatalogV2Style = imgStyle === "product-catalog-v2";
 
   const imgCost = useMemo(() => {
     const perImage = MODEL_COST[imgModel] || 0.03;
@@ -542,8 +546,10 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     toast.info("Generating...");
 
     const backendStyle = imgStyle.startsWith('cs_') ? imgStyle : (STYLE_MAP[imgStyle] || "ad_creative");
-    // Product Catalog hides the model picker — force Nano Banana Pro (best identity preservation)
-    const backendModel = imgStyle === 'product-catalog' ? "fal_nano_banana_pro" : (MODEL_MAP[imgModel] || "fal_nano_banana");
+    const isProductCatalogV2 = imgStyle === 'product-catalog-v2';
+    const isAnyCatalog = imgStyle === 'product-catalog' || isProductCatalogV2;
+    // Catalog styles hide the model picker — force Nano Banana Pro (best identity preservation)
+    const backendModel = isAnyCatalog ? "fal_nano_banana_pro" : (MODEL_MAP[imgModel] || "fal_nano_banana");
     const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
@@ -556,16 +562,18 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const sceneHint = SCENE_STYLES.has(imgStyle) && scene !== "Auto" ? `Scene: ${scene}. ` : "";
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
     const isProductCatalogStyle = imgStyle === 'product-catalog';
-    const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
-    const catalogModelPrompt = isProductCatalogStyle ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
+    const catalogPosePrompt = isAnyCatalog ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
+    const catalogModelPrompt = isAnyCatalog ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
     const catalogFramingPrompt = isProductCatalogStyle ? (CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.prompt || '') : '';
     const catalogModelLabel = catalogAvatar || (CATALOG_MODELS.find(m => m.id === catalogModel)?.label || '');
     const catalogPoseLabel = CATALOG_POSES.find(p => p.id === catalogPose)?.label || '';
     const catalogFramingLabel = CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.label || '';
-    // When an avatar is chosen, the model comes from the avatar reference (sent via `audience`),
+    // v1: when an avatar is chosen, the model comes from the avatar reference (sent via `audience`),
     // so leave the model description out of custom_prompt.
     const catalogModelBlock = isProductCatalogStyle && !catalogAvatar ? `${catalogModelPrompt}\n\n` : '';
-    const customInstr = isProductCatalogStyle
+    const customInstr = isProductCatalogV2
+      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}]\n${catalogModelPrompt}\n\n${catalogPosePrompt}`
+      : isProductCatalogStyle
       ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogModelBlock}${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
@@ -578,15 +586,17 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           generateCreatives({
             product_id: product.id, store_id: storeId, style: bs, ai_model: backendModel,
             custom_prompt: customInstr,
-            show_model: subject === "On model",
-            text_overlay: textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom",
-            overlay_text: textMode === "Custom" ? customText : "",
-            audience: isProductCatalogStyle
+            show_model: isProductCatalogV2 ? true : subject === "On model",
+            text_overlay: isProductCatalogV2 ? "none" : (textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom"),
+            overlay_text: isProductCatalogV2 ? "" : (textMode === "Custom" ? customText : ""),
+            audience: isProductCatalogV2
+              ? undefined
+              : isProductCatalogStyle
               ? (catalogAvatar || undefined)
               : (useAudience && audience !== "auto" ? audience : undefined),
-            aspect_ratio: imgRatio,
+            aspect_ratio: isProductCatalogV2 ? "4:5" : imgRatio,
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
-            reference_url: colorRef,
+            reference_url: isProductCatalogV2 ? undefined : colorRef,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
         );
@@ -728,8 +738,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "1rem 0" }} />
 
-          {/* Model + Subject — hidden for product-catalog (everything hardcoded) */}
-          {imgStyle !== "product-catalog" && (
+          {/* Model + Subject — hidden for catalog styles */}
+          {!isAnyCatalogStyle && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
                 <SectionLabel style={{ marginTop: 0 }}>Model</SectionLabel>
@@ -746,15 +756,15 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Color + Audience — hidden for product-catalog */}
-          {imgStyle !== "product-catalog" && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {/* Color + Audience — hidden for catalog styles */}
+          {!isAnyCatalogStyle && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {colors.length > 1 && (
               <div>
                 <SectionLabel style={{ marginTop: "0.75rem" }}>Color</SectionLabel>
                 <Select value={selectedColor} onChange={setSelectedColor} options={colors} />
               </div>
             )}
-            {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
+            {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && !isAnyCatalogStyle && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "0.75rem" }}>
                   <button onClick={() => setUseAudience(!useAudience)} style={{
@@ -796,7 +806,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           </div>}
 
           {/* Model pose — conditional */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && !isAnyCatalogStyle && (
             <div>
               <SectionLabel>Model pose</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -808,7 +818,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
 
           {/* Body type — hidden for realistic-beach (hardcoded in prompt) */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && !isAnyCatalogStyle && (
             <div>
               <SectionLabel>Body type</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -820,7 +830,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
 
           {/* Framing — hidden for realistic-beach */}
-          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && imgStyle !== "product-catalog" && (
+          {subject === "On model" && !abMode && imgStyle !== "realistic-beach" && !isAnyCatalogStyle && (
             <div>
               <SectionLabel>Framing</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -877,8 +887,30 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </>
           )}
 
-          {/* Scene — conditional on style, hidden for product-catalog */}
-          {showSceneForStyle && !abMode && imgStyle !== "product-catalog" && (
+          {/* Catalog v2 controls — only Model preset + Pose (everything else hardcoded in the v2 prompt) */}
+          {imgStyle === "product-catalog-v2" && (
+            <>
+              <div>
+                <SectionLabel>Model preset</SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {CATALOG_MODELS.map((m) => (
+                    <Pill key={m.id} active={catalogModel === m.id} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <SectionLabel>Pose</SectionLabel>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {CATALOG_POSES.map((p) => (
+                    <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Scene — conditional on style, hidden for catalog styles */}
+          {showSceneForStyle && !abMode && !isAnyCatalogStyle && (
             <div>
               <SectionLabel>Scene / environment</SectionLabel>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -889,7 +921,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {imgStyle !== "product-catalog" && (<>
+          {!isAnyCatalogStyle && (<>
           {/* ─── A/B TEST MODE ─── */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: "1.25rem" }}>
             <SectionLabel style={{ margin: 0, flex: 1 }}>A/B test mode</SectionLabel>
@@ -1008,8 +1040,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           )}
           </>)}
 
-          {/* Count + Ratio + Resolution for product-catalog (shown separately since the block above is hidden) */}
-          {imgStyle === "product-catalog" && (
+          {/* Count + (Ratio for v1 only) + Resolution for catalog styles (the big block above is hidden) */}
+          {isAnyCatalogStyle && (
             <>
               <div style={{ display: "flex", gap: 16, alignItems: "end", marginTop: "1rem", flexWrap: "wrap" }}>
                 <div>
@@ -1020,14 +1052,16 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                     ))}
                   </div>
                 </div>
-                <div>
-                  <SectionLabel>Aspect ratio</SectionLabel>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    {IMG_RATIOS.map((r) => (
-                      <RatioBox key={r.label} {...r} active={imgRatio === r.label} onClick={() => setImgRatio(r.label)} />
-                    ))}
+                {!isProductCatalogV2Style && (
+                  <div>
+                    <SectionLabel>Aspect ratio</SectionLabel>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      {IMG_RATIOS.map((r) => (
+                        <RatioBox key={r.label} {...r} active={imgRatio === r.label} onClick={() => setImgRatio(r.label)} />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div>
                   <SectionLabel>Resolution</SectionLabel>
                   <div style={{ display: "flex", gap: 6 }}>
