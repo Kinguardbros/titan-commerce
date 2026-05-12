@@ -240,24 +240,22 @@ Recreate the swimsuit faithfully on the model: same color, same cut, same neckli
 
 ${catalogModelLine}
 
-She is barefoot on a quiet beach, ocean behind her, the sky a soft blue fading to pale near the horizon.
+She is barefoot on a quiet beach, ocean behind her, a bright pale sky.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 === LIGHTING — READ CAREFULLY, DO NOT SKIP THIS ===
-Time/feel: soft warm late-afternoon daylight (a gentle golden warmth, NOT a heavy orange filter, NOT a cold neutral day, NOT gloomy grey, NOT harsh high-noon).
+WEATHER & LIGHT TYPE: a bright OVERCAST day — the sky is a soft, bright, hazy white-grey (NOT clear blue, NOT a hard sunny day). There is NO visible sun, NO direct sunbeam, NO golden hour, NO sunset. The whole sky acts like one giant softbox: the light is FLAT, SOFT, and comes EVENLY from everywhere at once. Because there is no single light source, there are NO directional cast shadows — no shadow stretching off to one side, no dark side of the body, no hard shadow on the sand, no shadow under the bust, no shadow on either leg. Bright but soft, like a professional studio shoot done outdoors under a huge diffuser.
 
-SUN POSITION: the sun is in front of the model, in line with the camera (the photographer is shooting with the sun behind their back). The light hits her face, body and the swimsuit head-on, square to the camera. NOT to her side, NOT behind her, NOT a low side-angle rake.
+EXPOSURE: it is BRIGHT — high-key, airy, well-lit. The model's skin and the swimsuit are clearly and brightly exposed, never dim, never dark, never moody. Black fabric reads as a rich dark grey-black with the ribbed texture / pleating / seams clearly visible — NOT crushed to a flat black silhouette.
 
-HOW TO PROVE THE SUN IS IN FRONT — THE SHADOW ON THE SAND: because the sun is in line with the camera, the model's cast shadow on the sand points AWAY from the camera. It falls directly behind her and is mostly HIDDEN behind her own body — from the camera's point of view almost NO shadow is visible on the sand at her feet. There is NO long shadow stretching off to her left, NO long shadow stretching off to her right. If you see a shadow on the sand reaching out to one side, the sun is in the wrong place and the lighting is WRONG — move the sun in front of her.
-
-ON THE BODY AND THE GARMENT: because the light is frontal, there are NO shadows across the front of her body, NO dark side, NO shadow on either leg, both her left and right side are equally lit. The SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. The LOWER HALF of the swimsuit (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker, it does NOT sink into the body's shadow; top and bottom are equally exposed. ZERO shadows on the swimsuit — not under the bust, not at the waistband, not in the folds, not cast by her arms. The garment is fully exposed, bright and readable; if any part of it sinks into shadow, the lighting is WRONG. True blacks that still show fabric detail (not crushed to pure black).
+THE GARMENT: the SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO shadows on the swimsuit. If any part of the garment sinks into shadow, or the sky looks clear-blue-and-sunny with a directional shadow, the lighting is WRONG — make it a bright soft overcast day with flat even light.
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 Product: ${product.title}
 
 ${poseAndFraming}
 
-Garment: Fabric smooth, zero bunching. Match reference exactly.${isHighWaistTummy ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits HIGH — ABOVE the belly button. The navel is COMPLETELY COVERED by the fabric, not visible at all. No bare midriff, no exposed belly, no low-rise cut. The fabric covers the entire stomach from above the navel down, hugging and smoothing it. If the belly button is visible, the garment is WRONG — raise the waistline.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
+Garment: Fabric smooth, zero bunching. Match reference exactly.${isHighWaistTummy ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button (the navel is several centimetres BELOW the top edge of the fabric, fully buried under it). The belly button is COMPLETELY, ENTIRELY covered — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If ANY part of the belly button or navel area is visible, the garment is WRONG — raise the waistline higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 FACE QUALITY (critical):
 - Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
@@ -269,13 +267,13 @@ FACE QUALITY (critical):
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
-LIGHTING — READ THIS: the sun is BEHIND THE CAMERA shining straight at her (front light, in line with the camera), a soft warm late-afternoon glow. NOT side light, NOT backlight, NOT a low side-angle rake. Her shadow falls behind her, away from the camera. The swimsuit is frontally and evenly lit, bright, every detail readable, NO shadows on it.
+LIGHTING — READ THIS: bright OVERCAST day, no visible sun, the whole sky is one big soft diffuser — flat, soft, even light from everywhere, NO directional cast shadows anywhere (not on the body, not on the sand, not on the garment). Bright high-key exposure. NOT clear-blue-sunny, NOT golden hour, NOT moody. The swimsuit is evenly and brightly lit, every detail readable, black fabric shows texture (not crushed black).
 
 ${framingReminder}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, bare midriff, low-rise bottoms, low-waist cut, exposed stomach, ' : ''}side lighting, light from the side, side-angle sun, long shadow on the sand to one side, shadow stretching off to the left, shadow stretching off to the right, long cast shadow across the sand, rim light, backlight, backlit, silhouette, sun behind the model, harsh high-noon sun, hard direct overhead sun, hard cast shadows, shadow across the front of the body, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, gap above the waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}direct sunlight, visible sun, sunbeam, hard sunny day, clear blue sky, directional shadow, cast shadow, hard shadows, side lighting, side-angle sun, golden hour, sunset, sunrise, low-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, gloomy dark grey day, dark photo, underexposed, heavy orange filter, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
