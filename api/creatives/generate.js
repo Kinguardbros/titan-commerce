@@ -92,6 +92,8 @@ async function handler(req, res) {
     const isRealisticBeach = style === 'realistic_beach';
     const isProductCatalog = style === 'product_catalog';
     const isProductCatalogV2 = style === 'product_catalog_v2';
+    const isProductCatalogV3 = style === 'product_catalog_v3';
+    const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
     // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
     const catalogFramingKey = isProductCatalog
@@ -111,7 +113,7 @@ async function handler(req, res) {
     // landed on position 0 in Shopify (e.g. it became the featured image), Nano Banana would
     // copy its lighting/composition into the new output, undoing any prompt instructions.
     // Fix at the source: filter them out before slicing.
-    if (audience || isProductCatalog || isRealisticBeach || isProductCatalogV2) {
+    if (audience || isProductCatalog || isRealisticBeach || isProductCatalogV2 || isProductCatalogV3) {
       const AI_FILENAME = /_(product_photo_beach|realistic_beach|product_catalog|ad_creative|lifestyle|review_ugc|product_shot|beach_photo|static_clean|static_split|static_urgency|cs_[a-z0-9_-]+)_\d/i;
       const originals = images.filter((u) => !AI_FILENAME.test(u));
       // Fall back to the original list if a product happens to have only AI images (shouldn't
@@ -343,6 +345,43 @@ GARMENT RULES (non-negotiable):
 ${v2PoseText}
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture.`;
+    } else if (isProductCatalogV3) {
+      // Product Catalog v3 — STEP 1 of the double pipeline: a clean white-studio shot of the
+      // model in the swimsuit with FLAT EVEN ALL-SIDES studio lighting (the controlled
+      // environment is the whole point). poll_generations then fires step 2 (Ideogram BG) to
+      // swap the studio background for a beach. Model comes from the persona avatar (sandwich).
+      const v3HasAvatar = !!reference_url;
+      const v3Custom = (custom_prompt || '').replace(/\[catalog_[^\]]+\]/g, '').trim();
+      const v3PoseText = v3Custom.includes('POSE:')
+        ? v3Custom.slice(v3Custom.indexOf('POSE:')).trim()
+        : 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.';
+      const v3ModelDesc = (v3Custom.match(/^([\s\S]*?)(?=POSE:|$)/)?.[1] || '').trim()
+        || 'Mid-size woman, US size 12-14, natural soft body with visible curves, apple-shaped silhouette, real-looking belly and thighs (not athletic, not slim), late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no accessories, no tattoos.';
+      const v3ModelLine = v3HasAvatar
+        ? `Professional e-commerce swimwear product photography in a CLEAN STUDIO. THE MODEL — use the exact woman shown in reference image 1 / the last reference image: her exact face, hair, skin tone, body shape, and age. She is the ONLY person; do not invent a different face.`
+        : `Professional e-commerce swimwear product photography in a CLEAN STUDIO. THE MODEL — generate exactly this woman: ${v3ModelDesc}`;
+      const v3GarmentLine = v3HasAvatar
+        ? `REFERENCE IMAGES: image 1 AND the last image = THE MODEL (the SAME woman, twice). Any image in between = THE GARMENT — recreate this swimsuit faithfully: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage; do NOT redesign or reinterpret it, and do NOT let the garment images influence the model's face.`
+        : `Use the swimsuit shown in the attached image as the exact reference garment — recreate it faithfully: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage. Do not redesign or reinterpret it.`;
+      prompt = `${v3GarmentLine}
+
+${v3ModelLine}
+
+BACKGROUND: a CLEAN, SEAMLESS white-to-light-grey studio backdrop — NOTHING else: no props, no furniture, no floor line, no horizon, no shadows on the wall, no gradient, no colored background. Just a clean studio sweep behind her.
+
+LIGHTING (this is the whole point — get it perfect): FLAT, EVEN, SOFT studio lighting — a big softbox on the model from the front plus fill light on BOTH sides, so the swimsuit is lit FULLY AND EVENLY FROM ALL SIDES. ZERO harsh shadows, ZERO side-lit shadow, ZERO directional shadow. Every part of the swimsuit is crisp and bright — fabric texture, color, pattern, ribbing/pleating, trims, stitching, seams, waistband all clearly readable. Black fabric reads as a clean dark grey-black with ALL the texture visible — NOT crushed to a flat black silhouette. Bright, clean, true-to-life exposure — NOT dim, NOT overexposed, NOT washed out. The model's skin is evenly lit, natural, true to life.
+
+Product: ${product.title}
+
+${v3PoseText}
+
+GARMENT RULES (non-negotiable): for two-piece swimsuits the bikini bottoms must be high-waisted, sit well above the belly button, and fully cover the navel; moderate leg opening, not high-cut, full coverage across the hips and upper thighs. For one-piece swimsuits: full coverage from bust to upper hip, moderate leg opening.
+
+FACE QUALITY (critical): sharp detailed features, visible skin pores, individual eyebrow hairs, realistic catchlight in the eyes, visible iris detail, individual eyelashes, natural lip texture. Face tack sharp, no AI smoothing, no uncanny valley, no doll-like skin. If the face looks AI-generated, blurry, or plastic — the image is WRONG.
+
+CAMERA: shot at the model's chest height, lens parallel to the ground — a straight, eye-level catalog perspective. NOT a low-angle shot, NOT shot from below. Her proportions are natural and undistorted. Hyperrealistic, photographic, editorial swimwear catalog quality, 85mm lens at f/2.8, Canon R5 look, 8K, ultra-sharp. ${aspect_ratio || '4:5'} format.
+
+NEGATIVE: beach, ocean, sand, water, sky, outdoor, nature, sunset, golden hour, props, furniture, floor line, horizon line, gradient backdrop, colored background, dark background, shadow on the wall, harsh shadow, hard cast shadow, side lighting, directional shadow, dark side of the body, dim, dark photo, underexposed, overexposed, blown-out highlights, washed out, hazy bright wash, crushed blacks, garment crushed to pure black, deep shadows on the swimsuit, dark areas on the garment, visible belly button, exposed navel, low-rise bottoms, mid-rise bottoms, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, distorted perspective, text, watermarks.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -444,12 +483,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // images and re-adds the lower body anyway. The reliable fix is to crop the FINISHED
         // output server-side (done in poll_generations using meta.framing_crop) — see below.
         const avatarRef = reference_url;
-        // Product Catalog v2 is self-contained, no avatar, hardcoded 4:5 framing.
-        const outAspectRatio = isProductCatalogV2 ? '4:5' : aspect_ratio;
-        // Product Catalog (v1 & v2): with a persona avatar → sandwich [avatar, 1 product image, avatar]
-        //                            without an avatar     → 1 product image only (packshot/flat-lay,
-        //                                                    not a model shot), model comes from the prompt
-        const refImages = (isProductCatalog || isProductCatalogV2)
+        // Product Catalog v2/v3 are self-contained; v3 is step 1 of the double pipeline.
+        const outAspectRatio = (isProductCatalogV2 || isProductCatalogV3) ? '4:5' : aspect_ratio;
+        // Product Catalog (v1, v2, v3): with a persona avatar → sandwich [avatar, 1 product image, avatar]
+        //                               without an avatar     → 1 product image only (packshot/flat-lay,
+        //                                                       not a model shot), model comes from the prompt
+        const refImages = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3)
           ? (avatarRef ? [avatarRef, ...images.slice(0, 1), avatarRef] : images.slice(0, 1))
           : (avatarRef ? [avatarRef, ...productImages, avatarRef] : images.slice(0, 4));
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
@@ -466,7 +505,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `PRODUCT REPRODUCTION — PIXEL-ACCURATE:\nThe garment in the final image must be an EXACT visual copy of the reference image(s). Match PRECISELY: exact color ratio and placement, exact width of every stripe/trim/band/border, exact neckline shape and depth, exact waistband height and style, exact stitching pattern, exact strap width. Do NOT "improve", simplify, or reinterpret the design. Copy it exactly as shown in the reference.`;
         const productCheck = isProductCatalog ? '' : `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL PRODUCT CHECK: The garment proportions (color ratios, stripe widths, trim sizes, waistband height) must EXACTLY match the product reference images. If any detail looks different from the reference — it is WRONG. The product must be a faithful reproduction, not an interpretation.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-        const falPrompt = (isProductCatalog || isProductCatalogV2)
+        const falPrompt = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3)
           ? prompt  // Product Catalog prompts are self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
         falModelUsed = bananaModel;
@@ -580,6 +619,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       ...(negMatch && { negative_prompt: negMatch[1].trim() }),
       ...(audience && { audience }),
       ...(catalogFramingKey && { framing_crop: catalogFramingKey }), // poll_generations crops the finished image to this
+      ...(isProductCatalogV3 && { stage: 'studio', v3_beach_scene: v3BeachKey, v3_aspect: '4:5' }), // poll_generations fires step 2 (Ideogram bg replace)
       subject: show_model ? 'On model' : 'Product only',
       submitted_at: new Date().toISOString(),
       ...(isPending && { poll_base: pollBase }),
