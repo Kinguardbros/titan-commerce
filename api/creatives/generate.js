@@ -217,8 +217,18 @@ async function handler(req, res) {
       const framingSection = poseAndFraming.match(/FRAMING:\s*([\s\S]*?)$/);
       const framingText = framingSection ? framingSection[1].trim() : '';
       const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet');
-      const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
-      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
+      const isWaistUp = framingText.includes('waist/hip level') || framingText.includes('Upper body portrait');
+      const isDetailCrop = framingText.includes('chest to upper thigh') || framingText.includes('No face visible');
+      const isNonFullFraming = isThreeQuarter || isWaistUp || isDetailCrop;
+      // Dedicated, bordered FRAMING block — the avatar reference may show the full body, so the
+      // crop must be stated forcefully (the edit model otherwise reproduces the reference framing).
+      const framingBlock = isNonFullFraming
+        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — DO NOT IGNORE ===\nThe reference photo of the model may show her full body, but in THIS image the crop is TIGHTER. ${framingText} Crop the frame to exactly this. ${isThreeQuarter ? 'Do NOT show her feet, do NOT show her ankles — the bottom of the frame is at mid-calf.' : isWaistUp ? 'Do NOT show her legs below the hip — the bottom of the frame is at the waist/hip.' : 'Do NOT show her head or her legs — the frame is a tight crop on the garment midsection only.'} The composition of THIS image is independent of how the reference is framed — crop tighter.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+        : '';
+      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
+        : isWaistUp ? ', full body, full legs, visible knees, visible feet, visible ankles'
+        : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
+        : '';
 
       // When a persona avatar is the reference, the model comes FROM that image (sandwich:
       // image 1 + last image). Otherwise the model is generated from the modelDesc text and
@@ -240,17 +250,17 @@ Recreate the swimsuit faithfully on the model: same color, same cut, same neckli
 
 ${catalogModelLine}
 
-She is barefoot on a real beach, standing on sand. Behind her is a CLEARLY VISIBLE beach scene: ocean with gentle waves, wet and dry sand, and a bright, fairly clean sky — soft white clouds that are BREAKING UP with patches of light blue showing through, a low horizon line. It looks like an actual photo taken at the beach on a bright day when the clouds are clearing — NOT a featureless white blur, NOT a heavy dark-grey overcast, NOT studio fog. The background is softly out of focus (shallow depth of field, model tack sharp) but it is unmistakably a beach: you can see the sea, the sand, the patchy blue-and-white sky.
+She is barefoot on a real beach, standing on sand. Behind her is a CLEARLY VISIBLE beach scene: ocean with gentle waves, wet and dry sand, and a CLEAN bright LIGHT-BLUE sky with only a few small wispy high clouds — but NO visible sun, no sunbeam, no glare. A calm, clear, bright beach day. NOT a featureless white blur, NOT a heavy grey overcast, NOT studio fog. The background is softly out of focus (shallow depth of field, model tack sharp) but it is unmistakably a beach: you can see the sea, the sand, the clean blue sky.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 === LIGHTING — READ CAREFULLY, DO NOT SKIP THIS ===
-SKY: bright and fairly clean — broken cloud cover, patches of soft light blue between bright white clouds. NOT a heavy grey overcast, but also NOT a hard cloudless sunny day with a blazing sun.
+SKY: a CLEAN bright light-blue sky with only a few small wispy high clouds. No visible sun disc, no sunbeam, no glare. NOT a heavy grey overcast, but also NOT a hard sunny day with a blazing sun casting shadows.
 
-LIGHT ON THE MODEL: even though the sky has some blue, the SUN ITSELF is still hidden behind a thin veil of cloud — so the light falling on the model is FLAT, SOFT, and comes EVENLY from a broad bright sky, like a giant softbox. There is NO single hard light source pointed at her. Therefore there are NO directional cast shadows — no shadow stretching off to one side, no dark side of the body, no hard shadow on the sand, no shadow under the bust, no shadow on either leg. Bright but soft, like a professional shoot done outdoors under a huge diffuser.
+LIGHT ON THE MODEL: even though the sky is clear and blue, the SUN ITSELF is NOT in frame and is veiled by a high thin haze — so the light falling on the model is FLAT, SOFT, and comes EVENLY from a broad bright sky, like a giant softbox. There is NO single hard light source pointed at her. Therefore there are NO directional cast shadows — no shadow stretching off to one side, no dark side of the body, no hard shadow on the sand, no shadow under the bust, no shadow on either leg. Bright but soft, like a professional shoot done outdoors under a huge diffuser.
 
-EXPOSURE: the MODEL and SWIMSUIT are BRIGHT — high-key, airy, well-lit, never dim, never dark, never moody. Black fabric reads as a rich dark grey-black with the ribbed texture / pleating / seams clearly visible — NOT crushed to a flat black silhouette. The BACKGROUND is also properly exposed — visible sea, sand, and a bright blue-and-white sky — NOT blown out to pure white, NOT a foggy haze.
+EXPOSURE: the MODEL and SWIMSUIT are BRIGHT — high-key, airy, well-lit, never dim, never dark, never moody. Black fabric reads as a rich dark grey-black with the ribbed texture / pleating / seams clearly visible — NOT crushed to a flat black silhouette. The BACKGROUND is also properly exposed — visible sea, sand, and a clean light-blue sky — NOT blown out to pure white, NOT a foggy haze.
 
-THE GARMENT: the SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO shadows on the swimsuit. If any part of the garment sinks into shadow, OR a directional shadow appears on the body / sand, OR the background is a featureless white blur or a gloomy dark grey, the result is WRONG — bright clean sky with broken cloud, flat even soft light on the model, real beach visible behind.
+THE GARMENT: the SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO shadows on the swimsuit. If any part of the garment sinks into shadow, OR a directional shadow appears on the body / sand, OR the background is a featureless white blur or a gloomy dark grey, the result is WRONG — clean light-blue sky (no visible sun), flat even soft light on the model, real beach visible behind.
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 Product: ${product.title}
@@ -269,9 +279,8 @@ FACE QUALITY (critical):
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
-LIGHTING — READ THIS: bright clean sky with broken cloud (patches of light blue between white clouds), but the SUN is hidden behind a thin veil so the light on the model is flat, soft and even — like a giant softbox. NO directional cast shadows anywhere (not on the body, not on the sand, not on the garment). Bright high-key exposure. NOT a hard cloudless sunny day, NOT golden hour, NOT moody, NOT a heavy grey overcast. The swimsuit is evenly and brightly lit, every detail readable, black fabric shows texture (not crushed black).
-
-${framingReminder}
+LIGHTING — READ THIS: a clean bright light-blue sky with just a few wispy high clouds — but NO visible sun disc, NO sunbeam. The sun stays behind a high thin haze, so the light on the model is flat, soft and even — like a giant softbox. NO directional cast shadows anywhere (not on the body, not on the sand, not on the garment). Bright high-key exposure. NOT a hard cloudless sunny day with a blazing sun, NOT golden hour, NOT moody, NOT a heavy grey overcast. The swimsuit is evenly and brightly lit, every detail readable, black fabric shows texture (not crushed black).
+${framingBlock}
 
 ${catalogFinalCheck}
 
