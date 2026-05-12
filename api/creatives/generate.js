@@ -78,11 +78,15 @@ async function handler(req, res) {
     const { data: product, error: pErr } = await supabase.from('products').select('*').eq('id', product_id).single();
     if (pErr || !product) return res.status(404).json({ error: 'Product not found' });
 
-    // If store_id provided, load store for store-specific shopify_url
+    // If store_id provided, load store for store-specific shopify_url + name (Isola = all tummy-control)
     let storeShopifyUrl = null;
+    let isIsola = false;
     if (store_id) {
-      const { data: store } = await supabase.from('stores').select('shopify_url').eq('id', store_id).single();
-      if (store) storeShopifyUrl = store.shopify_url;
+      const { data: store } = await supabase.from('stores').select('shopify_url, name').eq('id', store_id).single();
+      if (store) {
+        storeShopifyUrl = store.shopify_url;
+        isIsola = (store.name || '').toLowerCase().includes('isola');
+      }
     }
 
     const isRealisticBeach = style === 'realistic_beach';
@@ -95,6 +99,8 @@ async function handler(req, res) {
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
+    // Product Catalog on the Isola store is always tummy-control → always hide the navel.
+    const catalogHighWaist = (isProductCatalog && isIsola) || isHighWaistTummy;
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -255,11 +261,11 @@ She is barefoot on a real beach, standing on sand on a bright sunny day. Behind 
 === LIGHTING — READ CAREFULLY, DO NOT SKIP THIS ===
 SKY: a bright clear BLUE sky with a few real, soft, white clouds and light haze near the horizon. NOT a flat cloudless sky, NOT a heavy grey overcast.
 
-LIGHT ON THE MODEL: bright natural daylight. The SUN IS BEHIND THE CAMERA — a frontal light source — so the model and the swimsuit are lit EVENLY FROM THE FRONT, bright and fully readable. The light has a subtle warm, slightly golden quality (late-morning real sun, lightly hazy) — not harsh, not glaring. Only SOFT NATURAL shadows: a gentle shadow under the chin, a soft shadow tucked behind an arm. There is NO hard cast shadow stretching off to one side, NO side-lit shadow on the garment, NO dark side of the body, NO directional shadow streaking across the sand. Frontal soft sun — never side-lit, never harsh.
+LIGHT ON THE MODEL: bright DIRECT sunlight — the sun is up and shining DIRECTLY ON HER FROM THE FRONT (the sun is behind the camera). The model and the swimsuit are in FULL bright sunlight, brilliantly lit, every detail blazing-clear and high-key. The light has a subtle warm quality (real midday-to-late-morning sun). Only SOFT NATURAL shadows from that frontal direction — a gentle shadow under the chin, a soft shadow tucked behind an arm. There is NO hard cast shadow stretching off to one side, NO side-lit shadow on the garment, NO dark side of the body, NO directional shadow streaking across the sand. DIRECT FRONTAL sun — never side-lit, never from the side.
 
 EXPOSURE: the MODEL and SWIMSUIT are BRIGHT — well-lit, airy, never dim, never dark, never moody. Black fabric reads as a rich dark grey-black with the ribbed texture / pleating / seams clearly visible — NOT crushed to a flat black silhouette. The BACKGROUND is also properly exposed — visible sea, waves, sand, dune grass, and a blue sky with clouds — NOT blown out to pure white, NOT a foggy haze.
 
-THE GARMENT: the SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. The swimsuit is exposed a touch BRIGHTER than a perfectly neutral exposure — the shadows on the fabric are lifted, so even the deepest folds and the underside of the bust stay fully readable; the garment never goes dim, muddy, or grey-flat. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO hard shadows on the swimsuit. (This brighter exposure applies to the GARMENT only — it does NOT change the scene: the sky stays a bright blue with soft clouds, the sun stays behind the camera, the background stays a properly-exposed real beach.) If any part of the garment sinks into shadow, OR a hard directional / side-lit shadow appears on the body / garment / sand, OR the background is a featureless white blur or a gloomy dark grey, the result is WRONG.
+THE GARMENT: the SWIMSUIT is the hero of this photo. It is HIT BY DIRECT FRONT SUNLIGHT and is BRIGHT — fully, brilliantly lit, never dim, never grey-flat; every part crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. Black fabric reads as a bright dark grey-black with all the ribbed / pleated texture catching the light — NOT crushed to a flat black silhouette. The swimsuit is exposed a touch BRIGHTER than a perfectly neutral exposure — the shadows on the fabric are lifted, so even the deepest folds and the underside of the bust stay fully readable. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO hard shadows on the swimsuit. (This bright frontal-sun exposure applies to the GARMENT and model — it does NOT change the scene: the sky stays a bright blue with soft clouds, the sun stays behind the camera, the background stays a properly-exposed real beach, not blown out.) If any part of the garment sinks into shadow, OR a hard directional / side-lit shadow appears on the body / garment / sand, OR the background is a featureless white blur or a gloomy dark grey, the result is WRONG.
 
 GRADE: warm, clean, slightly bright — sun-kissed skin and hair, true-to-life colors. NOT a cool / grey / blue grade, NOT a heavy orange filter, NOT washed-out, NOT flat lifeless lighting.
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -268,7 +274,7 @@ Product: ${product.title}
 
 ${poseAndFraming}
 
-Garment: Fabric smooth, zero bunching. Match reference exactly.${isHighWaistTummy ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button (the navel is several centimetres BELOW the top edge of the fabric, fully buried under it). The belly button is COMPLETELY, ENTIRELY covered — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If ANY part of the belly button or navel area is visible, the garment is WRONG — raise the waistline higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
+Garment: Fabric smooth, zero bunching. Match reference exactly.${catalogHighWaist ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 FACE QUALITY (critical):
 - Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
@@ -282,12 +288,12 @@ CAMERA: shot at the model's chest height, lens parallel to the ground — a stra
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
-LIGHTING — READ THIS: bright natural daylight with the SUN BEHIND THE CAMERA (frontal) — the model and product lit evenly from the front, bright and fully readable. Subtle warm, slightly golden light. Only SOFT NATURAL shadows — NO hard side-lit / directional shadow on the product, body, or sand. Bright BLUE sky with a few soft white clouds, light haze at the horizon. Warm, clean, slightly bright grade — NOT cool/grey, NOT a heavy orange filter, NOT washed-out, NOT moody, NOT a heavy grey overcast. Black fabric shows texture, not crushed black.
+LIGHTING — READ THIS: bright DIRECT frontal sunlight on the model and product (the sun is behind the camera) — the swimsuit is in full bright sun, brilliantly lit, every detail readable. Subtle warm light. Only SOFT NATURAL shadows — NO hard side-lit / directional shadow on the product, body, or sand. Bright BLUE sky with a few soft white clouds, light haze at the horizon. Warm, clean, slightly bright grade — NOT cool/grey, NOT a heavy orange filter, NOT washed-out, NOT moody, NOT a heavy grey overcast, NOT blown out. Black fabric shows texture, not crushed black.
 ${framingBlock}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, gap above the waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}blown-out white background, featureless white background, empty white background, foggy haze, missing background, studio backdrop, no beach visible, overexposed background, white void behind the model, heavy grey overcast, gloomy dark sky, directional shadow, hard cast shadow, side lighting, side-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, dark photo, underexposed, heavy orange filter, washed-out colors, flat lifeless lighting, cool blue grade, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, worm's-eye view, upward camera angle, distorted perspective, foreshortened legs, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}${catalogHighWaist ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, navel showing above the waistband, gap above the waistband, low-set waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}blown-out white background, featureless white background, empty white background, foggy haze, missing background, studio backdrop, no beach visible, overexposed background, white void behind the model, heavy grey overcast, gloomy dark sky, directional shadow, hard cast shadow, side lighting, side-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, dark photo, underexposed, heavy orange filter, washed-out colors, flat lifeless lighting, cool blue grade, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, worm's-eye view, upward camera angle, distorted perspective, foreshortened legs, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
