@@ -4,12 +4,6 @@ import { useToast } from "../hooks/useToast.jsx";
 import StyleBuilder from "./StyleBuilder";
 
 // Map V2 style IDs → backend style keys
-const CATALOG_MODELS = [
-  { id: 'everyday38', label: 'Model 1 (38) Everyday', prompt: 'A 38-year-old woman, US size 12-14, mid-size natural body with soft curves, real-looking belly and thighs, apple-shaped silhouette with weight carried in the midsection, full bust, soft arms. Shoulder-length warm brunette hair with subtle natural waves and slight golden undertones, slightly windswept. Fair-to-medium skin with a hint of natural warmth, light freckles on cheeks and shoulders, no tattoos. Soft round face with warm brown eyes, soft natural eyebrows, full cheeks, gentle smile lines. Calm warm expression with a soft genuine smile, approachable and grounded, looks like a real mid-30s mom who takes care of herself. Minimal natural makeup, no jewelry. North American or Northern European appearance, evokes the relatable everyday woman, not a model. Confident in her body, comfortable presence.' },
-  { id: 'coastal28', label: 'Model 2 (28) Coastal', prompt: 'A 28-year-old woman, US size 4-6, slim athletic build with natural soft curves, not muscular and not skinny, healthy and toned. Long wavy chestnut brown hair with subtle natural highlights, falling past her shoulders, slightly windswept. Warm olive-toned skin with a light natural tan, no visible tattoos, minimal freckles across the nose. Soft oval face with high cheekbones, full natural eyebrows, hazel-green eyes, full lips, straight nose. Warm genuine smile that reaches her eyes, approachable and confident. No makeup or extremely minimal natural makeup. No jewelry. Mediterranean or Southern European appearance, evokes Italian or Spanish coastal beauty. Natural unposed energy, looks like a real woman on vacation, not a professional model.' },
-  { id: 'confident48', label: 'Model 3 (48) Confident', prompt: 'A 48-year-old woman, US size 16-18, full plus-size natural body with generous curves, soft fuller belly, fuller hips and thighs, supportive bust, soft upper arms. Shoulder-length dark blonde or warm light-brown hair with subtle natural lowlights and a few silver-grey strands at the temples (showing real age, not aged), softly tousled and slightly windswept. Fair skin with a warm undertone, light sun-kissed glow, soft natural laugh lines around the eyes and mouth, no tattoos. Soft heart-shaped face with warm blue-grey eyes, soft natural eyebrows, full lips with a relaxed natural smile, gentle smile lines that show character not aging. Warm confident expression, secure and self-assured, looks like a real woman in her late 40s who has earned her presence. Minimal natural makeup, no jewelry. North American or Northern European appearance, evokes the confident mature woman who is finally buying for herself. Calm grounded energy.' },
-];
-
 const CATALOG_FRAMINGS = [
   { id: 'full', label: 'Full body', prompt: 'FRAMING: Full body shot from head to feet, model fills ~70% of vertical frame.' },
   { id: 'three-quarter', label: '3/4 body', prompt: 'FRAMING: Three-quarter body crop from head to mid-calf. Do NOT show feet. Model fills ~80% of vertical frame.' },
@@ -370,6 +364,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState("auto");
   const [useAudience, setUseAudience] = useState(true);
+  const [catalogPose, setCatalogPose] = useState("hero");
+  const [catalogFraming, setCatalogFraming] = useState("three-quarter");
+  const [catalogAvatar, setCatalogAvatar] = useState(null); // persona name — the reference model for Product Catalog
 
   useEffect(() => {
     const sid = storeId;
@@ -423,12 +420,16 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           parsed.push({ name: av.persona_name, age: '', label: av.description || 'Custom avatar', reference_url: av.reference_url, is_active: av.is_active !== false });
         }
       }
+      // Pre-select the first usable reference model for Product Catalog (no text-preset fallback)
+      const firstRefModel = parsed.filter((p) => p.reference_url && p.is_active !== false)[0]?.name || null;
+      if (firstRefModel) setCatalogAvatar((cur) => cur || firstRefModel);
       if (parsed.length) setPersonas(parsed.filter((p) => p.is_active !== false));
     }).catch(() => {});
   }, [storeId, product?.id]);
   const [tab, setTab] = useState("image");
   // Image config
-  const [imgStyle, setImgStyle] = useState("ad-creative");
+  const [imgStyle, setImgStyle] = useState("product-catalog");
+  const [showAllStyles, setShowAllStyles] = useState(false);
   const [imgModel, setImgModel] = useState("nano-banana-pro");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
@@ -442,10 +443,6 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [framing, setFraming] = useState("Full body");
   const [scene, setScene] = useState("Auto");
   const [negPrompt, setNegPrompt] = useState("");
-  const [catalogPose, setCatalogPose] = useState("hero");
-  const [catalogModel, setCatalogModel] = useState("everyday38");
-  const [catalogFraming, setCatalogFraming] = useState("three-quarter");
-  const [catalogAvatar, setCatalogAvatar] = useState(null); // persona name, or null = use text preset
   const [showNegPrompt, setShowNegPrompt] = useState(false);
   // A/B test
   const [abMode, setAbMode] = useState(false);
@@ -538,6 +535,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
   const handleGenImage = useCallback(async () => {
     if (!product?.id || generating) return;
+    if (imgStyle === "product-catalog" && !catalogAvatar) { toast.error("Pick a reference model first"); return; }
     setGenerating(true); setCompleted(0);
     toast.info("Generating...");
 
@@ -557,16 +555,12 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const negHint = negPrompt.trim() ? `\nNegative: ${negPrompt.trim()}` : "";
     const isProductCatalogStyle = imgStyle === 'product-catalog';
     const catalogPosePrompt = isProductCatalogStyle ? (CATALOG_POSES.find(p => p.id === catalogPose)?.prompt || '') : '';
-    const catalogModelPrompt = isProductCatalogStyle ? (CATALOG_MODELS.find(m => m.id === catalogModel)?.prompt || '') : '';
     const catalogFramingPrompt = isProductCatalogStyle ? (CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.prompt || '') : '';
-    const catalogModelLabel = catalogAvatar || (CATALOG_MODELS.find(m => m.id === catalogModel)?.label || '');
+    const catalogModelLabel = catalogAvatar || '';
     const catalogPoseLabel = CATALOG_POSES.find(p => p.id === catalogPose)?.label || '';
     const catalogFramingLabel = CATALOG_FRAMINGS.find(f => f.id === catalogFraming)?.label || '';
-    // When an avatar is chosen, the model comes from the avatar reference (sent via `audience`),
-    // so leave the model description out of custom_prompt.
-    const catalogModelBlock = isProductCatalogStyle && !catalogAvatar ? `${catalogModelPrompt}\n\n` : '';
     const customInstr = isProductCatalogStyle
-      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogModelBlock}${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
+      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
@@ -596,7 +590,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogPose, catalogFraming, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -697,34 +691,58 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Styles header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <SectionLabel style={{ margin: 0, flex: 1 }}>Styles</SectionLabel>
-            <button onClick={() => setShowFavsOnly((p) => !p)} style={{
-              padding: "4px 10px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
-              border: `1px solid ${showFavsOnly ? NEON_BORDER : BORDER_DIM}`,
-              background: showFavsOnly ? NEON_DIM : "transparent",
-              color: showFavsOnly ? NEON_LIGHT : TEXT_MID, cursor: "pointer",
-              boxShadow: showFavsOnly ? NEON_GLOW_SM : "none", transition: "all 0.2s",
-            }}>★ Favorites</button>
-            <button onClick={() => setShowBuilder(true)} style={{
-              padding: "4px 10px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
-              border: `1px solid ${BORDER_DIM}`, background: "transparent",
-              color: TEXT_MID, cursor: "pointer",
-            }}>+ New style</button>
-          </div>
+          {!showAllStyles ? (
+            <>
+              {/* Simplified view — only Product Catalog visible */}
+              <SectionLabel style={{ marginTop: 0 }}>Style</SectionLabel>
+              <StyleCard
+                style={{ id: "product-catalog", title: "Product Catalog", desc: "Pro e-commerce product photo", icon: "📸" }}
+                selected={true}
+                onClick={() => setImgStyle("product-catalog")}
+                favorited={false}
+                onToggleFav={() => {}}
+              />
+              <button onClick={() => setShowAllStyles(true)} style={{
+                marginTop: 10, padding: "6px 12px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
+                border: `1px solid ${BORDER_DIM}`, background: "transparent", color: TEXT_MID, cursor: "pointer",
+              }}>Show all styles ▾</button>
+            </>
+          ) : (
+            <>
+              {/* Styles header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <SectionLabel style={{ margin: 0, flex: 1 }}>Styles</SectionLabel>
+                <button onClick={() => setShowFavsOnly((p) => !p)} style={{
+                  padding: "4px 10px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
+                  border: `1px solid ${showFavsOnly ? NEON_BORDER : BORDER_DIM}`,
+                  background: showFavsOnly ? NEON_DIM : "transparent",
+                  color: showFavsOnly ? NEON_LIGHT : TEXT_MID, cursor: "pointer",
+                  boxShadow: showFavsOnly ? NEON_GLOW_SM : "none", transition: "all 0.2s",
+                }}>★ Favorites</button>
+                <button onClick={() => setShowBuilder(true)} style={{
+                  padding: "4px 10px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
+                  border: `1px solid ${BORDER_DIM}`, background: "transparent",
+                  color: TEXT_MID, cursor: "pointer",
+                }}>+ New style</button>
+              </div>
 
-          {/* Style categories */}
-          <div style={{ background: BG_SURFACE, borderRadius: 14, border: `1px solid rgba(255,255,255,0.03)`, padding: "8px 12px", marginBottom: "1rem" }}>
-            {filteredCategories.map((cat) => (
-              <CategorySection key={cat.id} category={cat} selectedStyle={imgStyle} onSelectStyle={setImgStyle}
-                favorites={favorites} onToggleFav={toggleFav} collapsed={collapsedCats.has(cat.id)}
-                onToggle={() => toggleCat(cat.id)} customStyles={cat.id === "custom" && !showFavsOnly ? customStyles : []} />
-            ))}
-            {filteredCategories.length === 0 && (
-              <div style={{ padding: "24px 0", textAlign: "center", color: TEXT_MID, fontSize: 13 }}>No favorites yet — star a style to add it here</div>
-            )}
-          </div>
+              {/* Style categories */}
+              <div style={{ background: BG_SURFACE, borderRadius: 14, border: `1px solid rgba(255,255,255,0.03)`, padding: "8px 12px", marginBottom: "1rem" }}>
+                {filteredCategories.map((cat) => (
+                  <CategorySection key={cat.id} category={cat} selectedStyle={imgStyle} onSelectStyle={setImgStyle}
+                    favorites={favorites} onToggleFav={toggleFav} collapsed={collapsedCats.has(cat.id)}
+                    onToggle={() => toggleCat(cat.id)} customStyles={cat.id === "custom" && !showFavsOnly ? customStyles : []} />
+                ))}
+                {filteredCategories.length === 0 && (
+                  <div style={{ padding: "24px 0", textAlign: "center", color: TEXT_MID, fontSize: 13 }}>No favorites yet — star a style to add it here</div>
+                )}
+              </div>
+              <button onClick={() => setShowAllStyles(false)} style={{
+                padding: "6px 12px", borderRadius: 999, fontSize: 11, fontFamily: "'DM Mono', monospace",
+                border: `1px solid ${BORDER_DIM}`, background: "transparent", color: TEXT_MID, cursor: "pointer", marginBottom: "1rem",
+              }}>▴ Show less</button>
+            </>
+          )}
 
           <div style={{ height: 1, background: "rgba(255,255,255,0.04)", margin: "1rem 0" }} />
 
@@ -836,27 +854,25 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             <>
               <div>
                 <SectionLabel>Reference model</SectionLabel>
-                <Select
-                  value={catalogAvatar || "__preset__"}
-                  onChange={(v) => setCatalogAvatar(v === "__preset__" ? null : v)}
-                  options={["__preset__", ...personas.filter((p) => p.reference_url).map((p) => p.name)]}
-                  renderOption={(opt) => opt === "__preset__"
-                    ? "Use text preset below"
-                    : `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-                {catalogAvatar && (
-                  <div style={{ fontSize: 11, color: TEXT_MID, marginTop: 4 }}>
-                    Using avatar "{catalogAvatar}" — the model presets below are ignored.
+                {personas.filter((p) => p.reference_url).length > 0 ? (
+                  <>
+                    <Select
+                      value={catalogAvatar || ""}
+                      onChange={(v) => setCatalogAvatar(v || null)}
+                      options={personas.filter((p) => p.reference_url).map((p) => p.name)}
+                      renderOption={(opt) => `${opt}${personas.find((p) => p.name === opt)?.age ? ` (${personas.find((p) => p.name === opt).age})` : ""}${personas.find((p) => p.name === opt)?.label ? ` — ${personas.find((p) => p.name === opt).label}` : ""}`}
+                    />
+                    {!catalogAvatar && (
+                      <div style={{ fontSize: 11, color: NEON_HOT, marginTop: 4 }}>
+                        Pick a reference model to generate.
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ fontSize: 12, color: TEXT_MID, padding: "8px 0" }}>
+                    No reference models yet — create one in the Avatars tab.
                   </div>
                 )}
-              </div>
-              <div>
-                <SectionLabel>Model preset</SectionLabel>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {CATALOG_MODELS.map((m) => (
-                    <Pill key={m.id} active={catalogModel === m.id && !catalogAvatar} disabled={!!catalogAvatar} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
-                  ))}
-                </div>
               </div>
               <div>
                 <SectionLabel>Pose</SectionLabel>

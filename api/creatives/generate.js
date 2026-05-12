@@ -203,13 +203,22 @@ async function handler(req, res) {
       const modelDesc = modelDescMatch ? modelDescMatch[1].trim() : 'Mid-size woman, US size 12-14, natural soft body with visible curves, late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no tattoos.';
       // Extract pose + framing (everything from POSE: onwards)
       const poseAndFraming = catalogCustom.includes('POSE:') ? catalogCustom.slice(catalogCustom.indexOf('POSE:')) : 'POSE: Standing facing camera, weight on right hip, arms relaxed, warm genuine smile.';
-      // Extract framing reminder for end of prompt (recency bias)
-      // Extract full framing text (all sentences after FRAMING:)
+      // Extract full framing text (all sentences after FRAMING:) for a dedicated FRAMING section.
       const framingSection = poseAndFraming.match(/FRAMING:\s*([\s\S]*?)$/);
       const framingText = framingSection ? framingSection[1].trim() : '';
       const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet');
-      const framingReminder = framingText ? `\nCROP (MANDATORY): ${framingText}` : '';
-      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs' : '';
+      const isWaistUp = framingText.includes('waist/hip level') || framingText.includes('Upper body portrait');
+      const isDetailCrop = framingText.includes('chest to upper thigh') || framingText.includes('No face visible');
+      const isFullBody = !isThreeQuarter && !isWaistUp && !isDetailCrop; // default framing
+      // Dedicated, bordered FRAMING block — the model reference photo is full-body, so the crop
+      // must be stated forcefully or the edit model just copies the reference composition.
+      const framingBlock = (framingText && !isFullBody)
+        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — DO NOT IGNORE ===\nThe reference photo of the model shows her FULL BODY, but in THIS image the crop is DIFFERENT. ${framingText} Crop the frame to exactly this — do NOT show the full body just because the reference photo does. The framing of the final image is independent of how the reference is framed.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+        : (framingText ? `\n\nFRAMING: ${framingText}` : '');
+      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles'
+        : isWaistUp ? ', full body, full legs, visible knees, visible feet, visible ankles'
+        : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
+        : '';
 
       // When a persona avatar is the reference, the model comes FROM that image (sandwich:
       // image 1 + last image). Otherwise the model is generated from the modelDesc text and
@@ -261,8 +270,7 @@ FACE QUALITY (critical):
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
 LIGHTING — READ THIS: the sun is BEHIND THE CAMERA shining straight at her (front light, in line with the camera), a soft warm late-afternoon glow. NOT side light, NOT backlight, NOT a low side-angle rake. Her shadow falls behind her, away from the camera. The swimsuit is frontally and evenly lit, bright, every detail readable, NO shadows on it.
-
-${framingReminder}
+${framingBlock}
 
 ${catalogFinalCheck}
 
