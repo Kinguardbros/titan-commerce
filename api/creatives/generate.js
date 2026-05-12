@@ -3,6 +3,7 @@ import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib
 import { submitFalJob } from '../../lib/fal.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
+import { cropAvatarForFraming } from '../../lib/avatar-crop.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -87,6 +88,11 @@ async function handler(req, res) {
 
     const isRealisticBeach = style === 'realistic_beach';
     const isProductCatalog = style === 'product_catalog';
+    // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
+    const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
+    const catalogFramingKey = isProductCatalog
+      ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || null)
+      : null;
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -364,12 +370,21 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // With persona avatar: sandwich pattern — avatar FIRST + product images + avatar LAST
         // This doubles the identity signal so AI doesn't lose the face among headless crop product shots.
         const productImages = images.slice(0, 2);
+        // Product Catalog with a non-full framing: crop the (full-body) avatar reference to that
+        // framing before sending — the edit model copies the reference composition, so a
+        // 3/4-cropped reference produces a 3/4-cropped output (prompt alone can't override it).
+        let avatarRef = reference_url;
+        if (isProductCatalog && reference_url && catalogFramingKey) {
+          const cropped = await cropAvatarForFraming(reference_url, catalogFramingKey);
+          if (cropped) avatarRef = cropped;
+          console.log(`[generate] Cropped avatar to "${catalogFramingKey}": ${!!cropped}`);
+        }
         // Product Catalog: with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                  without an avatar     → 1 product image only (packshot/flat-lay,
         //                                          not a model shot), model comes from the prompt's modelDesc
         const refImages = isProductCatalog
-          ? (reference_url ? [reference_url, ...images.slice(0, 1), reference_url] : images.slice(0, 1))
-          : (reference_url ? [reference_url, ...productImages, reference_url] : images.slice(0, 4));
+          ? (avatarRef ? [avatarRef, ...images.slice(0, 1), avatarRef] : images.slice(0, 1))
+          : (avatarRef ? [avatarRef, ...productImages, avatarRef] : images.slice(0, 4));
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch
