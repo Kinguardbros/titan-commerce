@@ -542,6 +542,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
   const handleGenImage = useCallback(async () => {
     if (!product?.id || generating) return;
+    if (imgStyle === 'product-catalog-v2' && !catalogAvatar) { toast.error("Select a reference model first"); return; }
     setGenerating(true); setCompleted(0);
     toast.info("Generating...");
 
@@ -572,7 +573,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     // so leave the model description out of custom_prompt.
     const catalogModelBlock = isProductCatalogStyle && !catalogAvatar ? `${catalogModelPrompt}\n\n` : '';
     const customInstr = isProductCatalogV2
-      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}]\n${catalogModelPrompt}\n\n${catalogPosePrompt}`
+      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}]\n${catalogPosePrompt}`
       : isProductCatalogStyle
       ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_framing:${catalogFramingLabel}]\n${catalogModelBlock}${catalogPosePrompt}\n\n${catalogFramingPrompt}` + (imgInstructions ? `\n${imgInstructions}` : '')
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
@@ -589,9 +590,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             show_model: isProductCatalogV2 ? true : subject === "On model",
             text_overlay: isProductCatalogV2 ? "none" : (textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom"),
             overlay_text: isProductCatalogV2 ? "" : (textMode === "Custom" ? customText : ""),
-            audience: isProductCatalogV2
-              ? undefined
-              : isProductCatalogStyle
+            audience: (isProductCatalogV2 || isProductCatalogStyle)
               ? (catalogAvatar || undefined)
               : (useAudience && audience !== "auto" ? audience : undefined),
             aspect_ratio: isProductCatalogV2 ? "4:5" : imgRatio,
@@ -887,16 +886,23 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </>
           )}
 
-          {/* Catalog v2 controls — only Model preset + Pose (everything else hardcoded in the v2 prompt) */}
+          {/* Catalog v2 controls — only Reference model (avatar, required) + Pose; everything else hardcoded in the v2 prompt */}
           {imgStyle === "product-catalog-v2" && (
             <>
               <div>
-                <SectionLabel>Model preset</SectionLabel>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {CATALOG_MODELS.map((m) => (
-                    <Pill key={m.id} active={catalogModel === m.id} onClick={() => setCatalogModel(m.id)}>{m.label}</Pill>
-                  ))}
-                </div>
+                <SectionLabel>Reference model</SectionLabel>
+                {personas.filter((p) => p.reference_url).length > 0 ? (
+                  <Select
+                    value={catalogAvatar || ""}
+                    onChange={setCatalogAvatar}
+                    options={personas.filter((p) => p.reference_url).map((p) => p.name)}
+                    renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
+                  />
+                ) : (
+                  <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
+                    No persona avatars yet — create one in the Avatars tab to use this style.
+                  </div>
+                )}
               </div>
               <div>
                 <SectionLabel>Pose</SectionLabel>
@@ -1086,14 +1092,19 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
               <span style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>${imgCost}</span>
             </div>
           </div>
-          <button onClick={handleGenImage} style={{
-            width: "100%", marginTop: "1rem", padding: "15px 0", border: "none", borderRadius: 14,
-            background: abMode
+          {isProductCatalogV2Style && !catalogAvatar && (
+            <div style={{ fontSize: 11, color: TEXT_MID, marginTop: "1rem" }}>Select a reference model above to generate.</div>
+          )}
+          <button onClick={handleGenImage} disabled={generating || (isProductCatalogV2Style && !catalogAvatar)} style={{
+            width: "100%", marginTop: (isProductCatalogV2Style && !catalogAvatar) ? "0.5rem" : "1rem", padding: "15px 0", border: "none", borderRadius: 14,
+            background: (isProductCatalogV2Style && !catalogAvatar)
+              ? "rgba(255,255,255,0.08)"
+              : abMode
               ? `linear-gradient(135deg, ${NEON} 0%, ${CYAN} 100%)`
               : `linear-gradient(135deg, ${NEON} 0%, #c48a18 100%)`,
-            color: BG_DEEP, fontSize: 15, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
-            cursor: "pointer", transition: "all 0.25s",
-            boxShadow: NEON_GLOW_BTN,
+            color: (isProductCatalogV2Style && !catalogAvatar) ? TEXT_MID : BG_DEEP, fontSize: 15, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+            cursor: (isProductCatalogV2Style && !catalogAvatar) ? "not-allowed" : "pointer", transition: "all 0.25s",
+            boxShadow: (isProductCatalogV2Style && !catalogAvatar) ? "none" : NEON_GLOW_BTN,
           }}>
             {generating ? `Generating... ${completed}/${abMode ? imgCount * 2 : imgCount}` : abMode ? `Generate A/B test (${imgCount}× each)` : `Generate ${imgCount} ${styleName.toLowerCase()}${imgCount > 1 ? "s" : ""}`}
             <span style={{ marginLeft: 8, opacity: 0.5 }}>↗</span>
