@@ -93,6 +93,10 @@ async function handler(req, res) {
     const catalogFramingKey = isProductCatalog
       ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || null)
       : null;
+    if (isProductCatalog) {
+      console.log('[generate][DIAG] productCatalog: style=%s, catalogFramingLabel=%j, catalogFramingKey=%j, custom_prompt(first 300)=%j',
+        style, catalogFramingLabel, catalogFramingKey, (custom_prompt || '').slice(0, 300));
+    }
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.control|high.waist|high.waisted|ruched.sculpting|tankini/i.test(titleLower);
@@ -385,10 +389,11 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // framing before sending — the edit model copies the reference composition, so a
         // 3/4-cropped reference produces a 3/4-cropped output (prompt alone can't override it).
         let avatarRef = reference_url;
+        console.log('[generate][DIAG] avatar crop check: isProductCatalog=%s, reference_url=%j, catalogFramingKey=%j', isProductCatalog, reference_url ? reference_url.slice(0, 80) : null, catalogFramingKey);
         if (isProductCatalog && reference_url && catalogFramingKey) {
           const cropped = await cropAvatarForFraming(reference_url, catalogFramingKey);
           if (cropped) avatarRef = cropped;
-          console.log(`[generate] Cropped avatar to "${catalogFramingKey}": ${!!cropped}`);
+          console.log(`[generate][DIAG] Cropped avatar to "${catalogFramingKey}": ${!!cropped}${cropped ? ' → ' + cropped.slice(0, 90) : ''}`);
         }
         // Product Catalog: with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                  without an avatar     → 1 product image only (packshot/flat-lay,
@@ -413,6 +418,10 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         const falPrompt = isProductCatalog
           ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
+        if (isProductCatalog) {
+          console.log('[generate][DIAG] falPrompt has FRAMING block: %s | refImages count: %d | aspect_ratio: %s | resolution: %s',
+            falPrompt.includes('FRAMING / CROP'), refImages.length, aspect_ratio, resolution);
+        }
         // Product Catalog: 1 product reference image (packshot/flat-lay, not a model shot).
         // The model is generated from the prompt's description, not copied from the reference.
         falModelUsed = bananaModel;
