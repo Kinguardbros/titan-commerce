@@ -3,7 +3,6 @@ import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib
 import { submitFalJob } from '../../lib/fal.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
-import { cropAvatarForFraming } from '../../lib/avatar-crop.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -381,19 +380,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // With persona avatar: sandwich pattern — avatar FIRST + product images + avatar LAST
         // This doubles the identity signal so AI doesn't lose the face among headless crop product shots.
         const productImages = images.slice(0, 2);
-        // Product Catalog with a non-full framing: crop the (full-body) avatar reference to that
-        // framing AND switch the output aspect ratio to match the cropped reference's shape —
-        // otherwise the edit model fills the tall (e.g. 4:5) canvas by re-adding the lower body.
-        let avatarRef = reference_url;
-        let outAspectRatio = aspect_ratio;
-        if (isProductCatalog && reference_url && catalogFramingKey) {
-          const cropped = await cropAvatarForFraming(reference_url, catalogFramingKey);
-          if (cropped?.url) {
-            avatarRef = cropped.url;
-            if (cropped.ratio) outAspectRatio = cropped.ratio;
-          }
-          console.log(`[generate] Cropped avatar to "${catalogFramingKey}": ${!!cropped?.url}, output aspect_ratio → ${outAspectRatio}`);
-        }
+        // Note: for Product Catalog non-full framing we used to crop the avatar reference + match
+        // the output aspect ratio, but Nano Banana edit ignores aspect_ratio when given reference
+        // images and re-adds the lower body anyway. The reliable fix is to crop the FINISHED
+        // output server-side (done in poll_generations using meta.framing_crop) — see below.
+        const avatarRef = reference_url;
+        const outAspectRatio = aspect_ratio;
         // Product Catalog: with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                  without an avatar     → 1 product image only (packshot/flat-lay,
         //                                          not a model shot), model comes from the prompt's modelDesc
@@ -527,6 +519,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       ...(colorVariant && { color: colorVariant[1].trim() }),
       ...(negMatch && { negative_prompt: negMatch[1].trim() }),
       ...(audience && { audience }),
+      ...(catalogFramingKey && { framing_crop: catalogFramingKey }), // poll_generations crops the finished image to this
       subject: show_model ? 'On model' : 'Product only',
       submitted_at: new Date().toISOString(),
       ...(isPending && { poll_base: pollBase }),
