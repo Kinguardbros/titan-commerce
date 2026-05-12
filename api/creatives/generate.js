@@ -91,6 +91,7 @@ async function handler(req, res) {
 
     const isRealisticBeach = style === 'realistic_beach';
     const isProductCatalog = style === 'product_catalog';
+    const isProductCatalogV2 = style === 'product_catalog_v2';
     // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
     const catalogFramingKey = isProductCatalog
@@ -110,7 +111,7 @@ async function handler(req, res) {
     // landed on position 0 in Shopify (e.g. it became the featured image), Nano Banana would
     // copy its lighting/composition into the new output, undoing any prompt instructions.
     // Fix at the source: filter them out before slicing.
-    if (audience || isProductCatalog || isRealisticBeach) {
+    if (audience || isProductCatalog || isRealisticBeach || isProductCatalogV2) {
       const AI_FILENAME = /_(product_photo_beach|realistic_beach|product_catalog|ad_creative|lifestyle|review_ugc|product_shot|beach_photo|static_clean|static_split|static_urgency|cs_[a-z0-9_-]+)_\d/i;
       const originals = images.filter((u) => !AI_FILENAME.test(u));
       // Fall back to the original list if a product happens to have only AI images (shouldn't
@@ -294,6 +295,45 @@ ${framingBlock}
 ${catalogFinalCheck}
 
 NEGATIVE: ${catalogNegativePrefix}${catalogHighWaist ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, navel showing above the waistband, gap above the waistband, low-set waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}blown-out white background, featureless white background, empty white background, foggy haze, missing background, studio backdrop, no beach visible, overexposed background, white void behind the model, heavy grey overcast, gloomy dark sky, directional shadow, hard cast shadow, side lighting, side-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, dark photo, underexposed, heavy orange filter, washed-out colors, flat lifeless lighting, cool blue grade, overexposed, overexposed model, blown-out highlights, blown-out skin, washed-out face, hazy bright wash, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, worm's-eye view, upward camera angle, distorted perspective, foreshortened legs, text, watermarks${framingNegative}.`.trim();
+    } else if (isProductCatalogV2) {
+      // Golden-hour Product Catalog v2 — verbatim prompt, two substitutions: ${v2ModelDesc} from the
+      // chosen Model preset, ${v2PoseText} from the chosen Pose preset. No avatar, no framing crop.
+      const v2Custom = (custom_prompt || '').replace(/\[catalog_[^\]]+\]/g, '').trim();
+      const v2ModelDesc = (v2Custom.match(/^([\s\S]*?)(?=POSE:|$)/)?.[1] || '').trim()
+        || 'Mid-size woman, US size 12-14, natural soft body with visible curves, apple-shaped silhouette, real-looking belly and thighs (not athletic, not slim), late 30s to mid 40s, warm relatable expression with a soft natural smile. Natural windswept hair, minimal makeup, no jewelry, no accessories, no tattoos.';
+      const v2PoseText = v2Custom.includes('POSE:')
+        ? v2Custom.slice(v2Custom.indexOf('POSE:')).trim()
+        : 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.';
+      prompt = `Use the swimsuit shown in the attached image as the exact reference garment. Recreate this swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage. Do not redesign, restyle, or reinterpret the swimsuit. The garment in the attached image is the product, replicate it exactly.
+
+Professional e-commerce swimwear product photography. ${v2ModelDesc}
+
+She is barefoot on a quiet beach at golden hour, ocean and sky softly out of focus in the background.
+
+LIGHTING (critical, do not alter):
+- Warm directional golden-hour sunlight hitting the model from the front or front-three-quarter angle, illuminating her face, décolletage, and the front of the garment directly
+- The model's skin and the garment must be the brightest, most exposed elements in the frame
+- Background (ocean, sky, sand) is exposed approximately one stop darker than the model, slightly desaturated, slightly cooler in tone, so the subject pops forward
+- No flat side-lighting, no overcast diffusion, no backlit silhouette
+- Subtle warm rim light along her hair and shoulder for separation from background
+
+COMPOSITION:
+- Vertical 4:5 framing
+- Full body or three-quarter body crop, model centered, framing emphasizes the torso and the garment construction
+- Shallow depth of field, background softly out of focus
+- Sharp focus on the garment fabric, fit, seaming, and texture
+- Dry sand under her feet, clean uncluttered foreground
+
+GARMENT RULES (non-negotiable):
+- For one-piece swimsuits: full coverage from bust to upper hip, moderate leg opening (not high-cut), the suit covers the body as designed in the reference image
+- For two-piece swimsuits: bikini bottoms must be high-waisted, sit well above the belly button, and fully cover the navel
+- Bikini bottoms must have moderate leg opening, not high-cut, with full coverage across the hips and upper thighs
+- Repeat: high-waisted bottoms, navel fully covered, moderate leg cut
+- Garment fabric texture, color, and structural details must match the attached reference exactly
+
+${v2PoseText}
+
+Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin texture and fabric texture.`;
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -395,11 +435,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // images and re-adds the lower body anyway. The reliable fix is to crop the FINISHED
         // output server-side (done in poll_generations using meta.framing_crop) — see below.
         const avatarRef = reference_url;
-        const outAspectRatio = aspect_ratio;
-        // Product Catalog: with a persona avatar → sandwich [avatar, 1 product image, avatar]
-        //                  without an avatar     → 1 product image only (packshot/flat-lay,
-        //                                          not a model shot), model comes from the prompt's modelDesc
-        const refImages = isProductCatalog
+        // Product Catalog v2 is self-contained, no avatar, hardcoded 4:5 framing.
+        const outAspectRatio = isProductCatalogV2 ? '4:5' : aspect_ratio;
+        // Product Catalog (v1 & v2): with a persona avatar → sandwich [avatar, 1 product image, avatar]
+        //                            without an avatar     → 1 product image only (packshot/flat-lay,
+        //                                                    not a model shot), model comes from the prompt
+        const refImages = (isProductCatalog || isProductCatalogV2)
           ? (avatarRef ? [avatarRef, ...images.slice(0, 1), avatarRef] : images.slice(0, 1))
           : (avatarRef ? [avatarRef, ...productImages, avatarRef] : images.slice(0, 4));
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
@@ -416,8 +457,8 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `PRODUCT REPRODUCTION — PIXEL-ACCURATE:\nThe garment in the final image must be an EXACT visual copy of the reference image(s). Match PRECISELY: exact color ratio and placement, exact width of every stripe/trim/band/border, exact neckline shape and depth, exact waistband height and style, exact stitching pattern, exact strap width. Do NOT "improve", simplify, or reinterpret the design. Copy it exactly as shown in the reference.`;
         const productCheck = isProductCatalog ? '' : `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL PRODUCT CHECK: The garment proportions (color ratios, stripe widths, trim sizes, waistband height) must EXACTLY match the product reference images. If any detail looks different from the reference — it is WRONG. The product must be a faithful reproduction, not an interpretation.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-        const falPrompt = isProductCatalog
-          ? prompt  // Product Catalog prompt is self-contained — no extra wrappers
+        const falPrompt = (isProductCatalog || isProductCatalogV2)
+          ? prompt  // Product Catalog prompts are self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
         falModelUsed = bananaModel;
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: outAspectRatio, resolution });
