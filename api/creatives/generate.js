@@ -94,7 +94,7 @@ async function handler(req, res) {
       : null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
-    const isHighWaistTummy = /tummy.control|high.waist|high.waisted|ruched.sculpting|tankini/i.test(titleLower);
+    const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -276,6 +276,8 @@ FACE QUALITY (critical):
 - Realistic facial proportions, no uncanny valley, no doll-like smoothing
 - If the face looks AI-generated, blurry, or plastic — the image is WRONG
 
+CAMERA: shot at the model's chest height, lens parallel to the ground — a straight, eye-level catalog perspective. NOT a low-angle shot, NOT shot from below looking up, NOT a worm's-eye view. The horizon line sits roughly at the model's chest. Her proportions are natural and undistorted — head, torso, and legs in correct proportion, no foreshortening.
+
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
 LIGHTING — READ THIS: a clean bright light-blue sky with just a few wispy high clouds — but NO visible sun disc, NO sunbeam. The sun stays behind a high thin haze, so the light on the model is flat, soft and even — like a giant softbox. NO directional cast shadows anywhere (not on the body, not on the sand, not on the garment). Bright high-key exposure. NOT a hard cloudless sunny day with a blazing sun, NOT golden hour, NOT moody, NOT a heavy grey overcast. The swimsuit is evenly and brightly lit, every detail readable, black fabric shows texture (not crushed black).
@@ -283,7 +285,7 @@ ${framingBlock}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, gap above the waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}blown-out white background, featureless white background, empty white background, foggy haze, missing background, studio backdrop, no beach visible, overexposed background, white void behind the model, heavy grey overcast, gloomy dark sky, direct hard sunlight, blazing visible sun, harsh sunbeam, cloudless hard sunny day, directional shadow, hard cast shadow, side lighting, side-angle sun, golden hour, sunset, sunrise, low-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, dark photo, underexposed, heavy orange filter, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, gap above the waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : ''}blown-out white background, featureless white background, empty white background, foggy haze, missing background, studio backdrop, no beach visible, overexposed background, white void behind the model, heavy grey overcast, gloomy dark sky, direct hard sunlight, blazing visible sun, harsh sunbeam, cloudless hard sunny day, directional shadow, hard cast shadow, side lighting, side-angle sun, golden hour, sunset, sunrise, low-angle sun, shadow on the sand to one side, dark side of the body, shadow on one leg, shadow under the bust, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, dim, dark photo, underexposed, heavy orange filter, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, worm's-eye view, upward camera angle, distorted perspective, foreshortened legs, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
