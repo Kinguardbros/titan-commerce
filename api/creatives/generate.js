@@ -231,7 +231,18 @@ Recreate the swimsuit faithfully on the model: same color, same cut, same neckli
 
 ${catalogModelLine}
 
-She is barefoot on a quiet beach, ocean behind her, the sky a soft blue fading to pale near the horizon. LIGHTING — THIS IS CRITICAL: the SUN is BEHIND THE CAMERA, shining over the photographer's shoulder STRAIGHT AT HER — front lighting, the light hits her face, body and the swimsuit head-on, square to the camera. The sun is NOT to her side, NOT behind her, NOT a low side-angle golden-hour rake — it is in front of her, in line with the camera, lighting her frontally and evenly. The tone is a soft warm late-afternoon glow (gently golden, NOT a heavy orange filter, NOT a neutral cold day). Because the light is frontal, her own shadow falls AWAY from the camera (behind her / at her feet, on the sand) — there are NO shadows across the front of her body or the swimsuit. The SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part of it clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. ZERO shadows on the swimsuit — not under the bust, not at the waistband, not in the folds, not cast by her arms. The garment is fully exposed, bright and readable; if any part of it sinks into shadow, or the light is coming from the side, the lighting is WRONG. True blacks that still show fabric detail (not crushed to pure black). NOT a gloomy grey day, NOT dark, NOT moody, NOT high-noon harsh — soft, warm, glowing, frontally and evenly lit.
+She is barefoot on a quiet beach, ocean behind her, the sky a soft blue fading to pale near the horizon.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+=== LIGHTING — READ CAREFULLY, DO NOT SKIP THIS ===
+Time/feel: soft warm late-afternoon daylight (a gentle golden warmth, NOT a heavy orange filter, NOT a cold neutral day, NOT gloomy grey, NOT harsh high-noon).
+
+SUN POSITION: the sun is in front of the model, in line with the camera (the photographer is shooting with the sun behind their back). The light hits her face, body and the swimsuit head-on, square to the camera. NOT to her side, NOT behind her, NOT a low side-angle rake.
+
+HOW TO PROVE THE SUN IS IN FRONT — THE SHADOW ON THE SAND: because the sun is in line with the camera, the model's cast shadow on the sand points AWAY from the camera. It falls directly behind her and is mostly HIDDEN behind her own body — from the camera's point of view almost NO shadow is visible on the sand at her feet. There is NO long shadow stretching off to her left, NO long shadow stretching off to her right. If you see a shadow on the sand reaching out to one side, the sun is in the wrong place and the lighting is WRONG — move the sun in front of her.
+
+ON THE BODY AND THE GARMENT: because the light is frontal, there are NO shadows across the front of her body, NO dark side, NO shadow on either leg, both her left and right side are equally lit. The SWIMSUIT is the hero of this photo and must be evenly, fully, brightly lit — every part clearly visible and crisply readable: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband. ZERO shadows on the swimsuit — not under the bust, not at the waistband, not in the folds, not cast by her arms. The garment is fully exposed, bright and readable; if any part of it sinks into shadow, the lighting is WRONG. True blacks that still show fabric detail (not crushed to pure black).
+━━━━━━━━━━━━━━━━━━━━━━━━
 
 Product: ${product.title}
 
@@ -255,7 +266,7 @@ ${framingReminder}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}side lighting, light from the side, side-angle sun, rim light, backlight, backlit, silhouette, sun behind the model, harsh high-noon sun, hard direct overhead sun, hard cast shadows, shadow across the front of the body, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}side lighting, light from the side, side-angle sun, long shadow on the sand to one side, shadow stretching off to the left, shadow stretching off to the right, long cast shadow across the sand, rim light, backlight, backlit, silhouette, sun behind the model, harsh high-noon sun, hard direct overhead sun, hard cast shadows, shadow across the front of the body, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
