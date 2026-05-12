@@ -93,6 +93,9 @@ async function handler(req, res) {
     const catalogFramingKey = isProductCatalog
       ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || null)
       : null;
+    // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
+    const titleLower = (product.title || '').toLowerCase();
+    const isHighWaistTummy = /tummy.control|high.waist|high.waisted|ruched.sculpting|tankini/i.test(titleLower);
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -254,7 +257,7 @@ Product: ${product.title}
 
 ${poseAndFraming}
 
-Garment: High-waisted bottoms cover navel. Fabric smooth, zero bunching. Match reference exactly.
+Garment: Fabric smooth, zero bunching. Match reference exactly.${isHighWaistTummy ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits HIGH — ABOVE the belly button. The navel is COMPLETELY COVERED by the fabric, not visible at all. No bare midriff, no exposed belly, no low-rise cut. The fabric covers the entire stomach from above the navel down, hugging and smoothing it. If the belly button is visible, the garment is WRONG — raise the waistline.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 FACE QUALITY (critical):
 - Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
@@ -272,7 +275,7 @@ ${framingReminder}
 
 ${catalogFinalCheck}
 
-NEGATIVE: ${catalogNegativePrefix}side lighting, light from the side, side-angle sun, long shadow on the sand to one side, shadow stretching off to the left, shadow stretching off to the right, long cast shadow across the sand, rim light, backlight, backlit, silhouette, sun behind the model, harsh high-noon sun, hard direct overhead sun, hard cast shadows, shadow across the front of the body, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
+NEGATIVE: ${catalogNegativePrefix}${isHighWaistTummy ? 'visible belly button, exposed navel, bare midriff, low-rise bottoms, low-waist cut, exposed stomach, ' : ''}side lighting, light from the side, side-angle sun, long shadow on the sand to one side, shadow stretching off to the left, shadow stretching off to the right, long cast shadow across the sand, rim light, backlight, backlit, silhouette, sun behind the model, harsh high-noon sun, hard direct overhead sun, hard cast shadows, shadow across the front of the body, deep shadows on the swimsuit, dark areas on the garment, swimsuit lost in shadow, underlit swimsuit, crushed blacks, garment crushed to pure black, dramatic lighting, moody lighting, gloomy grey day, dark photo, underexposed, heavy orange filter, oversaturated sunset, sunset, plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, text, watermarks${framingNegative}.`.trim();
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -304,10 +307,9 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       });
     }
 
-    // Auto-detect tummy control / high-waist swimwear → inject coverage instructions into prompt
-    // Skip for realistic_beach — standalone style handles everything internally
-    const titleLower = (product.title || '').toLowerCase();
-    const isTummyControl = !isRealisticBeach && !isProductCatalog && /tummy.control|high.waist|ruched.sculpting|tankini/i.test(titleLower);
+    // Tummy-control coverage for the non-standalone styles. Product Catalog handles it inside
+    // its own prompt block above (isHighWaistTummy); realistic_beach handles everything internally.
+    const isTummyControl = !isRealisticBeach && !isProductCatalog && isHighWaistTummy;
     let coverageReminder = '';
     if (isTummyControl && show_model) {
       const coverageInstr = `\n\nCRITICAL PRODUCT COVERAGE RULES — THIS SWIMSUIT IS TUMMY CONTROL:\n` +
