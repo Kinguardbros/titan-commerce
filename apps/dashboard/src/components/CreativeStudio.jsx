@@ -590,7 +590,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
       : isProductCatalogV2
       ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}]\n${catalogPosePrompt}`
       : isProductCatalogStyle
-      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}][catalog_beach:${catalogBeach}]\n${catalogPosePrompt}`
+      ? `[catalog_model:${catalogModelLabel}][catalog_pose:${catalogPoseLabel}]\n${catalogPosePrompt}`
       : `${colorPrefix}${poseHint}${bodyHint}${framingHint}${sceneHint}${imgInstructions}${negHint}`.trim();
 
     const stylesToGen = abMode ? [imgStyle, abStyle] : [imgStyle];
@@ -855,7 +855,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Catalog v1 controls — Reference model (avatar, required) + Pose + Beach scene; framing/aspect/model preset removed, post-process always crops to 3/4 */}
+          {/* Catalog v1 controls — Reference model (avatar, required) + Pose; framing/aspect/model preset/beach scene removed, post-process always crops to 3/4, beach is hardcoded sunny in the backend */}
           {imgStyle === "product-catalog" && (
             <>
               <div>
@@ -878,14 +878,6 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {CATALOG_POSES.map((p) => (
                     <Pill key={p.id} active={catalogPose === p.id} onClick={() => setCatalogPose(p.id)}>{p.label}</Pill>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <SectionLabel>Beach scene</SectionLabel>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {CATALOG_BEACH_SCENES.map((s) => (
-                    <Pill key={s.id} active={catalogBeach === s.id} onClick={() => setCatalogBeach(s.id)}>{s.label}</Pill>
                   ))}
                 </div>
               </div>
