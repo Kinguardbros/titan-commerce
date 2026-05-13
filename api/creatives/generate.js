@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib/higgsfield.js';
 import { submitFalJob } from '../../lib/fal.js';
+import { buildV1BeachScene } from '../../lib/v1-beach-scenes.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -93,11 +94,14 @@ async function handler(req, res) {
     const isProductCatalog = style === 'product_catalog';
     const isProductCatalogV2 = style === 'product_catalog_v2';
     const isProductCatalogV3 = style === 'product_catalog_v3';
-    const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
+    // Beach scene key — used by both v1 (selects scene+lighting variant in the single-shot prompt)
+    // and v3 (selects the master beach prompt for step 2). 'sunny' is the default for both.
+    const beachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
+    const v3BeachKey = beachKey; // back-compat alias for the v3 branch + configMeta
     // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
     const catalogFramingKey = isProductCatalog
-      ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || null)
+      ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || 'three-quarter')
       : null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
@@ -213,6 +217,8 @@ async function handler(req, res) {
     // Pure prompt from product reference images + hardcoded body/environment description.
     let prompt;
     if (isProductCatalog) {
+      // Beach scene variant (sunny/golden/dune/cove) — swaps the scene line and lighting summary.
+      const v1Scene = buildV1BeachScene(beachKey);
       // Parse catalog config from custom_prompt (model desc, pose, framing)
       const catalogCustom = custom_prompt ? custom_prompt.replace(/\[catalog_[^\]]+\]/g, '').trim() : '';
       // Extract model description (everything before POSE:)
@@ -224,7 +230,10 @@ async function handler(req, res) {
       // Extract full framing text (all sentences after FRAMING:)
       const framingSection = poseAndFraming.match(/FRAMING:\s*([\s\S]*?)$/);
       const framingText = framingSection ? framingSection[1].trim() : '';
-      const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet');
+      // v1 always uses 3/4 framing (post-process crops the finished image). When the frontend stops
+      // sending [catalog_framing:...] and there's no FRAMING: text, force isThreeQuarter so the
+      // framingBlock reminder still gets included in the prompt.
+      const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet') || !framingText;
       const isWaistUp = framingText.includes('waist/hip level') || framingText.includes('Upper body portrait');
       const isDetailCrop = framingText.includes('chest to upper thigh') || framingText.includes('No face visible');
       const isNonFullFraming = isThreeQuarter || isWaistUp || isDetailCrop;
@@ -258,7 +267,7 @@ Recreate the swimsuit faithfully on the model: same color, same cut, same neckli
 
 ${catalogModelLine}
 
-She is barefoot on a real beach, standing on sand on a bright sunny day. Behind her is a CLEARLY VISIBLE beach scene: ocean with gentle waves on one side, soft dry sand with a few dune grasses / beach grass, a low dune line, and a bright BLUE sky with a few scattered soft white clouds and light haze near the horizon. A clear, warm, sunny beach day. NOT a featureless white blur, NOT a heavy grey overcast, NOT studio fog. The background is softly out of focus (shallow depth of field, model tack sharp) but it is unmistakably a real beach: you can see the sea, the waves, the sand, the dune grass, the blue sky with clouds.
+${v1Scene.sceneLine}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 === LIGHTING — READ CAREFULLY, DO NOT SKIP THIS ===
@@ -291,7 +300,7 @@ CAMERA: shot at the model's chest height, lens parallel to the ground — a stra
 
 Hyperrealistic, photographic, editorial swimwear catalog quality, shot on 85mm lens at f/2.8, Canon R5 look, true-to-life skin and fabric texture. 8K resolution, ultra-sharp. ${aspect_ratio || '4:5'} format.
 
-LIGHTING — READ THIS: natural frontal daylight on the model and product (the sun is behind the camera) — well-exposed and clearly readable, a natural balanced true-to-life exposure, NOT dim and NOT overexposed / blown out / washed out. Subtle warm light. Only SOFT NATURAL shadows — NO hard side-lit / directional shadow on the product, body, or sand. Bright BLUE sky with a few soft white clouds, light haze at the horizon, background holds full visible detail (NOT blown out to white, sand and sky NOT vaporised). Warm, clean grade — NOT cool/grey, NOT a heavy orange filter, NOT washed-out, NOT moody, NOT a heavy grey overcast. Black fabric shows texture, not crushed black.
+${v1Scene.lightingSummary}
 ${framingBlock}
 
 ${catalogFinalCheck}
@@ -595,6 +604,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     const catalogModelMatch = (custom_prompt || '').match(/\[catalog_model:([^\]]+)\]/);
     const catalogPoseMatch = (custom_prompt || '').match(/\[catalog_pose:([^\]]+)\]/);
     const catalogFramingMatch = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/);
+    const catalogBeachMatch = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/);
 
 
     const MODEL_LABELS = {
@@ -611,6 +621,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       ...(catalogModelMatch && { catalog_model: catalogModelMatch[1].trim() }),
       ...(catalogPoseMatch && { pose: catalogPoseMatch[1].trim() }),
       ...(catalogFramingMatch && { framing: catalogFramingMatch[1].trim() }),
+      ...(catalogBeachMatch && { beach_scene: catalogBeachMatch[1].trim() }),
       ...(!catalogPoseMatch && poseMatch && { pose: poseMatch[1].trim() }),
       ...(bodyMatch && { body_type: bodyMatch[1].trim() }),
       ...(!catalogFramingMatch && framingMatch && { framing: framingMatch[1].trim() }),
