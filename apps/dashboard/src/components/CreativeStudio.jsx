@@ -166,6 +166,13 @@ const IMG_MODELS = [
   { id: "ideogram-edit", label: "Ideogram Edit", detail: "Smart editing — $0.03" },
   { id: "flux-kontext", label: "FLUX Kontext Pro", detail: "Identity preserve — $0.04" },
 ];
+// Subset of IMG_MODELS allowed for Product Catalog v1-v5 styles. Catalog flows use
+// the [avatar, productPhoto, avatar] sandwich pattern + need strong identity lock,
+// so only Nano Banana variants are allowed for now. ChatGPT Image planned later.
+const CATALOG_AI_MODELS = [
+  { id: "nano-banana-pro", label: "Nano Banana Pro", detail: "Best identity preserve — $0.15/img" },
+  { id: "nano-banana", label: "Nano Banana 2", detail: "Cheaper, slightly weaker identity — $0.08/img" },
+];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
   { id: "kling-v3", label: "Kling V3 Pro", detail: "Best" },
@@ -445,6 +452,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   // Image config
   const [imgStyle, setImgStyle] = useState("ad-creative");
   const [imgModel, setImgModel] = useState("nano-banana-pro");
+  // Catalog-only AI model picker (separate from imgModel because catalog flows force a Nano Banana variant)
+  const [catalogAiModel, setCatalogAiModel] = useState("nano-banana-pro");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
   const [customText, setCustomText] = useState("");
@@ -531,10 +540,12 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const isProductCatalogV2Style = imgStyle === "product-catalog-v2";
 
   const imgCost = useMemo(() => {
-    const perImage = MODEL_COST[imgModel] || 0.03;
+    // For catalog styles use the catalog model picker; otherwise the general imgModel
+    const activeModel = isAnyCatalogStyle ? catalogAiModel : imgModel;
+    const perImage = MODEL_COST[activeModel] || 0.03;
     const base = imgCount * perImage;
     return abMode ? (base * 2).toFixed(2) : base.toFixed(2);
-  }, [imgCount, abMode, imgModel]);
+  }, [imgCount, abMode, imgModel, isAnyCatalogStyle, catalogAiModel]);
 
   const vidCost = useMemo(() => {
     const dur = parseInt(duration);
@@ -571,7 +582,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const isProductCatalogV5 = imgStyle === 'product-catalog-v5';
     const isAnyCatalog = imgStyle === 'product-catalog' || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5;
     // Catalog styles hide the model picker — force Nano Banana Pro (best identity preservation)
-    const backendModel = isAnyCatalog ? "fal_nano_banana_pro" : (MODEL_MAP[imgModel] || "fal_nano_banana");
+    const backendModel = isAnyCatalog ? (MODEL_MAP[catalogAiModel] || "fal_nano_banana_pro") : (MODEL_MAP[imgModel] || "fal_nano_banana");
     const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
     const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
@@ -632,7 +643,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, catalogBeach, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, catalogAiModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, catalogBeach, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -864,6 +875,19 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                   <Pill key={f} active={framing === f} onClick={() => setFraming(f)}>{f}</Pill>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Shared AI model picker for all Product Catalog styles (v1-v5) — Nano Banana variants only (sandwich-friendly + identity-preserve). */}
+          {isAnyCatalogStyle && (
+            <div>
+              <SectionLabel>AI model</SectionLabel>
+              <Select
+                value={catalogAiModel}
+                onChange={setCatalogAiModel}
+                options={CATALOG_AI_MODELS}
+                renderOption={(m) => `${m.label} — ${m.detail}`}
+              />
             </div>
           )}
 
