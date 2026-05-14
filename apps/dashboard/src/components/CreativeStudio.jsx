@@ -173,18 +173,18 @@ const CATALOG_AI_MODELS = [
   { id: "nano-banana-pro", label: "Nano Banana Pro", detail: "Best identity preserve — $0.15/img" },
   { id: "nano-banana", label: "Nano Banana 2", detail: "Cheaper, slightly weaker identity — $0.08/img" },
 ];
-// v5-only: warm post-sunset afterglow backdrop tint. Sent to backend as `v5_backdrop_color`,
-// inject into V5_PROMPT_BODY as a high-priority override (sky + ambient + sand take this tone,
-// model + swimsuit stay TRUE TO LIFE).
-const V5_BACKDROP_COLORS = [
-  { id: 'peach', label: 'Soft peach' },
-  { id: 'rose', label: 'Dusty rose' },
-  { id: 'cream', label: 'Warm cream' },
-  { id: 'beige', label: 'Soft beige' },
-  { id: 'sage', label: 'Sage green' },
-  { id: 'lavender', label: 'Soft lavender' },
-  { id: 'taupe', label: 'Warm taupe' },
-];
+// FUTURE: backdrop tint picker pro v5 (warm afterglow color override). Zakomentováno —
+// uživatel místo toho chtěl PRODUCT color selector (Shopify variants). Backdrop selector
+// může mít budoucnost (viz commit 25111a6), uchováváme.
+// const V5_BACKDROP_COLORS = [
+//   { id: 'peach', label: 'Soft peach' },
+//   { id: 'rose', label: 'Dusty rose' },
+//   { id: 'cream', label: 'Warm cream' },
+//   { id: 'beige', label: 'Soft beige' },
+//   { id: 'sage', label: 'Sage green' },
+//   { id: 'lavender', label: 'Soft lavender' },
+//   { id: 'taupe', label: 'Warm taupe' },
+// ];
 const VID_PROVIDERS = ["fal.ai", "Replicate", "RunwayML"];
 const VID_MODELS = [
   { id: "kling-v3", label: "Kling V3 Pro", detail: "Best" },
@@ -466,8 +466,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const [imgModel, setImgModel] = useState("nano-banana-pro");
   // Catalog-only AI model picker (separate from imgModel because catalog flows force a Nano Banana variant)
   const [catalogAiModel, setCatalogAiModel] = useState("nano-banana-pro");
-  // v5-only: backdrop tint (peach default; sent to backend as v5_backdrop_color, injected into V5_PROMPT_BODY)
-  const [v5BackdropColor, setV5BackdropColor] = useState("peach");
+  // FUTURE: backdrop tint state pro v5 — zakomentováno společně s V5_BACKDROP_COLORS výše. Viz commit 25111a6.
+  // const [v5BackdropColor, setV5BackdropColor] = useState("peach");
   const [subject, setSubject] = useState("On model");
   const [textMode, setTextMode] = useState("No text");
   const [customText, setCustomText] = useState("");
@@ -648,7 +648,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             aspect_ratio: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogStyle) ? "4:5" : imgRatio,
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
             reference_url: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogStyle) ? undefined : colorRef,
-            v5_backdrop_color: isProductCatalogV5 ? v5BackdropColor : undefined,
+            product_color: (isAnyCatalog && selectedColor && selectedColor !== "All colors") ? selectedColor : undefined,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
         );
@@ -658,7 +658,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     setGenerating(false);
     toast.success(`Generated!`);
     if (onGenerated) onGenerated();
-  }, [product, storeId, imgStyle, imgModel, catalogAiModel, v5BackdropColor, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, catalogBeach, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
+  }, [product, storeId, imgStyle, imgModel, catalogAiModel, imgCount, subject, modelPose, scene, imgInstructions, textMode, customText, negPrompt, imgResolution, catalogAvatar, catalogModel, catalogPose, catalogFraming, catalogBeach, abMode, abStyle, selectedColor, colorToImage, audience, useAudience, generating, onGenerated, toast]);
 
   const handleGenVideo = useCallback(async () => {
     if (generating) return;
@@ -808,14 +808,16 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Color + Audience — hidden for catalog styles */}
+          {/* Color — visible for both catalog and non-catalog flows when product has variant colors */}
+          {colors.length > 1 && (
+            <div>
+              <SectionLabel style={{ marginTop: "0.75rem" }}>Color</SectionLabel>
+              <Select value={selectedColor} onChange={setSelectedColor} options={colors} />
+            </div>
+          )}
+
+          {/* Audience switch — hidden for catalog styles (catalog má vlastní Reference model dropdown) */}
           {!isAnyCatalogStyle && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            {colors.length > 1 && (
-              <div>
-                <SectionLabel style={{ marginTop: "0.75rem" }}>Color</SectionLabel>
-                <Select value={selectedColor} onChange={setSelectedColor} options={colors} />
-              </div>
-            )}
             {personas.length > 0 && subject === "On model" && imgStyle !== "realistic-beach" && !isAnyCatalogStyle && (
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: "0.75rem" }}>
@@ -1020,33 +1022,23 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             </div>
           )}
 
-          {/* Catalog v5 controls — Reference model + Backdrop color (everything else is hardcoded server-side) */}
+          {/* Catalog v5 controls — Reference model only (everything else is hardcoded server-side). Backdrop color picker zakomentován, viz commit 25111a6. */}
           {imgStyle === "product-catalog-v5" && (
-            <>
-              <div>
-                <SectionLabel>Reference model</SectionLabel>
-                {personas.filter((p) => p.reference_url).length > 0 ? (
-                  <Select
-                    value={catalogAvatar || ""}
-                    onChange={setCatalogAvatar}
-                    options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                    renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                  />
-                ) : (
-                  <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                    No persona avatars yet — create one in the Avatars tab to use this style.
-                  </div>
-                )}
-              </div>
-              <div>
-                <SectionLabel>Backdrop color</SectionLabel>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {V5_BACKDROP_COLORS.map((c) => (
-                    <Pill key={c.id} active={v5BackdropColor === c.id} onClick={() => setV5BackdropColor(c.id)}>{c.label}</Pill>
-                  ))}
+            <div>
+              <SectionLabel>Reference model</SectionLabel>
+              {personas.filter((p) => p.reference_url).length > 0 ? (
+                <Select
+                  value={catalogAvatar || ""}
+                  onChange={setCatalogAvatar}
+                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
+                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
+                />
+              ) : (
+                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
+                  No persona avatars yet — create one in the Avatars tab to use this style.
                 </div>
-              </div>
-            </>
+              )}
+            </div>
           )}
 
           {/* Scene — conditional on style, hidden for catalog styles */}
