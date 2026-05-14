@@ -40,6 +40,7 @@ const STYLE_MAP = {
   "product-catalog-v4": "product_catalog_v4",
   "product-catalog-v5": "product_catalog_v5",
   "product-catalog-v6": "product_catalog_v6",
+  "product-catalog-v7": "product_catalog_v7",
   "realistic-beach": "realistic_beach",
   "ad-creative": "ad_creative",
   "product-shot": "product_shot",
@@ -118,6 +119,7 @@ const STYLE_CATEGORIES = [
       { id: "product-catalog-v4", title: "Product Catalog v4", desc: "Editorial strobe + on-location beach (Andie Swim aesthetic)", icon: "📷" },
       { id: "product-catalog-v5", title: "Product Catalog v5", desc: "Editorial strobe + warm afterglow (sun below horizon, product pops)", icon: "🌇" },
       { id: "product-catalog-v6", title: "Product Catalog v6", desc: "Editorial strobe + bright daylight beach (vivid turquoise ocean, blue sky)", icon: "☀️" },
+      { id: "product-catalog-v7", title: "Product Catalog v7", desc: "Soft warm afterglow + balanced exposure (visible warm tones, natural look)", icon: "🌤" },
       { id: "realistic-beach", title: "Realistic Beach", desc: "Ultra-real curvy model, golden hour, no AI look", icon: "🏖" },
       { id: "product-shot", title: "Product shot", desc: "Clean white bg, detail focus", icon: "◉" },
       { id: "beach-photo", title: "Beach photo", desc: "Warm golden, ocean bokeh", icon: "◐" },
@@ -552,8 +554,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
   const isProductCatalogV4Style = imgStyle === "product-catalog-v4";
   const isProductCatalogV5Style = imgStyle === "product-catalog-v5";
   const isProductCatalogV6Style = imgStyle === "product-catalog-v6";
+  const isProductCatalogV7Style = imgStyle === "product-catalog-v7";
   const isProductCatalogV1Style = imgStyle === "product-catalog";
-  const isAnyCatalogStyle = isProductCatalogV1Style || imgStyle === "product-catalog-v2" || isProductCatalogV3Style || isProductCatalogV4Style || isProductCatalogV5Style || isProductCatalogV6Style;
+  const isAnyCatalogStyle = isProductCatalogV1Style || imgStyle === "product-catalog-v2" || isProductCatalogV3Style || isProductCatalogV4Style || isProductCatalogV5Style || isProductCatalogV6Style || isProductCatalogV7Style;
   const isProductCatalogV2Style = imgStyle === "product-catalog-v2";
 
   const imgCost = useMemo(() => {
@@ -588,7 +591,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
   const handleGenImage = useCallback(async () => {
     if (!product?.id || generating) return;
-    if ((imgStyle === 'product-catalog' || imgStyle === 'product-catalog-v2' || imgStyle === 'product-catalog-v3' || imgStyle === 'product-catalog-v4' || imgStyle === 'product-catalog-v5' || imgStyle === 'product-catalog-v6') && !catalogAvatar) { toast.error("Select a reference model first"); return; }
+    if ((imgStyle === 'product-catalog' || imgStyle === 'product-catalog-v2' || imgStyle === 'product-catalog-v3' || imgStyle === 'product-catalog-v4' || imgStyle === 'product-catalog-v5' || imgStyle === 'product-catalog-v6' || imgStyle === 'product-catalog-v7') && !catalogAvatar) { toast.error("Select a reference model first"); return; }
     setGenerating(true); setCompleted(0);
     toast.info("Generating...");
 
@@ -598,7 +601,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const isProductCatalogV4 = imgStyle === 'product-catalog-v4';
     const isProductCatalogV5 = imgStyle === 'product-catalog-v5';
     const isProductCatalogV6 = imgStyle === 'product-catalog-v6';
-    const isAnyCatalog = imgStyle === 'product-catalog' || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6;
+    const isProductCatalogV7 = imgStyle === 'product-catalog-v7';
+    const isAnyCatalog = imgStyle === 'product-catalog' || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7;
     // Catalog styles hide the model picker — force Nano Banana Pro (best identity preservation)
     const backendModel = isAnyCatalog ? (MODEL_MAP[catalogAiModel] || "fal_nano_banana_pro") : (MODEL_MAP[imgModel] || "fal_nano_banana");
     const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
@@ -622,7 +626,9 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     // v1: when an avatar is chosen, the model comes from the avatar reference (sent via `audience`),
     // so leave the model description out of custom_prompt.
     const catalogModelBlock = isProductCatalogStyle && !catalogAvatar ? `${catalogModelPrompt}\n\n` : '';
-    const customInstr = isProductCatalogV6
+    const customInstr = isProductCatalogV7
+      ? '' // v7: prompt is fully server-side; no [catalog_*] tags or UI text injection
+      : isProductCatalogV6
       ? '' // v6: prompt is fully server-side; no [catalog_*] tags or UI text injection
       : isProductCatalogV5
       ? '' // v5: prompt is fully server-side; no [catalog_*] tags or UI text injection
@@ -645,15 +651,15 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           generateCreatives({
             product_id: product.id, store_id: storeId, style: bs, ai_model: backendModel,
             custom_prompt: customInstr,
-            show_model: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle) ? true : subject === "On model",
-            text_overlay: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle) ? "none" : (textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom"),
-            overlay_text: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle) ? "" : (textMode === "Custom" ? customText : ""),
-            audience: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle)
+            show_model: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle) ? true : subject === "On model",
+            text_overlay: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle) ? "none" : (textMode === "No text" ? "none" : textMode === "Auto" ? "auto" : "custom"),
+            overlay_text: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle) ? "" : (textMode === "Custom" ? customText : ""),
+            audience: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle)
               ? (catalogAvatar || undefined)
               : (useAudience && audience !== "auto" ? audience : undefined),
-            aspect_ratio: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle) ? "4:5" : imgRatio,
+            aspect_ratio: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle) ? "4:5" : imgRatio,
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
-            reference_url: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogStyle) ? undefined : colorRef,
+            reference_url: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogStyle) ? undefined : colorRef,
             product_color: (isAnyCatalog && selectedColor && selectedColor !== "All colors") ? selectedColor : undefined,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
@@ -1049,6 +1055,25 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
           {/* Catalog v6 controls — Reference model only (everything else is hardcoded server-side). Bright midday daylight + vivid background. */}
           {imgStyle === "product-catalog-v6" && (
+            <div>
+              <SectionLabel>Reference model</SectionLabel>
+              {personas.filter((p) => p.reference_url).length > 0 ? (
+                <Select
+                  value={catalogAvatar || ""}
+                  onChange={setCatalogAvatar}
+                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
+                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
+                />
+              ) : (
+                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
+                  No persona avatars yet — create one in the Avatars tab to use this style.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Catalog v7 controls — Reference model only (everything else is hardcoded server-side). Soft warm afterglow + balanced exposure. */}
+          {imgStyle === "product-catalog-v7" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
               {personas.filter((p) => p.reference_url).length > 0 ? (
