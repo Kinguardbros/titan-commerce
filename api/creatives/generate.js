@@ -47,7 +47,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url } = req.body;
+  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url, v5_backdrop_color } = req.body;
   style = style || 'ad_creative'; ai_model = ai_model || 'fal_nano_banana'; custom_prompt = custom_prompt || ''; show_model = show_model !== false; text_overlay = text_overlay || 'none'; overlay_text = overlay_text || ''; aspect_ratio = aspect_ratio || '1:1';
   // Nano Banana output resolution — only the nano-banana models honor it
   resolution = ['1K', '2K', '4K'].includes(resolution) ? resolution : '2K';
@@ -407,10 +407,22 @@ NEGATIVE: beach, ocean, sand, water, sky, outdoor, nature, sunset, golden hour, 
       // V5_PROMPT_BODY + conditional HIGH-WAIST navel-hide block. Difference is only the
       // V5_PROMPT_BODY content (warm afterglow setting, neutral subject for product pop).
       const v5Prefix = `REFERENCE IMAGES: image 1 AND the last image = THE MODEL (the SAME woman, shown twice — use her exact face, hair, skin tone, body shape, and age). Any image in between = THE GARMENT (cropped product shots — copy the swimsuit's color, cut, neckline, strap style, fabric texture, seaming, construction, coverage exactly; do NOT let it influence the model's face).\n\nProduct: ${product.title}\n\n`;
+      // v5 backdrop color override — from frontend Backdrop color pill picker. Steers the warm afterglow tint.
+      const V5_BACKDROP_COLOR_LABELS = {
+        peach: 'soft pale peach',
+        rose: 'soft dusty rose',
+        cream: 'warm cream',
+        beige: 'soft beige',
+        sage: 'light dusty sage green',
+        lavender: 'soft pale lavender',
+        taupe: 'warm taupe',
+      };
+      const backdropColorLabel = V5_BACKDROP_COLOR_LABELS[v5_backdrop_color] || V5_BACKDROP_COLOR_LABELS.peach;
+      const v5BackdropOverride = `\n\nBACKDROP COLOR OVERRIDE (high priority): The post-sunset afterglow sky and ambient light read as ${backdropColorLabel} (a soft, gently desaturated, muted version of this color — NOT vibrant, NOT saturated). The sand reads as a muted neutral that complements the ${backdropColorLabel} sky. The product fabric color and the model's skin tone read TRUE TO LIFE — they are NOT cast or tinted by the ${backdropColorLabel} ambient light.\n`;
       const v5HighWaistBlock = catalogHighWaist
         ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━`
         : '';
-      prompt = `${v5Prefix}${V5_PROMPT_BODY}${v5HighWaistBlock}`;
+      prompt = `${v5Prefix}${V5_PROMPT_BODY}${v5BackdropOverride}${v5HighWaistBlock}`;
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
