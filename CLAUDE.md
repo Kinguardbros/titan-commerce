@@ -227,6 +227,9 @@ Key patterns:
 | `shopify-webhook-handlers.js` | `handleProductCreate/Update/Delete` — delete = soft archive |
 | `doc-processor.js` | Store doc ingestion (mammoth for .docx, etc.) → `store_knowledge` |
 | `validate.js` | Input validation: `requireFields()`, `requireQuery()` |
+| `v3-beach-scenes.js` | `buildV3BeachPrompt(sceneKey)` — Ideogram BG prompts for v3 step 2 (sunny / golden / dune / cove) |
+| `v4-prompt.js` | `V4_PROMPT_BODY` — verbatim user-provided ~13K-char editorial-strobe prompt for Product Catalog v4 |
+| `avatar-crop.js` | `processCatalogImage(buf, framingKey)` — sharp-based crop + brightness lift, called from `poll_generations` for v1 only |
 | **Action modules** (`lib/actions/`) — dispatched by `api/system.js` | |
 | `stores.js` | `stores_list` (strips admin_token) |
 | `pipeline.js` | `pipeline_log` |
@@ -248,7 +251,7 @@ Key patterns:
 | `system.js` | Thin router (~112 lines) — delegates 56 actions to 16 modules in `lib/actions/` |
 | `auth/login.js` | Password authentication → session token |
 | `auth/shopify.js` | Shopify OAuth callback (HMAC is **hex** here — not base64 like webhooks) |
-| `creatives/generate.js` | Generate image creative (routes by `ai_model` → fal.ai Nano Banana / FLUX / Ideogram, or Higgsfield Soul/Flux Kontext). Contains the standalone **Product Catalog** and **Realistic Beach** prompt blocks. ⚠️ large file, churned heavily — read git history before changing. |
+| `creatives/generate.js` | Generate image creative (routes by `ai_model` → fal.ai Nano Banana / FLUX / Ideogram, or Higgsfield Soul/Flux Kontext). Contains the standalone **Product Catalog v1 / v2 / v3 / v4** and **Realistic Beach** prompt blocks. v4 imports `V4_PROMPT_BODY` from `lib/v4-prompt.js` and wraps it with reference-roles prefix + product title + conditional HIGH-WAIST navel-hide block. ⚠️ large file, churned heavily — read git history before changing. |
 | `creatives/regenerate.js` | Regenerate image or video creative |
 | `creatives/convert-to-video.js` | Convert image creative to video (Higgsfield DOP Turbo) |
 | `creatives/list.js` | List creatives (filter by status, product_id, store_id, type) |
@@ -382,12 +385,12 @@ Password gate → `api/auth/login.js` → HMAC session token (with `expires`) �
 
 ### Creative Styles
 - Built-in (`lib/higgsfield.js` `STYLE_PROMPTS`): `ad_creative`, `product_shot`, `product_photo_beach`, `lifestyle`, `review_ugc`, `static_clean`, `static_split`, `static_urgency` (+ `branded_*` for branded content)
-- Standalone styles handled directly in `api/creatives/generate.js` (bypass `buildStyledPrompt`): **`product_catalog`** (pro e-commerce swimwear photography — model preset + pose + framing pills, beach setting; sends up to 2 product reference images, Nano Banana Pro) and **`realistic_beach`** (ultra-real curvy model, bright daylight, bypasses audience/age/tummy/skill systems)
+- Standalone styles handled directly in `api/creatives/generate.js` (bypass `buildStyledPrompt`): **`product_catalog`** (v1, e-commerce swimwear — model preset + pose + framing pills, beach setting; post-processed via `processCatalogImage`), **`product_catalog_v2`** (single-shot, model + pose pills, no framing/beach), **`product_catalog_v3`** (2-step pipeline: studio shot via Nano Banana Pro → beach BG swap via Ideogram replace-background), **`product_catalog_v4`** (verbatim user editorial-strobe prompt from `lib/v4-prompt.js`, minimal UI: Reference model + Resolution + Count only — no Pose / Beach / Framing) and **`realistic_beach`** (ultra-real curvy model, bright daylight, bypasses audience/age/tummy/skill systems). All catalog v1/v2/v3/v4 use the `[avatar, productPhoto, avatar]` sandwich; Isola always-on for HIGH-WAIST navel-hide block via `catalogHighWaist`. Only v1 is post-processed; v2/v3/v4 outputs go straight to Storage.
 - Custom styles: `cs_`-prefixed, loaded from `store_skills` (`custom-style-{slug}`), built via Custom Style Builder; in `higgsfield.js` they early-return before `STYLE_PROMPTS` lookup
 - Per-store brand context injected; feedback learning from approved/rejected creatives
 
 ### Persona Avatars
-Per-persona reference photos (`persona_avatars` table) for model consistency. When `audience` is selected in a non-standalone flow, the persona's `reference_url` is auto-injected as a reference image using a **sandwich pattern** (avatar FIRST + product images + avatar LAST) to keep identity signal strong among headless product crops. Standalone styles (`product_catalog`, `realistic_beach`) skip avatar injection.
+Per-persona reference photos (`persona_avatars` table) for model consistency. When `audience` is selected in a non-standalone flow, the persona's `reference_url` is auto-injected as a reference image using a **sandwich pattern** (avatar FIRST + product images + avatar LAST) to keep identity signal strong among headless product crops. Catalog v1/v2/v3/v4 also use this sandwich (avatar required by frontend guard). Only `realistic_beach` skips avatar injection entirely.
 
 ### Product Image Filtering (creative gen)
 Pushed AI creatives get appended to the END of a product's Shopify images. For audience flows and standalone styles, only the **first 2** product images are used as references (original product shots, not previously-pushed AI creatives) — avoids copying a prior model's face.
