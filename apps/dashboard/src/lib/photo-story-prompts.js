@@ -246,6 +246,137 @@ Swimsuit: ${p.title} in ${color}.${STUDIO_CONSISTENCY}`,
   },
 ];
 
+// ─── CELESTE SHOTS — close-up studio with warm warm color backdrop (intimate apparel style) ───
+// Inspired by celeste-dor.com — close-up framing (mid-chin to mid-torso), solid warm peach/cream
+// backdrop, flat frontal softbox lighting, no outdoor, no horizon, no fashion drama.
+const CELESTE_CONSISTENCY = `\n\nCRITICAL MODEL CONSISTENCY: The FIRST reference image shows the EXACT model to use — match her face, hair color and style, skin tone, body type, and age PRECISELY. She must be recognizable as the same person across ALL shots. Do NOT change the model. The product fabric color must read TRUE TO LIFE (NOT warm-shifted by the backdrop, NOT orange-cast, NOT washed out).`;
+
+const CELESTE_BACKDROP_AND_LIGHT = `BACKDROP: Solid soft warm color backdrop — pale peach / dusty cream / soft beige (a single warm neutral that complements the product color WITHOUT competing). Very subtle gradient (slightly lighter at top). Heavily out of focus, gentle even tone. NO seamless paper edges, NO visible floor line, NO outdoor, NO props, NO objects, NO textures, NO patterns. The backdrop is purely supportive — a soft warm color wash.\n\nLIGHTING: Soft frontal softbox positioned directly in front of the model, max 10-15 degrees off-axis. FLAT, EVEN front fill across the entire body and garment. NO side shadows on the fabric, NO rim light, NO dimensional body modeling, NO directional shaping. The garment color reads UNIFORMLY across its entire surface so every detail (neckline, cut, fabric texture, seaming, waistband) is sharply visible. Subtle natural highlights on hair and skin from the front strobe.\n\nNEGATIVE: full body shot, legs, hips, knees, feet, horizon line, outdoor, beach, sand, ocean, sky, sunset, golden hour, lifestyle scene, props, furniture, side shadows on fabric, rim light, backlit model, dramatic lighting, theatrical lighting, fashion editorial drama, white seamless paper backdrop, gradient backdrop with visible bands, vibrant background colors, dimensional body shaping shadows, hot side / dark side, harsh shadows, blown out highlights, plastic skin, doll face, anatomical errors, extra fingers, distorted hands, watermarks, logos.`;
+
+export const CELESTE_SHOTS = [
+  {
+    key: 'celeste_hero',
+    label: 'Hero Close-up',
+    order: 1,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP studio shot. Frame goes from mid-chin/mouth down to mid-torso/waist (NO legs, NO hips, NO horizon, NO outdoor). Model facing camera straight-on, body roughly square to the lens. Both shoulders visible, decolleté and full bra/swimsuit top visible. Mid-arms visible down to elbows. The product fills approximately 60-70% of the vertical frame. Vertical 4:5 aspect ratio.
+
+Soft confident expression with gentle natural smile. GAZE: Looking directly at camera with warm warm eye contact. Catchlights in the eyes.
+
+Swimsuit: ${p.title} in ${color}.
+${p.description ? `Product details: ${p.description}` : ''}
+Fabric sitting smoothly on body, zero bunching. Product is the focal point — clean, sharp, every detail crisp.
+
+This is the ANCHOR image for the Celeste set. All subsequent shots must match this model and this backdrop exactly.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_34_angle',
+    label: '3/4 Angle Close-up',
+    order: 2,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP at three-quarter angle. SAME MODEL as hero. Body turned approximately 30 degrees to the left. Same crop — mid-chin/mouth down to mid-torso/waist. One hand resting gently at the collarbone or near the shoulder strap (coquette gesture). GAZE: Looking directly at camera with soft confident expression, gentle smile.
+
+Swimsuit: ${p.title} in ${color}.
+The slight angle shows side profile of the cup / neckline / strap how it sits on the body.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_hand_on_strap',
+    label: 'Hand on Strap',
+    order: 3,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP, hand-on-strap detail. SAME MODEL. Same crop — mid-chin down to mid-torso. One hand raised, fingers gently touching the shoulder strap or hovering near it (a soft natural coquette gesture, NOT pulling, NOT awkward). Other arm relaxed at side. GAZE: Looking slightly past camera with a soft introspective expression, OR looking down at the strap.
+
+Swimsuit: ${p.title} in ${color}.
+The hand draws attention to the strap construction, neckline cut, and shoulder fit.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_side_profile',
+    label: 'Side Profile Close-up',
+    order: 4,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP, side profile. SAME MODEL. Body fully turned to the side (90 degrees), but frame still cropped close — from mid-jaw down to mid-torso. Side of face visible (eye, cheek, jawline). Hair softly behind the shoulder. Arms relaxed at side. GAZE: Looking straight ahead in the direction she is facing — NOT at camera.
+
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Side seam, side cup shape, how the neckline curves around the bust from profile.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_back_close',
+    label: 'Back Close-up',
+    order: 5,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP, back view. SAME MODEL facing away from camera. Frame goes from top of head/hair down to mid-back. One arm raised, hand lightly touching the back of the head or sweeping hair to the side. GAZE: Looking down or away (face not visible from camera angle).
+
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Back band, clasp, cross-back straps, back-smoothing fit. The raised arm shows underarm fit and band stability.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_macro_fabric',
+    label: 'Material Macro',
+    order: 6,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `EXTREME close-up macro shot of the fabric ON the model's body. Frame shows approximately 20×25cm area — focused on the neckline edge and upper cup of the bra/swimsuit. Tiny portion of skin visible at edges of fabric (collarbone, decolleté edge). Face NOT visible in this crop (frame is below the chin).
+
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Fabric weave texture at macro level. Individual stitch line along the neckline edge. Elastic trim if any. Tack sharp on the fabric, very shallow depth of field on the edges.
+
+This shot proves the product is high quality. Every stitch must look intentional.
+
+${CELESTE_BACKDROP_AND_LIGHT}`,
+  },
+  {
+    key: 'celeste_underbust',
+    label: 'Underbust Detail',
+    order: 7,
+    defaultOn: true,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP, underbust detail. SAME MODEL. Frame goes from just below the chin down to upper hip/waist. Slight 15-degree turn for visual interest. Hands relaxed at sides or one hand gently resting at the hip below the bra band. GAZE: Soft looking down OR looking at camera with soft confident expression.
+
+Swimsuit: ${p.title} in ${color}.
+FOCUS: Underbust band, where the bra/swimsuit meets the torso, the band's smoothing effect. Skin around the band visible to show fit (no digging, no rolling).
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+  {
+    key: 'celeste_feature_callout',
+    label: 'Feature Callout',
+    order: 8,
+    defaultOn: false,
+    suggestedStyle: 'product_shot',
+    cost: 0.14,
+    buildPrompt: (p, color) => `Cropped CLOSE-UP, hero front view with feature callout space. SAME MODEL. Same crop as hero — mid-chin down to mid-torso. Body straight, both shoulders square, hands relaxed. GAZE: Direct confident eye contact with camera, soft natural smile. Model positioned slightly OFF-CENTER (shifted to the right of the frame) to leave clear NEGATIVE SPACE on the LEFT side of the frame for text callouts in post-production.
+
+Swimsuit: ${p.title} in ${color}.
+The product is fully visible and unobstructed. Construction details (neckline, straps, cup shape, fabric) are sharp and crisp.
+
+NO text, NO callouts, NO arrows, NO badges, NO labels in the image itself — just leave clean negative space on the left side suitable for text overlay added later in post.
+
+${CELESTE_BACKDROP_AND_LIGHT}${CELESTE_CONSISTENCY}`,
+  },
+];
+
 export function buildColorVariantPrompt(product, color) {
   return `Three-quarter angle full body shot. SAME MODEL as the hero shot — IDENTICAL face, hair, skin tone, body type. IDENTICAL POSE — 30-degree angle to left, weight on right hip, relaxed arms. Model fills 70% of frame.
 

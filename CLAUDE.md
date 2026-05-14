@@ -184,7 +184,7 @@ Key patterns:
 | `CreativeDetailModal.jsx` | Full-screen creative review: preview, edit, approve, reject, convert to video, push to Shopify |
 | `CreativeEditor.jsx` | Inline creative review (preview, edit, approve, reject) |
 | `GeneratePanel.jsx` | Older creative gen panel (image + video modes) — still used in some flows |
-| `PhotoStoryModal.jsx` | Photo Story Studio — generates a clean white-studio shot set; prompts in `lib/photo-story-prompts.js` |
+| `PhotoStoryModal.jsx` | Photo Story Studio — generates one of 3 multi-shot sets via `storyMode` toggle: BEACH (lifestyle, outdoor with `STORY_SHOTS`), STUDIO (clean white backdrop e-commerce angles with `STUDIO_SHOTS`), CELESTE (close-up studio with warm peach/cream backdrop, intimate apparel style with `CELESTE_SHOTS`). Prompts in `lib/photo-story-prompts.js` |
 | `OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
 | `ImportModal.jsx` | 4-step product import wizard (scrape URL → preview → import → done); collection URLs scrape multiple products |
 | `SizeChartEditor.jsx` | Size chart: read/edit/import from image (Claude Vision) → Shopify metafield |
@@ -210,7 +210,7 @@ Key patterns:
 | **Frontend libs** (`apps/dashboard/src/lib/`) | |
 | `api.js` | All API fetch functions, auth token handling, `getProducts()` (paginated), `getAllProducts()` (full list, up to 200) |
 | `supabase.js` | Supabase client for realtime subscriptions |
-| `photo-story-prompts.js` | Prompt templates for Photo Story Studio |
+| `photo-story-prompts.js` | Prompt templates for Photo Story Studio — exports `STORY_SHOTS` (beach lifestyle), `STUDIO_SHOTS` (clean white studio), `CELESTE_SHOTS` (close-up warm-backdrop intimate apparel style) + helpers |
 | **Backend libs** (`lib/`) | |
 | `claude.js` | Claude API wrapper — dynamic per-store brand system prompt from `store_skills` (fallback: generic + store name), `optimizeProduct()` |
 | `higgsfield.js` | Higgsfield image/video generation + `buildStyledPrompt()` (built-in styles + `cs_` custom styles from `store_skills`) + per-store brand context + feedback learning. ⚠️ large file, fragile prompt logic. |

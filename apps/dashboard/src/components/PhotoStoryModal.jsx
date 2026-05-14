@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { generateCreatives, getProductDetail, getSkills } from '../lib/api';
 const genStoryId = () => crypto.randomUUID();
-import { STORY_SHOTS, STUDIO_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
+import { STORY_SHOTS, STUDIO_SHOTS, CELESTE_SHOTS, buildColorVariantPrompt, buildUGCPrompt, DEFAULT_COST_PER_IMAGE } from '../lib/photo-story-prompts';
 import { useToast } from '../hooks/useToast.jsx';
 import './PhotoStoryModal.css';
 
@@ -19,7 +19,7 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [colors, setColors] = useState([]);
   const [heroColor, setHeroColor] = useState('');
   const [variantColors, setVariantColors] = useState(new Set());
-  const activeShots = storyMode === 'studio' ? STUDIO_SHOTS : STORY_SHOTS;
+  const activeShots = storyMode === 'studio' ? STUDIO_SHOTS : storyMode === 'celeste' ? CELESTE_SHOTS : STORY_SHOTS;
   const [selectedShots, setSelectedShots] = useState(() => new Set(STORY_SHOTS.filter(s => s.defaultOn).map(s => s.key)));
   const [includeUGC, setIncludeUGC] = useState(false);
   const [aiModel, setAiModel] = useState('fal_nano_banana');
@@ -28,13 +28,13 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState('auto');
   const [realisticMode, setRealisticMode] = useState(false);
-  const [storyMode, setStoryMode] = useState('beach'); // 'beach' | 'studio'
+  const [storyMode, setStoryMode] = useState('beach'); // 'beach' | 'studio' | 'celeste'
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
 
   // Reset selected shots when story mode changes
   useEffect(() => {
-    const shots = storyMode === 'studio' ? STUDIO_SHOTS : STORY_SHOTS;
+    const shots = storyMode === 'studio' ? STUDIO_SHOTS : storyMode === 'celeste' ? CELESTE_SHOTS : STORY_SHOTS;
     setSelectedShots(new Set(shots.filter(s => s.defaultOn).map(s => s.key)));
   }, [storyMode]);
 
@@ -255,6 +255,10 @@ export default function PhotoStoryModal({ product, storeId, onClose, onCompleted
                 <button className={`ps-mode-btn${storyMode === 'studio' ? ' ps-mode-btn--active' : ''}`} onClick={() => setStoryMode('studio')}
                   style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${storyMode === 'studio' ? 'var(--gold, #d4a853)' : 'var(--edge, #333)'}`, background: storyMode === 'studio' ? 'rgba(212,168,83,.1)' : 'transparent', color: storyMode === 'studio' ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
                   📷 Studio Story
+                </button>
+                <button className={`ps-mode-btn${storyMode === 'celeste' ? ' ps-mode-btn--active' : ''}`} onClick={() => setStoryMode('celeste')}
+                  style={{ flex: 1, padding: '8px 12px', borderRadius: 8, border: `1px solid ${storyMode === 'celeste' ? 'var(--gold, #d4a853)' : 'var(--edge, #333)'}`, background: storyMode === 'celeste' ? 'rgba(212,168,83,.1)' : 'transparent', color: storyMode === 'celeste' ? 'var(--gold)' : 'var(--text3)', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                  💗 Celeste Close-up
                 </button>
               </div>
             </div>
