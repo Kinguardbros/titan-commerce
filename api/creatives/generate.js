@@ -499,6 +499,8 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
     let requestId = null;            // fal.ai request_id or HF job_id
     let pollBase = null;             // fal.ai poll base (null for HF)
     let falModelUsed = null;         // full fal model path (for poll worker fallback)
+    let retryPrompt = null;          // catalog flows: prompt to resubmit on poll-time failure
+    let retryImageUrls = null;       // catalog flows: image refs to resubmit on poll-time failure
     const productDesc = (product.description || '').replace(/<[^>]*>/g, '').slice(0, 300);
 
     // Map ai_model key → fal.ai model path (only for models NOT available on Higgsfield directly)
@@ -551,6 +553,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
           ? prompt  // Product Catalog prompts are self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
         falModelUsed = bananaModel;
+        // Capture retry context for poll_generations — catalog flows need to resubmit with sandwich + same prompt
+        // when fal.ai returns "result fetch 422" (typically NSFW classifier on the result, retry on cheaper/looser model often passes)
+        if (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5) {
+          retryPrompt = falPrompt;
+          retryImageUrls = refImages;
+        }
         const job = await submitFalJob({ model: falModelUsed, prompt: falPrompt, imageUrl: refImages, aspectRatio: outAspectRatio, resolution });
         requestId = job.requestId;
         pollBase = job.pollBase;
@@ -665,6 +673,8 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       subject: show_model ? 'On model' : 'Product only',
       submitted_at: new Date().toISOString(),
       ...(isPending && { poll_base: pollBase }),
+      ...(retryPrompt && { retry_prompt: retryPrompt }),
+      ...(retryImageUrls && { retry_image_urls: retryImageUrls }),
     };
 
     const creativeRecord = {
