@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib/higgsfield.js';
 import { submitFalJob } from '../../lib/fal.js';
+import { V4_PROMPT_BODY } from '../../lib/v4-prompt.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -93,6 +94,7 @@ async function handler(req, res) {
     const isProductCatalog = style === 'product_catalog';
     const isProductCatalogV2 = style === 'product_catalog_v2';
     const isProductCatalogV3 = style === 'product_catalog_v3';
+    const isProductCatalogV4 = style === 'product_catalog_v4';
     // Beach scene key — used by v3 (selects the master beach prompt for step 2 Ideogram bg replace).
     // 'sunny' is the default. v1 doesn't read this — its scene is hardcoded.
     const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
@@ -105,7 +107,7 @@ async function handler(req, res) {
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
     // Any Product Catalog variant on the Isola store is always tummy-control → always hide the navel.
-    const catalogHighWaist = ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3) && isIsola) || isHighWaistTummy;
+    const catalogHighWaist = ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4) && isIsola) || isHighWaistTummy;
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -115,7 +117,7 @@ async function handler(req, res) {
     // landed on position 0 in Shopify (e.g. it became the featured image), Nano Banana would
     // copy its lighting/composition into the new output, undoing any prompt instructions.
     // Fix at the source: filter them out before slicing.
-    if (audience || isProductCatalog || isRealisticBeach || isProductCatalogV2 || isProductCatalogV3) {
+    if (audience || isProductCatalog || isRealisticBeach || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4) {
       const AI_FILENAME = /_(product_photo_beach|realistic_beach|product_catalog|ad_creative|lifestyle|review_ugc|product_shot|beach_photo|static_clean|static_split|static_urgency|cs_[a-z0-9_-]+)_\d/i;
       const originals = images.filter((u) => !AI_FILENAME.test(u));
       // Fall back to the original list if a product happens to have only AI images (shouldn't
@@ -387,6 +389,16 @@ FACE QUALITY (critical): sharp detailed features, visible skin pores, individual
 CAMERA: shot at the model's chest height, lens parallel to the ground — a straight, eye-level catalog perspective. NOT a low-angle shot, NOT shot from below. Her proportions are natural and undistorted. Hyperrealistic, photographic, editorial swimwear catalog quality, 85mm lens at f/2.8, Canon R5 look, 8K, ultra-sharp. ${aspect_ratio || '4:5'} format.${catalogHighWaist ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 NEGATIVE: beach, ocean, sand, water, sky, outdoor, nature, sunset, golden hour, props, furniture, floor line, horizon line, gradient backdrop, colored background, dark background, shadow on the wall, harsh shadow, hard cast shadow, side lighting, directional shadow, dark side of the body, dim, dark photo, underexposed, overexposed, blown-out highlights, washed out, hazy bright wash, crushed blacks, garment crushed to pure black, deep shadows on the swimsuit, dark areas on the garment, ${catalogHighWaist ? 'visible belly button, exposed navel, partially visible navel, peek of belly button, navel showing above the waistband, gap above the waistband, low-set waistband, bare midriff, low-rise bottoms, mid-rise bottoms, low-waist cut, exposed stomach, ' : 'visible belly button, exposed navel, low-rise bottoms, mid-rise bottoms, '}plastic skin, porcelain smoothing, AI face, blurry face, smooth featureless skin, doll eyes, slim body, flat stomach, thigh gap, low-angle shot, shot from below, distorted perspective, text, watermarks.`.trim();
+    } else if (isProductCatalogV4) {
+      // Product Catalog v4 — verbatim user prompt (editorial strobe + on-location beach).
+      // Backend only injects: (a) reference-roles prefix, (b) Product: <title>, and (c) a
+      // conditional HIGH-WAIST navel-hide block when catalogHighWaist. The user's prompt body
+      // (V4_PROMPT_BODY) is sent unchanged.
+      const v4Prefix = `REFERENCE IMAGES: image 1 AND the last image = THE MODEL (the SAME woman, shown twice — use her exact face, hair, skin tone, body shape, and age). Any image in between = THE GARMENT (cropped product shots — copy the swimsuit's color, cut, neckline, strap style, fabric texture, seaming, construction, coverage exactly; do NOT let it influence the model's face).\n\nProduct: ${product.title}\n\n`;
+      const v4HighWaistBlock = catalogHighWaist
+        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+        : '';
+      prompt = `${v4Prefix}${V4_PROMPT_BODY}${v4HighWaistBlock}`;
     } else if (isRealisticBeach) {
       prompt = `Use the attached image as the style and quality reference. Generate a new image matching this exact level of realism, lighting, and photographic quality.
 
@@ -489,11 +501,11 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // output server-side (done in poll_generations using meta.framing_crop) — see below.
         const avatarRef = reference_url;
         // Product Catalog v2/v3 are self-contained; v3 is step 1 of the double pipeline.
-        const outAspectRatio = (isProductCatalogV2 || isProductCatalogV3) ? '4:5' : aspect_ratio;
+        const outAspectRatio = (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4) ? '4:5' : aspect_ratio;
         // Product Catalog (v1, v2, v3): with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                               without an avatar     → 1 product image only (packshot/flat-lay,
         //                                                       not a model shot), model comes from the prompt
-        const refImages = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3)
+        const refImages = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4)
           ? (avatarRef ? [avatarRef, ...images.slice(0, 1), avatarRef] : images.slice(0, 1))
           : (avatarRef ? [avatarRef, ...productImages, avatarRef] : images.slice(0, 4));
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
@@ -510,7 +522,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
           ? `Dress the woman from reference image 1 in the exact product shown in reference images ${productRefRange}.`
           : `PRODUCT REPRODUCTION — PIXEL-ACCURATE:\nThe garment in the final image must be an EXACT visual copy of the reference image(s). Match PRECISELY: exact color ratio and placement, exact width of every stripe/trim/band/border, exact neckline shape and depth, exact waistband height and style, exact stitching pattern, exact strap width. Do NOT "improve", simplify, or reinterpret the design. Copy it exactly as shown in the reference.`;
         const productCheck = isProductCatalog ? '' : `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nFINAL PRODUCT CHECK: The garment proportions (color ratios, stripe widths, trim sizes, waistband height) must EXACTLY match the product reference images. If any detail looks different from the reference — it is WRONG. The product must be a faithful reproduction, not an interpretation.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
-        const falPrompt = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3)
+        const falPrompt = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4)
           ? prompt  // Product Catalog prompts are self-contained — no extra wrappers
           : `${productInstr}${colorOverride}\n\n${prompt}${identityLock}${ageReminder}${coverageReminder}${productCheck}`;
         falModelUsed = bananaModel;
