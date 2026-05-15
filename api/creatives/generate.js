@@ -112,8 +112,36 @@ async function handler(req, res) {
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
-    // Any Product Catalog variant on the Isola store is always tummy-control → always hide the navel.
-    const catalogHighWaist = ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7) && isIsola) || isHighWaistTummy;
+
+    // Auto-detect product type from title — drives swimwear-specific instructions vs garment-neutral.
+    // Product catalog v4-v7 prompts contain "swimsuit/bikini/waistband" language by default.
+    // For NON-swim products (dresses, skirts, cover-ups, tops), inject a GARMENT TYPE OVERRIDE
+    // that tells the model "this is a [dress/skirt/top/etc] — render exactly as in reference,
+    // ignore swimwear-specific instructions in the prompt."
+    const productTypeLower = (product.product_type || '').toLowerCase();
+    const productTagsLower = Array.isArray(product.tags) ? product.tags.join(' ').toLowerCase() : (typeof product.tags === 'string' ? product.tags.toLowerCase() : '');
+    const productSearchText = `${titleLower} ${productTypeLower} ${productTagsLower}`;
+    const isSwimwearProduct = /swim|bikini|one.?piece|tankini|swimsuit|monokini|bandeau|swim.?wear|trikini/i.test(productSearchText);
+    const isDressProduct = /\bdress\b|\bgown\b|kaftan|kimono(?!.bikini)|sundress|maxi.?dress|midi.?dress|mini.?dress/i.test(productSearchText);
+    const isSkirtProduct = !isDressProduct && /\bskirt\b|\bsarong\b|wrap.?skirt|swim.?skirt|skort/i.test(productSearchText);
+    const isCoverUpProduct = /cover.?up|beach.?wrap|beach.?shirt|beach.?dress|kaftan|tunic|robe|kimono/i.test(productSearchText);
+    const isTopProduct = !isSwimwearProduct && !isDressProduct && /\btop\b|\bblouse\b|\bshirt\b|\btee\b|tank.?top|crop.?top/i.test(productSearchText);
+    const isPantsProduct = /\bpants\b|\bshorts\b|\bjeans\b|trousers|leggings/i.test(productSearchText);
+    const isBraProduct = /\bbra\b|bralette|bandeau(?!.swim)/i.test(productSearchText);
+    // Determine descriptor for prompt injection. Default = "swimsuit" (legacy behavior).
+    const garmentDescriptor = isDressProduct ? 'dress'
+      : isCoverUpProduct ? 'beach cover-up'
+      : isSkirtProduct ? 'skirt'
+      : isTopProduct ? 'top'
+      : isPantsProduct ? 'pants'
+      : isBraProduct ? 'bra'
+      : 'swimsuit';
+    const isNonSwimGarment = !isSwimwearProduct && garmentDescriptor !== 'swimsuit';
+
+    // HIGH-WAIST navel-hide block applies ONLY to swimwear (one-pieces, high-waist bikinis, tummy-control).
+    // Previously: any Isola product → always inject. NEW: must also be swimwear product (avoid injecting
+    // "high-waist tummy-control" instructions on dresses, cover-ups, etc).
+    const catalogHighWaist = (((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7) && isIsola) || isHighWaistTummy) && !isNonSwimGarment;
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):
@@ -471,11 +499,25 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       });
     }
 
+    // Garment fidelity override — injected for ALL catalog styles (v1-v7). Two modes:
+    // (1) NON-SWIM detected (dress/skirt/cover-up/top/etc): explicitly tell model to ignore
+    //     swimwear language in the prompt and render the actual garment type from reference
+    // (2) SWIM detected (default): reinforce that the EXACT garment from reference must be
+    //     reproduced — covers cases where title says "Swim Set" but reference shows e.g. a maxi
+    //     dress, OR where reference is a different cut than what default prompt assumes
+    if ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7)) {
+      const garmentOverride = isNonSwimGarment
+        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nGARMENT TYPE OVERRIDE (CRITICAL — READ FIRST): This product is a ${garmentDescriptor.toUpperCase()}, NOT a swimsuit, NOT a bikini. The garment in the reference image is a ${garmentDescriptor} — render it EXACTLY as shown in the reference (same construction, same length, same coverage, same silhouette, same neckline, same sleeves/straps if any). IGNORE any references in the prompt to "swimsuit", "bikini", "one-piece", "waistband sitting at the waist", "high-waist tummy control", "navel coverage", or other swimwear-specific instructions — they DO NOT apply to this ${garmentDescriptor}. The ${garmentDescriptor}'s length, cut, and coverage must match the reference image precisely (e.g. if reference shows a maxi dress to ankles, generate a maxi dress to ankles — NOT a bikini top + skirt). Reproduce the EXACT garment from the reference.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+        : `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nGARMENT FIDELITY (CRITICAL — READ FIRST): The product reference image is the ULTIMATE SOURCE OF TRUTH for the garment. Render the garment EXACTLY as shown in the reference — same type (one-piece / bikini set / tankini / etc), same length, same coverage, same silhouette, same neckline depth, same strap style, same trim, same construction, same color and pattern. If the prompt below mentions "swimsuit" or "bikini" generically, that is just the product category — the SPECIFIC garment to render comes from the reference image. If the reference shows a long flowing dress, render a long flowing dress (do NOT default to bikini). If the reference shows a one-piece, render a one-piece (do NOT default to bikini). The reference garment's structure WINS over generic prompt language.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      prompt = `${garmentOverride}${prompt}`;
+    }
+
     // Product color override — injected for ALL catalog styles (v1-v5) when frontend sends
     // a specific color (Shopify variant). Sent verbatim to fal.ai. Realistic Beach and other
     // styles handle color through their own mechanisms (colorRef, customInstr colorPrefix).
     if ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7) && product_color) {
-      const productColorOverride = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nPRODUCT COLOR OVERRIDE (high priority): The swimsuit / garment in this image is in ${product_color} color. This is the color of the FABRIC. Render the fabric in this exact ${product_color} color across the entire surface — uniform, true-to-life, instantly recognizable as ${product_color}. NOT muddy, NOT washed-out, NOT color-shifted by ambient lighting, NOT a different shade. If the product reference image shows a different color, IGNORE that color and use ${product_color} as specified here.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      const colorGarmentLabel = garmentDescriptor === 'swimsuit' ? 'swimsuit / garment' : garmentDescriptor;
+      const productColorOverride = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nPRODUCT COLOR OVERRIDE (high priority): The ${colorGarmentLabel} in this image is in ${product_color} color. This is the color of the FABRIC. Render the fabric in this exact ${product_color} color across the entire surface — uniform, true-to-life, instantly recognizable as ${product_color}. NOT muddy, NOT washed-out, NOT color-shifted by ambient lighting, NOT a different shade. If the product reference image shows a different color, IGNORE that color and use ${product_color} as specified here.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
       prompt = `${prompt}${productColorOverride}`;
     }
 
