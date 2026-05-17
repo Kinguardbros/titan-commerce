@@ -526,6 +526,16 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       prompt = `${prompt}${productColorOverride}`;
     }
 
+    // Modesty guard — injected for ALL catalog styles when a model is shown. Nano Banana
+    // occasionally renders visible nipple shapes through thin/lycra/jersey fabric, especially
+    // on bust area in cold-shoulder / unlined / soft-cup styles. This block adds explicit
+    // anti-nipple-visibility instruction. Positioned at END of prompt (after color override)
+    // for maximum recency-bias weight.
+    if ((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7) && show_model !== false) {
+      const modestyGuard = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\nMODESTY GUARD (CRITICAL): The garment fabric across the bust area is COMPLETELY OPAQUE. The bust shape under the fabric is smooth and undefined — NO visible nipple shapes, NO visible nipple outlines, NO visible nipple protrusion, NO bumps or pointed shapes showing through the fabric. The bra cups / top fabric provide full coverage and full smoothing — the bust looks rounded and supported, with NO anatomical detail showing through. Fabric appears to have invisible internal padding or built-in lining. NO see-through fabric, NO sheer effect on the bust area, NO cold-effect, NO wet-look that reveals body contours underneath. The bust is shaped by the garment but anatomical features under the fabric are NOT visible.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      prompt = `${prompt}${modestyGuard}`;
+    }
+
     // Tummy-control coverage for the non-standalone styles. Product Catalog handles it inside
     // its own prompt block above (isHighWaistTummy); realistic_beach handles everything internally.
     const isTummyControl = !isRealisticBeach && !isProductCatalog && isHighWaistTummy;
