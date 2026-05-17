@@ -289,6 +289,39 @@ function Select({ value, onChange, options, renderOption }) {
   );
 }
 
+// Avatar dropdown — short labels in the select (name + age only) and the full
+// persona descriptor shown as a helper line under the dropdown when one is selected.
+// Used by every catalog style's "Reference model" picker.
+function AvatarSelect({ value, onChange, personas }) {
+  const usable = personas.filter((p) => p.reference_url);
+  if (usable.length === 0) {
+    return (
+      <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
+        No persona avatars yet — create one in the Avatars tab to use this style.
+      </div>
+    );
+  }
+  const selected = usable.find((p) => p.name === value);
+  return (
+    <>
+      <Select
+        value={value || ""}
+        onChange={onChange}
+        options={usable.map((p) => p.name)}
+        renderOption={(opt) => {
+          const p = usable.find((x) => x.name === opt);
+          return p?.age ? `${opt} (${p.age})` : opt;
+        }}
+      />
+      {selected?.label && (
+        <div style={{ fontSize: 11, color: TEXT_MID, marginTop: 6, lineHeight: 1.4 }}>
+          {selected.label}
+        </div>
+      )}
+    </>
+  );
+}
+
 function SectionLabel({ children, style: s }) {
   return (
     <div style={{
@@ -937,18 +970,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             <>
               <div>
                 <SectionLabel>Reference model</SectionLabel>
-                {personas.filter((p) => p.reference_url).length > 0 ? (
-                  <Select
-                    value={catalogAvatar || ""}
-                    onChange={setCatalogAvatar}
-                    options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                    renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                  />
-                ) : (
-                  <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                    No persona avatars yet — create one in the Avatars tab to use this style.
-                  </div>
-                )}
+                <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
               </div>
               <div>
                 <SectionLabel>Pose</SectionLabel>
@@ -966,18 +988,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             <>
               <div>
                 <SectionLabel>Reference model</SectionLabel>
-                {personas.filter((p) => p.reference_url).length > 0 ? (
-                  <Select
-                    value={catalogAvatar || ""}
-                    onChange={setCatalogAvatar}
-                    options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                    renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                  />
-                ) : (
-                  <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                    No persona avatars yet — create one in the Avatars tab to use this style.
-                  </div>
-                )}
+                <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
               </div>
               <div>
                 <SectionLabel>Pose</SectionLabel>
@@ -995,18 +1006,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             <>
               <div>
                 <SectionLabel>Reference model</SectionLabel>
-                {personas.filter((p) => p.reference_url).length > 0 ? (
-                  <Select
-                    value={catalogAvatar || ""}
-                    onChange={setCatalogAvatar}
-                    options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                    renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                  />
-                ) : (
-                  <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                    No persona avatars yet — create one in the Avatars tab to use this style.
-                  </div>
-                )}
+                <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
               </div>
               <div>
                 <SectionLabel>Pose</SectionLabel>
@@ -1031,18 +1031,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog-v4" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
-              {personas.filter((p) => p.reference_url).length > 0 ? (
-                <Select
-                  value={catalogAvatar || ""}
-                  onChange={setCatalogAvatar}
-                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-              ) : (
-                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                  No persona avatars yet — create one in the Avatars tab to use this style.
-                </div>
-              )}
+              <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
             </div>
           )}
 
@@ -1050,18 +1039,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog-v5" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
-              {personas.filter((p) => p.reference_url).length > 0 ? (
-                <Select
-                  value={catalogAvatar || ""}
-                  onChange={setCatalogAvatar}
-                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-              ) : (
-                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                  No persona avatars yet — create one in the Avatars tab to use this style.
-                </div>
-              )}
+              <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
             </div>
           )}
 
@@ -1069,18 +1047,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog-v6" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
-              {personas.filter((p) => p.reference_url).length > 0 ? (
-                <Select
-                  value={catalogAvatar || ""}
-                  onChange={setCatalogAvatar}
-                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-              ) : (
-                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                  No persona avatars yet — create one in the Avatars tab to use this style.
-                </div>
-              )}
+              <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
             </div>
           )}
 
@@ -1088,18 +1055,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog-v7" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
-              {personas.filter((p) => p.reference_url).length > 0 ? (
-                <Select
-                  value={catalogAvatar || ""}
-                  onChange={setCatalogAvatar}
-                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-              ) : (
-                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                  No persona avatars yet — create one in the Avatars tab to use this style.
-                </div>
-              )}
+              <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
             </div>
           )}
 
@@ -1107,18 +1063,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           {imgStyle === "product-catalog-v8" && (
             <div>
               <SectionLabel>Reference model</SectionLabel>
-              {personas.filter((p) => p.reference_url).length > 0 ? (
-                <Select
-                  value={catalogAvatar || ""}
-                  onChange={setCatalogAvatar}
-                  options={personas.filter((p) => p.reference_url).map((p) => p.name)}
-                  renderOption={(opt) => `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || "avatar"}`}
-                />
-              ) : (
-                <div style={{ fontSize: 12, color: TEXT_MID, marginTop: 4 }}>
-                  No persona avatars yet — create one in the Avatars tab to use this style.
-                </div>
-              )}
+              <AvatarSelect value={catalogAvatar} onChange={setCatalogAvatar} personas={personas} />
               <SectionLabel style={{ marginTop: "0.75rem" }}>Fill intensity</SectionLabel>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {["light", "medium", "strong"].map((lvl) => (
