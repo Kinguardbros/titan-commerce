@@ -44,6 +44,14 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
     try {
       const fullDesc = descText || persona.description || persona.label;
       const result = await generateAvatar(storeId, persona.name, fullDesc);
+      // Fire-and-forget: backend returns { status: 'generating', front_request_id, ... } immediately.
+      // Avatars.jsx polling picks up status transitions and refreshes the list.
+      if (result.status === 'generating') {
+        toast.success('Avatar generation started (front shot ~60s, then 3/4 angle). Persona row updates automatically.');
+        onUpdated?.();
+        return;
+      }
+      // Legacy sync response shape — keep for backward compat
       const newVariants = (result.variants || []).map(url => (typeof url === 'string' ? { url } : url));
       setVariants(prev => [...prev, ...newVariants]);
       toast.success(`Generated ${newVariants.length} variant(s)`);

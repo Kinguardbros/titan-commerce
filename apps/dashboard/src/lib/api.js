@@ -441,6 +441,12 @@ export function generateAvatar(storeId, personaName, description) {
   });
 }
 
+// Poll in-flight avatar generations (fire-and-forget pattern — generate_avatar returns
+// immediately with status='generating', this checks for completion every few seconds).
+export function pollAvatarGenerations(storeId) {
+  return fetchJSON(`/api/system?action=poll_avatar_generations&store_id=${storeId}`);
+}
+
 export function uploadAvatar(storeId, personaName, base64, mediaType) {
   return fetchJSON('/api/system?action=upload_avatar', {
     method: 'POST',

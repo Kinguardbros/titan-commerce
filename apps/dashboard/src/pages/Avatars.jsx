@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getAvatars, getSkills, generateAvatar, uploadStoreDoc, generateSkills } from '../lib/api';
+import { getAvatars, getSkills, generateAvatar, uploadStoreDoc, generateSkills, pollAvatarGenerations } from '../lib/api';
 import AvatarDetail from '../components/AvatarDetail';
 import AvatarBuilder from '../components/AvatarBuilder';
 import { useToast } from '../hooks/useToast.jsx';
@@ -51,13 +51,34 @@ export default function Avatars({ storeId, store }) {
   const mergedPersonas = [
     ...personas.map(p => {
       const avatar = avatars.find(a => a.persona_name === p.name);
-      return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '', is_active: avatar ? avatar.is_active !== false : true };
+      return { ...p, reference_url: avatar?.reference_url || null, variants: avatar?.variants || [], description: avatar?.description || '', is_active: avatar ? avatar.is_active !== false : true, status: avatar?.status || null };
     }),
     ...avatars.filter(a => !personaNames.has(a.persona_name)).map(a => ({
       name: a.persona_name, age: '', label: a.description || a.persona_name,
-      reference_url: a.reference_url, variants: a.variants || [], description: a.description || '', is_active: a.is_active !== false,
+      reference_url: a.reference_url, variants: a.variants || [], description: a.description || '', is_active: a.is_active !== false, status: a.status || null,
     })),
   ];
+
+  // Polling effect — when any avatar is in 'generating' or 'angles' status, poll backend
+  // every 5s to drive the fal.ai completion check. Frontend pulls the trigger because there's
+  // no cron/worker for avatars (creatives have one, avatars don't).
+  const hasInFlight = avatars.some(a => a.status === 'generating' || a.status === 'angles');
+  useEffect(() => {
+    if (!storeId || !hasInFlight) return;
+    const tick = async () => {
+      try {
+        await pollAvatarGenerations(storeId);
+        // Refresh avatar list to pick up status transitions / new variants
+        const fresh = await getAvatars(storeId);
+        setAvatars(fresh || []);
+      } catch (err) {
+        console.error('[Avatars] polling error:', err.message);
+      }
+    };
+    tick();  // run immediately on mount/dep change
+    const interval = setInterval(tick, 5000);
+    return () => clearInterval(interval);
+  }, [storeId, hasInFlight]);
 
   const refresh = useCallback(() => {
     Promise.all([
@@ -136,6 +157,16 @@ export default function Avatars({ storeId, store }) {
               {p.is_active === false && (
                 <div style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,0.7)', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   Inactive
+                </div>
+              )}
+              {(p.status === 'generating' || p.status === 'angles') && (
+                <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(20, 100, 200, 0.85)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
+                  {p.status === 'generating' ? '⏳ Generating front…' : '⏳ Generating 3/4 angle…'}
+                </div>
+              )}
+              {p.status === 'failed' && (
+                <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(200, 50, 50, 0.85)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
+                  ❌ Failed
                 </div>
               )}
               {!p.reference_url && (

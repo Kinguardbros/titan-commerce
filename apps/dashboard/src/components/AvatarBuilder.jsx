@@ -117,6 +117,16 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
         ? `Full body reference photograph of a woman against a clean white seamless studio background, evenly lit, soft professional studio lighting. THE MODEL: ${freeText.trim()} FRAMING IS CRITICAL — this is a FULL-LENGTH standing portrait: the ENTIRE figure is visible from the very top of her head down to the soles of her bare feet, with empty margin space ABOVE her head and BELOW her feet. Nothing is cropped — not the head, not the feet, not the legs. She fills roughly 70-80% of the vertical frame, centered, with breathing room on all sides. This is NOT a half-body shot, NOT a three-quarter (waist-up or knee-up) crop, NOT a close-up — the whole standing body must fit inside the frame. She is standing upright facing the camera, arms relaxed at sides, weight evenly on both feet, neutral natural expression. CLOTHING IS CRITICAL: she is wearing ONLY a plain BEIGE/NUDE skin-toned bra and BEIGE/NUDE skin-toned underwear briefs — the underwear color MUST match her skin tone, NOT black, NOT white, NOT grey, NOT any dark or bright color. Simple plain nude-colored underwear, no patterns, no lace, no logos. Bare feet, no shoes. Sharp detailed face — visible skin pores, individual eyelashes, realistic eye catchlight, true-to-life skin texture, not plastic, not airbrushed. Photorealistic, high resolution. FINAL CHECK — READ LAST: the FULL figure from head to feet is inside the frame with margin above the head and below the feet; nothing is cropped; clean white studio background; underwear is BEIGE/NUDE colored, NOT black. NEGATIVE: cropped at the knees, cropped at the waist, cropped at the thighs, cropped at the chest, head cut off, feet cut off, half-body shot, three-quarter crop, waist-up shot, close-up, portrait crop, zoomed in, tight crop.`
         : buildAvatarPrompt({ age, weight, height, bodyType, attractiveness, faceShape, noseSize, lipFullness, skinTone, hairColor, hairLength, hairStyle, imperfections, expression, extraNotes });
       const result = await generateAvatar(storeId, name.trim(), prompt);
+      // Fire-and-forget: backend returns { status: 'generating', front_request_id, persona_name }
+      // immediately. Variants land in DB asynchronously via poll_avatar_generations (driven by
+      // Avatars.jsx polling). User closes this builder and watches the persona row update.
+      if (result.status === 'generating') {
+        toast.success('Avatar generation started — front shot ~60s, then 3/4 angle. Check Avatars tab for progress.');
+        if (typeof onClose === 'function') onClose();
+        if (typeof onCreated === 'function') onCreated();
+        return;
+      }
+      // Legacy sync response shape — keep for backward compat in case anything still returns variants
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
       setVariants(urls);
       if (urls.length > 0) setSelectedVariant(urls[0]);
@@ -145,6 +155,13 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
 
       // 2. Generate avatar using uploaded photo as reference (identity preservation)
       const result = await generateAvatar(storeId, name.trim(), 'From uploaded photo');
+      // Fire-and-forget: backend returns { status: 'generating', ... }. Variants land asynchronously.
+      if (result.status === 'generating') {
+        toast.success('Avatar generation started from your photo — front shot ~60s, then 3/4 angle. Check Avatars tab for progress.');
+        if (typeof onClose === 'function') onClose();
+        if (typeof onCreated === 'function') onCreated();
+        return;
+      }
       const urls = (result.variants || []).map(v => typeof v === 'string' ? v : v.url);
       setVariants(urls);
       if (urls.length > 0) setSelectedVariant(urls[0]);
