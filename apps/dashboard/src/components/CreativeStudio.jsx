@@ -17,13 +17,16 @@ const CATALOG_FRAMINGS = [
   { id: 'detail', label: 'Detail crop', prompt: 'FRAMING: Close-up crop from chest to upper thigh. Focus on the garment midsection — waistband, fabric texture, construction details. No face visible.' },
 ];
 
+// Every pose ends with FRAMING: instruction so the prompt assembly always has a 3/4-body
+// framing constraint right next to the pose text. Without this, "Standing facing camera"
+// gets interpreted as a full-body standing portrait and Nano Banana renders feet.
 const CATALOG_POSES = [
-  { id: 'hero', label: 'Hero Front', prompt: 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile.' },
-  { id: '34angle', label: '3/4 Angle', prompt: 'POSE: Body turned 30 degrees to the left, one hand resting lightly on hip, other arm relaxed. Looking directly at camera with warm confident expression. Shows side profile of the garment fit.' },
-  { id: 'walking', label: 'Walking', prompt: 'POSE: Walking slowly toward camera at slight angle, one foot ahead of other in natural stride, arms swinging gently. Looking slightly past camera to the right as if noticing something. Genuine relaxed smile, wind catching hair slightly.' },
-  { id: 'back', label: 'Back View', prompt: 'POSE: Full back view, standing naturally, looking over right shoulder toward camera with soft smile. Arms relaxed at sides. Shows back construction of the garment — straps, seaming, rear coverage.' },
-  { id: 'armsup', label: 'Arms Up', prompt: 'POSE: Arms raised above head, hands touching or near hair. Direct eye contact, confident expression. Shows underarm fit, how top moves with body, strap behavior when arms are raised. Demonstrates freedom of movement.' },
-  { id: 'profile', label: 'Side Profile', prompt: 'POSE: Full side profile view, body perpendicular to camera. Looking straight ahead or slightly toward camera. Shows silhouette, garment cut from the side, waistband height, leg opening. One foot slightly ahead of other.' },
+  { id: 'hero', label: 'Hero Front', prompt: 'POSE: Standing facing camera, slight weight shift to right hip creating natural S-curve, arms relaxed at sides, direct confident eye contact with camera, warm genuine smile. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
+  { id: '34angle', label: '3/4 Angle', prompt: 'POSE: Body turned 30 degrees to the left, one hand resting lightly on hip, other arm relaxed. Looking directly at camera with warm confident expression. Shows side profile of the garment fit. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
+  { id: 'walking', label: 'Walking', prompt: 'POSE: Walking slowly toward camera at slight angle, one foot ahead of other in natural stride, arms swinging gently. Looking slightly past camera to the right as if noticing something. Genuine relaxed smile, wind catching hair slightly. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
+  { id: 'back', label: 'Back View', prompt: 'POSE: Back view, standing naturally, looking over right shoulder toward camera with soft smile. Arms relaxed at sides. Shows back construction of the garment — straps, seaming, rear coverage. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
+  { id: 'armsup', label: 'Arms Up', prompt: 'POSE: Arms raised above head, hands touching or near hair. Direct eye contact, confident expression. Shows underarm fit, how top moves with body, strap behavior when arms are raised. Demonstrates freedom of movement. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
+  { id: 'profile', label: 'Side Profile', prompt: 'POSE: Side profile view, body perpendicular to camera. Looking straight ahead or slightly toward camera. Shows silhouette, garment cut from the side, waistband height, leg opening. One foot slightly ahead of other. FRAMING: 3/4 body crop, head to mid-calf, feet NOT visible.' },
 ];
 
 const CATALOG_BEACH_SCENES = [
