@@ -844,6 +844,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       ...(negMatch && { negative_prompt: negMatch[1].trim() }),
       ...(audience && { audience }),
       ...(catalogFramingKey && { framing_crop: catalogFramingKey }), // poll_generations crops the finished image to this
+      ...(garmentLength && { garment_length: garmentLength }), // controls adaptive crop bias in processCatalogImage
       ...(isProductCatalogV3 && { stage: 'studio', v3_beach_scene: v3BeachKey, v3_aspect: '4:5' }), // poll_generations fires step 2 (Ideogram bg replace)
       subject: show_model ? 'On model' : 'Product only',
       submitted_at: new Date().toISOString(),
