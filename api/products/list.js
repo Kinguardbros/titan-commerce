@@ -15,13 +15,25 @@ async function handler(req, res) {
     const { id, store_id: storeId } = req.query;
 
     if (id) {
+      // Single-product fetch: require store_id so a product from another store can't be
+      // retrieved by guessing the id. Validate that the product belongs to the requested store.
+      if (!storeId) {
+        return res.status(400).json({ error: 'store_id is required for single-product fetch' });
+      }
       const { data, error } = await supabase
         .from('products')
         .select('*')
         .eq('id', id)
+        .eq('store_id', storeId)
         .single();
       if (error) throw error;
       return res.status(200).json(data);
+    }
+
+    // List/pagination path: store_id is REQUIRED. Without it, a query would return products
+    // across ALL stores (cross-store leak). Fail closed.
+    if (!storeId) {
+      return res.status(400).json({ error: 'store_id is required' });
     }
 
     const page = parseInt(req.query.page) || 1;
@@ -31,8 +43,7 @@ async function handler(req, res) {
     const showArchived = req.query.show_archived === 'true';
 
     // Count total products
-    let countQuery = supabase.from('products').select('id', { count: 'exact', head: true });
-    if (storeId) countQuery = countQuery.eq('store_id', storeId);
+    let countQuery = supabase.from('products').select('id', { count: 'exact', head: true }).eq('store_id', storeId);
     if (!showArchived) countQuery = countQuery.or('status.eq.active,status.is.null');
     const { count: total } = await countQuery;
 
@@ -40,12 +51,10 @@ async function handler(req, res) {
     let productsQuery = supabase
       .from('products')
       .select('id, shopify_id, handle, title, price, image_url, product_type, tags, status, created_at, has_size_chart')
+      .eq('store_id', storeId)
       .order('title')
       .range(offset, offset + limit - 1);
 
-    if (storeId) {
-      productsQuery = productsQuery.eq('store_id', storeId);
-    }
     if (!showArchived) {
       productsQuery = productsQuery.or('status.eq.active,status.is.null');
     }
@@ -55,14 +64,11 @@ async function handler(req, res) {
     if (error) throw error;
 
     // Get creative counts + published counts + audiences per product in one query
-    let countsQuery = supabase
+    const countsQuery = supabase
       .from('creatives')
       .select('product_id, status, metadata')
+      .eq('store_id', storeId)
       .not('product_id', 'is', null);
-
-    if (storeId) {
-      countsQuery = countsQuery.eq('store_id', storeId);
-    }
 
     const { data: counts } = await countsQuery;
 
