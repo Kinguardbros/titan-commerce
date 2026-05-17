@@ -668,6 +668,10 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
             reference_url: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8Style || isProductCatalogStyle) ? undefined : colorRef,
             product_color: (isAnyCatalog && selectedColor && selectedColor !== "All colors") ? selectedColor : undefined,
+            // Variant image — when user picks a color variant, send the variant's product image so
+            // backend can use IT as the garment reference (instead of the default featured image,
+            // which is typically the wrong color). The visual signal beats any text override.
+            variant_image_url: (isAnyCatalog && selectedColor && selectedColor !== "All colors" && colorRef) ? colorRef : undefined,
             v8_fill_intensity: isProductCatalogV8Style ? v8FillIntensity : undefined,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))

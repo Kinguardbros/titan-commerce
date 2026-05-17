@@ -50,7 +50,7 @@ async function handler(req, res) {
     return res.status(429).json({ error: 'Rate limit exceeded' });
   }
 
-  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url, product_color, v8_fill_intensity } = req.body;
+  let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url, product_color, variant_image_url, v8_fill_intensity } = req.body;
   style = style || 'ad_creative'; ai_model = ai_model || 'fal_nano_banana'; custom_prompt = custom_prompt || ''; show_model = show_model !== false; text_overlay = text_overlay || 'none'; overlay_text = overlay_text || ''; aspect_ratio = aspect_ratio || '1:1';
   // Nano Banana output resolution — only the nano-banana models honor it
   resolution = ['1K', '2K', '4K'].includes(resolution) ? resolution : '2K';
@@ -169,6 +169,14 @@ async function handler(req, res) {
       // Fall back to the original list if a product happens to have only AI images (shouldn't
       // happen for current data, but keep generation working rather than send empty refs).
       if (originals.length > 0) images = originals;
+      // When user picked a specific color variant (variant_image_url present), put that variant
+      // image FIRST and drop any duplicate further in the list. The catalog flows downstream slice
+      // to images.slice(0, 1), so position 0 is the only one that matters for the garment color.
+      // The vision signal from a correctly-colored reference image beats any prompt-level color
+      // override — Nano Banana copies what it SEES, not what the text claims.
+      if (variant_image_url && (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8)) {
+        images = [variant_image_url, ...images.filter((u) => u !== variant_image_url)];
+      }
       if (images.length > 2) images = images.slice(0, 2);
     }
     // Prepend reference_url to product images ONLY for non-audience flows (color variant, etc.).
