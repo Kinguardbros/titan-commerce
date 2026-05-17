@@ -296,12 +296,22 @@ async function handler(req, res) {
         : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
         : '';
 
+      // When user picked a specific variant color (product_color truthy), the PRODUCT COLOR
+      // OVERRIDE block at the end of the prompt will recolor the garment. To avoid that override
+      // fighting earlier "copy color from reference" instructions, drop the word "color" from
+      // those inline instructions so only construction details (cut/neckline/straps/fabric) come
+      // from the reference image, and color comes solely from the override at the end.
+      const colorFromReference = !product_color;
+      const garmentCopyAttrs = colorFromReference
+        ? "color, cut, neckline, strap style, fabric texture, seaming, construction, coverage"
+        : "cut, neckline, strap style, fabric texture, seaming, construction, coverage";
+
       // When a persona avatar is the reference, the model comes FROM that image (sandwich:
       // image 1 + last image). Otherwise the model is generated from the modelDesc text and
       // the reference is garment-only.
       const catalogReferenceRules = reference_url
-        ? `Reference image roles: image 1 AND the last image = THE MODEL (the SAME woman, shown twice — use her exact face, hair, skin tone, body shape, and age). Any image in between = THE GARMENT (cropped product shots — copy the swimsuit's color, cut, neckline, strap style, fabric texture, seaming, construction, coverage exactly; do NOT let it influence the model's face).`
-        : `The attached reference image shows the SWIMSUIT/GARMENT ONLY — use it solely to copy the garment (color, cut, neckline, strap style, fabric texture, seaming, construction, coverage). If a person appears in the reference, COMPLETELY IGNORE that person — do not copy her face, hair, body, age, or skin tone. The woman in the final image is a NEW model described below, not the person in the reference.`;
+        ? `Reference image roles: image 1 AND the last image = THE MODEL (the SAME woman, shown twice — use her exact face, hair, skin tone, body shape, and age). Any image in between = THE GARMENT (cropped product shots — copy the swimsuit's ${garmentCopyAttrs} exactly; do NOT let it influence the model's face).`
+        : `The attached reference image shows the SWIMSUIT/GARMENT ONLY — use it solely to copy the garment (${garmentCopyAttrs}). If a person appears in the reference, COMPLETELY IGNORE that person — do not copy her face, hair, body, age, or skin tone. The woman in the final image is a NEW model described below, not the person in the reference.`;
       const catalogModelLine = reference_url
         ? `Professional e-commerce swimwear product photography. THE MODEL — use the woman shown in reference image 1 AND the last reference image (the SAME woman, twice): her exact face, hair, skin tone, body shape, and age. She is the ONLY person; do not invent a different face.`
         : `Professional e-commerce swimwear product photography. THE MODEL — generate exactly this woman: ${modelDesc}`;
@@ -312,7 +322,7 @@ async function handler(req, res) {
 
       prompt = `${catalogReferenceRules}
 
-Recreate the swimsuit faithfully on the model: same color, same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
+Recreate the swimsuit faithfully on the model: ${colorFromReference ? "same color, " : ""}same cut, same neckline, same strap style, same fabric texture, same seaming, same construction details, same coverage.
 
 ${catalogModelLine}
 
@@ -326,7 +336,7 @@ LIGHT ON THE MODEL: natural daylight coming FROM THE FRONT (the sun is behind th
 
 EXPOSURE: the MODEL and SWIMSUIT are well-exposed — clearly readable, never dim, never dark, never moody, but ALSO never overexposed, never blown out, never washed out — a natural, balanced, true-to-life exposure. Black fabric reads as a rich dark grey-black with the ribbed texture / pleating / seams clearly visible — NOT crushed to a flat black silhouette. The BACKGROUND is also properly exposed — visible sea, waves, sand, dune grass, and a blue sky with clouds, all holding full detail — NOT blown out to pure white, NOT vaporised, NOT a foggy haze.
 
-THE GARMENT: the SWIMSUIT is the hero of this photo. It is lit by frontal daylight and is well-exposed and clearly readable — never dim, never grey-flat, but also never blown out: fabric texture, exact color and pattern, ribbing/pleating, trims, stitching, seams, waistband all crisply visible. Black fabric reads as a rich dark grey-black with all the ribbed / pleated texture catching the light — NOT crushed to a flat black silhouette, NOT a washed-out grey. Exposed neutrally — natural and true to life, the shadows on the fabric just gently filled so the deepest folds and the underside of the bust stay readable. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO hard shadows on the swimsuit. (This applies to the GARMENT and model — it does NOT change the scene: the sky stays a bright blue with soft clouds, the sun stays behind the camera, the background stays a properly-exposed real beach with full visible detail, not blown out to white.) If any part of the garment sinks into shadow, OR a hard directional / side-lit shadow appears on the body / garment / sand, OR the background / model / sand / sky is overexposed and washed out to white, OR the background is a gloomy dark grey, the result is WRONG.
+THE GARMENT: the SWIMSUIT is the hero of this photo. It is lit by frontal daylight and is well-exposed and clearly readable — never dim, never grey-flat, but also never blown out: fabric texture${colorFromReference ? ", exact color and pattern" : ""}, ribbing/pleating, trims, stitching, seams, waistband all crisply visible. Black fabric reads as a rich dark grey-black with all the ribbed / pleated texture catching the light — NOT crushed to a flat black silhouette, NOT a washed-out grey. Exposed neutrally — natural and true to life, the shadows on the fabric just gently filled so the deepest folds and the underside of the bust stay readable. The LOWER HALF (briefs / bottoms / skirt) is lit just as brightly as the top — it does NOT fall darker. ZERO hard shadows on the swimsuit. (This applies to the GARMENT and model — it does NOT change the scene: the sky stays a bright blue with soft clouds, the sun stays behind the camera, the background stays a properly-exposed real beach with full visible detail, not blown out to white.) If any part of the garment sinks into shadow, OR a hard directional / side-lit shadow appears on the body / garment / sand, OR the background / model / sand / sky is overexposed and washed out to white, OR the background is a gloomy dark grey, the result is WRONG.
 
 GRADE: warm, clean, natural — sun-kissed skin and hair, true-to-life colors with full saturation and full tonal range. NOT a cool / grey / blue grade, NOT a heavy orange filter, NOT washed-out, NOT overexposed, NOT a bright hazy wash, NOT flat lifeless lighting.
 ━━━━━━━━━━━━━━━━━━━━━━━━
@@ -335,7 +345,7 @@ Product: ${product.title}
 
 ${poseAndFraming}
 
-Garment: Fabric smooth, zero bunching. Match reference exactly.${catalogHighWaist ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
+Garment: Fabric smooth, zero bunching. ${colorFromReference ? "Match reference exactly." : "Match the reference for cut, construction, and silhouette (color comes from the PRODUCT COLOR OVERRIDE block below)."}${catalogHighWaist ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 FACE QUALITY (critical):
 - Sharp detailed facial features — visible skin pores, natural skin texture on face, individual eyebrow hairs
