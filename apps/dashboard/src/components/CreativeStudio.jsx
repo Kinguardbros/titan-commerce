@@ -910,7 +910,11 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
                   </div>
                 </div>
                 {useAudience && (
-                  <Select value={audience} onChange={setAudience} options={["auto", ...personas.map((p) => p.name)]} renderOption={(opt) => opt === "auto" ? "Auto — best match" : `${opt} (${personas.find((p) => p.name === opt)?.age || ""}) — ${personas.find((p) => p.name === opt)?.label || ""}`} />
+                  <Select value={audience} onChange={setAudience} options={["auto", ...personas.map((p) => p.name)]} renderOption={(opt) => {
+                    if (opt === "auto") return "Auto — best match";
+                    const p = personas.find((x) => x.name === opt);
+                    return p?.age ? `${opt} (${p.age})` : opt;
+                  }} />
                 )}
               </div>
             )}
