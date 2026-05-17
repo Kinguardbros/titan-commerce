@@ -6,7 +6,6 @@ import { V5_PROMPT_BODY } from '../../lib/v5-prompt.js';
 import { V6_PROMPT_BODY } from '../../lib/v6-prompt.js';
 import { V7_PROMPT_BODY } from '../../lib/v7-prompt.js';
 import { V8_PROMPT_BODY_TEMPLATE, detectV8ColorClass, buildV8LightingBlock, buildV8DoNotBlock } from '../../lib/v8-prompt.js';
-import { detectGarmentLength } from '../../lib/garment-length-detector.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -107,11 +106,13 @@ async function handler(req, res) {
     // Beach scene key — used by v3 (selects the master beach prompt for step 2 Ideogram bg replace).
     // 'sunny' is the default. v1 doesn't read this — its scene is hardcoded.
     const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
-    // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
+    // Product Catalog framing — post-process crop is DISABLED. We ask fal.ai for native 4:5
+    // and store the result as-is, so every catalog image has identical pixel dimensions.
+    // (Legacy `catalogFramingLabel` UI pill is no longer wired anywhere; left here so old
+    // [catalog_framing:X] tags in custom_prompt parse cleanly without erroring.)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
-    let catalogFramingKey = isProductCatalog
-      ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || 'three-quarter')
-      : null;
+    void catalogFramingLabel;
+    const catalogFramingKey = null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
@@ -141,27 +142,12 @@ async function handler(req, res) {
       : 'swimsuit';
     const isNonSwimGarment = !isSwimwearProduct && garmentDescriptor !== 'swimsuit';
 
-    // Vision-based garment-length detection for v1. Title keywords aren't reliable enough
-    // ('Lace-Up Floral Skirt Swim Set' falsely matches 'skirt' even though it's a bikini set).
-    // Classify the product image once and cache it on products.garment_length.
-    // 'short' / 'mid' → default above-knee crop (0.65); 'long' → disable crop + full-body framing.
-    let garmentLength = product.garment_length || null;
-    if (isProductCatalog && !garmentLength) {
-      const firstImg = (JSON.parse(product.images || '[]'))[0];
-      if (firstImg) {
-        garmentLength = await detectGarmentLength(firstImg);
-        if (garmentLength) {
-          console.log(`[generate] garment-length detected for ${product.handle}: ${garmentLength}`);
-          // Cache result so subsequent generations skip the Vision call.
-          await supabase.from('products').update({ garment_length: garmentLength }).eq('id', product.id);
-        }
-      }
-    }
-    // For long garments (maxi skirts, maxi dresses, full-length cover-ups): disable the
-    // post-process crop so the finished image keeps the full garment in frame.
-    if (isProductCatalog && garmentLength === 'long') {
-      catalogFramingKey = null;
-    }
+    // Vision-based garment-length detection — DISABLED. We no longer post-process catalog
+    // images (asking fal.ai for native 4:5 instead), so length-aware cropping isn't needed.
+    // The detectGarmentLength helper + products.garment_length column remain in place for
+    // future use (e.g. length-aware prompt hints).
+    const garmentLength = product.garment_length || null;
+    void garmentLength;
 
     // HIGH-WAIST navel-hide block applies ONLY to swimwear (one-pieces, high-waist bikinis, tummy-control).
     // Previously: any Isola product → always inject. NEW: must also be swimwear product (avoid injecting
@@ -295,27 +281,12 @@ async function handler(req, res) {
       // Extract full framing text (all sentences after FRAMING:)
       const framingSection = poseAndFraming.match(/FRAMING:\s*([\s\S]*?)$/);
       const framingText = framingSection ? framingSection[1].trim() : '';
-      // v1 always uses 3/4 framing (post-process crops the finished image). When the frontend stops
-      // sending [catalog_framing:...] and there's no FRAMING: text, force isThreeQuarter so the
-      // framingBlock reminder still gets included in the prompt.
-      const isThreeQuarter = framingText.includes('mid-calf') || framingText.includes('Do NOT show feet') || !framingText;
-      const isWaistUp = framingText.includes('waist/hip level') || framingText.includes('Upper body portrait');
-      const isDetailCrop = framingText.includes('chest to upper thigh') || framingText.includes('No face visible');
-      const isNonFullFraming = isThreeQuarter || isWaistUp || isDetailCrop;
-      // Dedicated, bordered FRAMING block — the avatar reference may show the full body, so the
-      // crop must be stated forcefully (the edit model otherwise reproduces the reference framing).
-      // When Vision flagged the garment as 'long' (maxi skirt, maxi dress, ankle-length cover-up),
-      // override into full-body framing so the entire product including the hem is visible.
-      const framingBlock = garmentLength === 'long'
-        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe garment is LONG (extends to the knee, calf, or ankle). The final photo MUST show the ENTIRE garment from top to bottom hem, plus the model's feet on the sand. FULL BODY shot from the top of the head down to the feet, with a small margin of background above the head and below the feet. The garment's lowest hem (skirt edge, dress hem, cover-up bottom) MUST be fully visible inside the frame with breathing room below it — NEVER cropped, NEVER cut off. If you can see only part of the garment with its hem outside the frame, the crop is WRONG — zoom out further until the entire garment fits.\n━━━━━━━━━━━━━━━━━━━━━━━━`
-        : isNonFullFraming
-        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe model reference image is already cropped to roughly this framing — keep that framing in the final image, do NOT zoom out, do NOT add her lower body back in. ${framingText} ${isThreeQuarter ? 'The BOTTOM EDGE of the final photo is at her mid-calf / just below the knee. Her feet are NOT in the photo. Her ankles are NOT in the photo. There is NO sand at her feet because her feet are below the frame. If you can see her feet or ankles, the crop is WRONG — crop tighter.' : isWaistUp ? 'The BOTTOM EDGE of the final photo is at her hip/waist. Her legs are NOT in the photo. If you can see her knees or feet, the crop is WRONG — crop tighter.' : 'This is a tight crop on the garment midsection ONLY — her head is NOT in the photo, her legs below the upper thigh are NOT in the photo. If you can see her face or her knees, the crop is WRONG — crop tighter.'}\n━━━━━━━━━━━━━━━━━━━━━━━━`
-        : '';
-      const framingNegative = garmentLength === 'long' ? ', garment hem cut off, dress hem cropped at frame edge, skirt hem outside frame, partial garment visible, lower edge of garment extending below frame'
-        : isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
-        : isWaistUp ? ', full body, full legs, visible knees, visible feet, visible ankles'
-        : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
-        : '';
+      // Framing comes entirely from the prompt now (no post-process crop). Tell Nano Banana
+      // explicitly to fit the whole model into a 4:5 portrait, head and feet inside the frame,
+      // with breathing room above and below. Output is the native 4:5 fal.ai render.
+      void framingText;
+      const framingBlock = `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING — 4:5 PORTRAIT, FULL BODY INSIDE THE FRAME ===\nFull-body 4:5 vertical portrait. The ENTIRE model fits inside the frame from the top of her head down to her feet, with a small margin of background above the head and below the feet. The garment is fully visible from top to bottom hem — NOTHING is cropped. The model occupies the central ~70-80% of the vertical frame, centered horizontally. NEVER cut off the head, NEVER cut off the feet, NEVER cut off the garment hem. If anything is cropped at the frame edge, the framing is WRONG — zoom out until everything fits.\n━━━━━━━━━━━━━━━━━━━━━━━━`;
+      const framingNegative = ', head cropped, top of head cut off, feet cropped, feet outside frame, garment hem cut off, partial garment, body extending beyond frame, tight crop, zoomed-in shot, close-up';
 
       // When user picked a specific variant color (product_color truthy), the PRODUCT COLOR
       // OVERRIDE block at the end of the prompt will recolor the garment. To avoid that override
@@ -698,11 +669,10 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // images and re-adds the lower body anyway. The reliable fix is to crop the FINISHED
         // output server-side (done in poll_generations using meta.framing_crop) — see below.
         const avatarRef = reference_url;
-        // Product Catalog v1: request 9:16 from Nano Banana (gives extra vertical headroom for
-        // full body), then post-process crops the finished image down to a deterministic 4:5
-        // centered on the upper body. v2-v8 ask fal.ai directly for 4:5.
-        const outAspectRatio = isProductCatalog ? '9:16'
-          : (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8) ? '4:5'
+        // All Product Catalog versions (v1-v8) request native 4:5 from Nano Banana so every
+        // output is exactly the same pixel dimensions (1664×2080 @ 2K). No post-process crop,
+        // no aspect-ratio drift, no per-product sizing differences.
+        const outAspectRatio = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8) ? '4:5'
           : aspect_ratio;
         // Product Catalog (v1, v2, v3): with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                               without an avatar     → 1 product image only (packshot/flat-lay,
