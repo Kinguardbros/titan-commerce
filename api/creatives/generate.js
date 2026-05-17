@@ -696,8 +696,12 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // images and re-adds the lower body anyway. The reliable fix is to crop the FINISHED
         // output server-side (done in poll_generations using meta.framing_crop) — see below.
         const avatarRef = reference_url;
-        // Product Catalog v2/v3 are self-contained; v3 is step 1 of the double pipeline.
-        const outAspectRatio = (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8) ? '4:5' : aspect_ratio;
+        // Product Catalog v1: request 9:16 from Nano Banana (gives extra vertical headroom for
+        // full body), then post-process crops the finished image down to a deterministic 4:5
+        // centered on the upper body. v2-v8 ask fal.ai directly for 4:5.
+        const outAspectRatio = isProductCatalog ? '9:16'
+          : (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8) ? '4:5'
+          : aspect_ratio;
         // Product Catalog (v1, v2, v3): with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                               without an avatar     → 1 product image only (packshot/flat-lay,
         //                                                       not a model shot), model comes from the prompt
