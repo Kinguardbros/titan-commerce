@@ -106,13 +106,13 @@ async function handler(req, res) {
     // Beach scene key — used by v3 (selects the master beach prompt for step 2 Ideogram bg replace).
     // 'sunny' is the default. v1 doesn't read this — its scene is hardcoded.
     const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
-    // Product Catalog framing — post-process crop is DISABLED. We ask fal.ai for native 4:5
-    // and store the result as-is, so every catalog image has identical pixel dimensions.
-    // (Legacy `catalogFramingLabel` UI pill is no longer wired anywhere; left here so old
-    // [catalog_framing:X] tags in custom_prompt parse cleanly without erroring.)
+    // Product Catalog v1 — post-process the finished image down to a 3/4-body crop
+    // (head to mid-calf, feet cropped off). Prompt instructions alone are not enough:
+    // Nano Banana mirrors the avatar reference image, which is full-body, so the model
+    // keeps coming back full-body unless we crop afterward.
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
     void catalogFramingLabel;
-    const catalogFramingKey = null;
+    const catalogFramingKey = isProductCatalog ? 'three-quarter' : null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
     const titleLower = (product.title || '').toLowerCase();
     const isHighWaistTummy = /tummy.?control|high.?wais?t|high.?rise|high.?cut|ruched|shirr|sculpt|shaping|control.?brief|retro.?(high|wais?t)|vintage.?(high|wais?t)|tankini/i.test(titleLower);
