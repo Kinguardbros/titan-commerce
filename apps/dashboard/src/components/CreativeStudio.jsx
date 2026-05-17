@@ -289,8 +289,7 @@ function Select({ value, onChange, options, renderOption }) {
   );
 }
 
-// Avatar dropdown — short labels in the select (name + age only) and the full
-// persona descriptor shown as a helper line under the dropdown when one is selected.
+// Avatar dropdown — short 'Name (age)' labels in the select, no helper text below.
 // Used by every catalog style's "Reference model" picker.
 function AvatarSelect({ value, onChange, personas }) {
   const usable = personas.filter((p) => p.reference_url);
@@ -301,24 +300,16 @@ function AvatarSelect({ value, onChange, personas }) {
       </div>
     );
   }
-  const selected = usable.find((p) => p.name === value);
   return (
-    <>
-      <Select
-        value={value || ""}
-        onChange={onChange}
-        options={usable.map((p) => p.name)}
-        renderOption={(opt) => {
-          const p = usable.find((x) => x.name === opt);
-          return p?.age ? `${opt} (${p.age})` : opt;
-        }}
-      />
-      {selected?.label && (
-        <div style={{ fontSize: 11, color: TEXT_MID, marginTop: 6, lineHeight: 1.4 }}>
-          {selected.label}
-        </div>
-      )}
-    </>
+    <Select
+      value={value || ""}
+      onChange={onChange}
+      options={usable.map((p) => p.name)}
+      renderOption={(opt) => {
+        const p = usable.find((x) => x.name === opt);
+        return p?.age ? `${opt} (${p.age})` : opt;
+      }}
+    />
   );
 }
 
@@ -489,7 +480,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
         if (av) { p.reference_url = av.reference_url || null; p.is_active = av.is_active !== false; }
         else { p.is_active = true; }
       }
-      // Add custom avatars not in audience-personas skill
+      // Add custom avatars not in audience-personas skill.
       const skillNames = new Set(parsed.map((p) => p.name));
       for (const av of avatarData || []) {
         if (!skillNames.has(av.persona_name) && av.reference_url) {
