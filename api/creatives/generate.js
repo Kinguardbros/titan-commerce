@@ -108,7 +108,7 @@ async function handler(req, res) {
     const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
     // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
-    let catalogFramingKey = isProductCatalog
+    const catalogFramingKey = isProductCatalog
       ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || 'three-quarter')
       : null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
@@ -139,16 +139,6 @@ async function handler(req, res) {
       : isBraProduct ? 'bra'
       : 'swimsuit';
     const isNonSwimGarment = !isSwimwearProduct && garmentDescriptor !== 'swimsuit';
-
-    // For v1 (product_catalog) with NON-swim garments (dress, skirt, cover-up, long top, etc.):
-    // disable the post-process crop so the finished image keeps the full garment in frame.
-    // The user-selected UI framing pill (3/4 body / Waist up / Detail crop) is bypassed because
-    // those crops were designed for swimwear silhouettes and cut off dress hems / maxi skirts.
-    // Together with the framing prompt override below this guarantees the garment hem is fully
-    // visible regardless of which framing pill the user picked.
-    if (isProductCatalog && isNonSwimGarment) {
-      catalogFramingKey = null;
-    }
 
     // HIGH-WAIST navel-hide block applies ONLY to swimwear (one-pieces, high-waist bikinis, tummy-control).
     // Previously: any Isola product → always inject. NEW: must also be swimwear product (avoid injecting
@@ -289,17 +279,12 @@ async function handler(req, res) {
       const isWaistUp = framingText.includes('waist/hip level') || framingText.includes('Upper body portrait');
       const isDetailCrop = framingText.includes('chest to upper thigh') || framingText.includes('No face visible');
       const isNonFullFraming = isThreeQuarter || isWaistUp || isDetailCrop;
-      // For NON-swim garments (dress, skirt, cover-up, long top) override the framing block to
-      // force a FULL-GARMENT crop. The default swim-shot framings (3/4 body / waist up / detail)
-      // were cutting off skirt hems and dress bottoms, leaving the product partially visible.
-      // This override wins over whatever UI framing pill the user selected.
-      const framingBlock = isNonSwimGarment
-        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe ${garmentDescriptor} must be FULLY VISIBLE in the frame from top to bottom. The BOTTOM EDGE of the ${garmentDescriptor} (hem, finish, lower seam) must be inside the photo with a small margin of background below it — NEVER cropped, NEVER cut off at the bottom of the frame. Adjust the framing to fit the entire garment: if the ${garmentDescriptor} is long (maxi skirt, long dress, full-length cover-up), zoom out so the whole garment fits, including the bottom hem AND the model's feet if needed. The full product silhouette must be visible to the customer. If you can see only part of the ${garmentDescriptor} with its hem cut off at the bottom edge, the crop is WRONG — zoom out further.\n━━━━━━━━━━━━━━━━━━━━━━━━`
-        : isNonFullFraming
+      // Dedicated, bordered FRAMING block — the avatar reference may show the full body, so the
+      // crop must be stated forcefully (the edit model otherwise reproduces the reference framing).
+      const framingBlock = isNonFullFraming
         ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe model reference image is already cropped to roughly this framing — keep that framing in the final image, do NOT zoom out, do NOT add her lower body back in. ${framingText} ${isThreeQuarter ? 'The BOTTOM EDGE of the final photo is at her mid-calf / just below the knee. Her feet are NOT in the photo. Her ankles are NOT in the photo. There is NO sand at her feet because her feet are below the frame. If you can see her feet or ankles, the crop is WRONG — crop tighter.' : isWaistUp ? 'The BOTTOM EDGE of the final photo is at her hip/waist. Her legs are NOT in the photo. If you can see her knees or feet, the crop is WRONG — crop tighter.' : 'This is a tight crop on the garment midsection ONLY — her head is NOT in the photo, her legs below the upper thigh are NOT in the photo. If you can see her face or her knees, the crop is WRONG — crop tighter.'}\n━━━━━━━━━━━━━━━━━━━━━━━━`
         : '';
-      const framingNegative = isNonSwimGarment ? ', garment hem cut off, skirt hem cropped at frame edge, dress bottom cut off, partial garment visible, lower edge of garment outside the frame, garment extending below frame, tight crop on top half only'
-        : isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
+      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
         : isWaistUp ? ', full body, full legs, visible knees, visible feet, visible ankles'
         : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
         : '';
