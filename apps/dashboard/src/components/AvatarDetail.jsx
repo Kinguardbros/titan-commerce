@@ -47,7 +47,7 @@ export default function AvatarDetail({ persona, storeId, storeName, onClose, onU
       // Fire-and-forget: backend returns { status: 'generating', front_request_id, ... } immediately.
       // Avatars.jsx polling picks up status transitions and refreshes the list.
       if (result.status === 'generating') {
-        toast.success('Avatar generation started (front shot ~60s, then 3/4 angle). Persona row updates automatically.');
+        toast.success('Avatar generation started (~60s). Persona row updates automatically.');
         onUpdated?.();
         return;
       }

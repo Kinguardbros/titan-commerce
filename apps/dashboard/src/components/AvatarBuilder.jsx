@@ -121,7 +121,7 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
       // immediately. Variants land in DB asynchronously via poll_avatar_generations (driven by
       // Avatars.jsx polling). User closes this builder and watches the persona row update.
       if (result.status === 'generating') {
-        toast.success('Avatar generation started — front shot ~60s, then 3/4 angle. Check Avatars tab for progress.');
+        toast.success('Avatar generation started (~60s). Check Avatars tab for progress.');
         if (typeof onClose === 'function') onClose();
         if (typeof onCreated === 'function') onCreated();
         return;
@@ -157,7 +157,7 @@ export default function AvatarBuilder({ storeId, onClose, onCreated }) {
       const result = await generateAvatar(storeId, name.trim(), 'From uploaded photo');
       // Fire-and-forget: backend returns { status: 'generating', ... }. Variants land asynchronously.
       if (result.status === 'generating') {
-        toast.success('Avatar generation started from your photo — front shot ~60s, then 3/4 angle. Check Avatars tab for progress.');
+        toast.success('Avatar generation started from your photo (~60s). Check Avatars tab for progress.');
         if (typeof onClose === 'function') onClose();
         if (typeof onCreated === 'function') onCreated();
         return;

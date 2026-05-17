@@ -59,10 +59,10 @@ export default function Avatars({ storeId, store }) {
     })),
   ];
 
-  // Polling effect — when any avatar is in 'generating' or 'angles' status, poll backend
-  // every 5s to drive the fal.ai completion check. Frontend pulls the trigger because there's
-  // no cron/worker for avatars (creatives have one, avatars don't).
-  const hasInFlight = avatars.some(a => a.status === 'generating' || a.status === 'angles');
+  // Polling effect — when any avatar is in 'generating' status, poll backend every 5s to
+  // drive the fal.ai completion check. Frontend pulls the trigger because there's no
+  // cron/worker for avatars (creatives have one, avatars don't).
+  const hasInFlight = avatars.some(a => a.status === 'generating');
   useEffect(() => {
     if (!storeId || !hasInFlight) return;
     const tick = async () => {
@@ -159,9 +159,9 @@ export default function Avatars({ storeId, store }) {
                   Inactive
                 </div>
               )}
-              {(p.status === 'generating' || p.status === 'angles') && (
+              {p.status === 'generating' && (
                 <div style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(20, 100, 200, 0.85)', color: '#fff', fontSize: 10, padding: '2px 8px', borderRadius: 4, letterSpacing: '0.05em', textTransform: 'uppercase', fontWeight: 600 }}>
-                  {p.status === 'generating' ? '⏳ Generating front…' : '⏳ Generating 3/4 angle…'}
+                  ⏳ Generating…
                 </div>
               )}
               {p.status === 'failed' && (
