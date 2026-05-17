@@ -438,7 +438,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
 
   // Load colors from product variants
   const [colors, setColors] = useState([]);
-  const [selectedColor, setSelectedColor] = useState("All colors");
+  const [selectedColor, setSelectedColor] = useState("Pick a color");
   const [colorToImage, setColorToImage] = useState({});
   const [personas, setPersonas] = useState([]);
   const [audience, setAudience] = useState("auto");
@@ -463,7 +463,7 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
           }
         }
       }
-      if (colorSet.size > 0) setColors(["All colors", ...colorSet]);
+      if (colorSet.size > 0) setColors(["Pick a color", ...colorSet]);
       setColorToImage(mapping);
     }).catch(() => {});
     Promise.all([
@@ -643,8 +643,8 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
     const isAnyCatalog = imgStyle === 'product-catalog' || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8;
     // Catalog styles hide the model picker — force Nano Banana Pro (best identity preservation)
     const backendModel = isAnyCatalog ? (MODEL_MAP[catalogAiModel] || "fal_nano_banana_pro") : (MODEL_MAP[imgModel] || "fal_nano_banana");
-    const colorRef = selectedColor !== "All colors" ? (colorToImage[selectedColor] || null) : null;
-    const colorPrefix = selectedColor !== "All colors" ? `Product color: ${selectedColor}. ` : "";
+    const colorRef = selectedColor !== "Pick a color" ? (colorToImage[selectedColor] || null) : null;
+    const colorPrefix = selectedColor !== "Pick a color" ? `Product color: ${selectedColor}. ` : "";
     const poseHint = subject === "On model" && modelPose !== "Standing" ? `Model pose: ${modelPose}. ` : "";
     const bodyHint = subject === "On model" && bodyType !== "Auto" ? `Model body type: ${bodyType}. ` : "";
     const framingHint = subject === "On model" ? (
@@ -700,11 +700,11 @@ export default function CreativeStudio({ product, storeId, creatives = [], onGen
             aspect_ratio: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8Style || isProductCatalogStyle) ? "4:5" : imgRatio,
             resolution: backendModel.includes("nano_banana") ? imgResolution : undefined,
             reference_url: (isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8Style || isProductCatalogStyle) ? undefined : colorRef,
-            product_color: (isAnyCatalog && selectedColor && selectedColor !== "All colors") ? selectedColor : undefined,
+            product_color: (isAnyCatalog && selectedColor && selectedColor !== "Pick a color") ? selectedColor : undefined,
             // Variant image — when user picks a color variant, send the variant's product image so
             // backend can use IT as the garment reference (instead of the default featured image,
             // which is typically the wrong color). The visual signal beats any text override.
-            variant_image_url: (isAnyCatalog && selectedColor && selectedColor !== "All colors" && colorRef) ? colorRef : undefined,
+            variant_image_url: (isAnyCatalog && selectedColor && selectedColor !== "Pick a color" && colorRef) ? colorRef : undefined,
             v8_fill_intensity: isProductCatalogV8Style ? v8FillIntensity : undefined,
           }).then(() => setCompleted((p) => p + 1))
             .catch((err) => toast.error(`Failed: ${err.message}`))
