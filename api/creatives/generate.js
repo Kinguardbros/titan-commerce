@@ -370,17 +370,19 @@ ${poseAndFraming}
 Garment: Fabric smooth, zero bunching. ${colorFromReference ? "Match reference exactly." : "Match the reference for cut, construction, and silhouette (color comes from the PRODUCT COLOR OVERRIDE block below)."}${catalogHighWaist ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== HIGH-WAIST TUMMY-CONTROL — MANDATORY, READ TWICE ===\nThis swimsuit is TUMMY CONTROL. The bottoms / one-piece waistline sits VERY HIGH — at the natural waist, WELL ABOVE the belly button. CRITICAL: the waistband sits NOTICEABLY HIGHER than it appears in the product reference photo — raise it up so the top edge reaches the natural waist / just below the bottom of the rib cage. The navel is buried several centimetres BELOW the top edge of the fabric, fully covered. The belly button is COMPLETELY, ENTIRELY hidden — not a peek, not a sliver, not partially — there is NO gap, NO cutout, NO bare skin between the bra/top and the high waistband where the navel could show. The fabric covers the entire stomach from the natural waist down, hugging and smoothing it. This is a FULL high-rise brief, NOT a mid-rise, NOT a low-rise. If you see ANY skin of the navel area above the waistband, the waistband is too low — raise it higher until the navel is fully hidden.\n━━━━━━━━━━━━━━━━━━━━━━━━` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-=== BODY × GARMENT — THIS IS THE WHOLE POINT OF THE PHOTO ===
-The model is GENUINELY CURVY (real plus-size body, soft natural belly, fuller hips and thighs that touch, soft upper arms, natural bust). She is NOT a slim model, NOT an athletic body, NOT airbrushed thin. Her curves are clearly visible and authentic — a real woman who looks like the customer.
+=== GARMENT SHAPING — THIS IS THE WHOLE POINT OF THE PHOTO ===
+${reference_url
+  ? `The model's body, age, face, skin tone, hair, height, weight, and proportions come ENTIRELY from reference image 1 / the last reference image — preserve her exact body as shown, do NOT slim her down, do NOT make her younger, do NOT change her face. Whatever body she has in the reference, that is HER body in the final image.`
+  : `The model is GENUINELY CURVY (real plus-size body, soft natural belly, fuller hips and thighs that touch, soft upper arms, natural bust). She is NOT a slim model, NOT an athletic body, NOT airbrushed thin. Her curves are clearly visible and authentic — a real woman who looks like the customer.`}
 
-AT THE SAME TIME the swimsuit DOES ITS JOB and visibly SHAPES her:
+The swimsuit DOES ITS JOB and visibly SHAPES her body:
 - The fabric SMOOTHS her tummy into a flat, sculpted midsection — no roll, no bulge above or below the waistband, no skin spillover
 - The bust is LIFTED and SUPPORTED — round, contoured, structured shape (NOT sagging, NOT spilling out, NOT flattened)
 - The waistline is CONTOURED — the swimsuit pulls in slightly at the natural waist creating an hourglass impression
 - The hips read SMOOTH and SHAPED — no fabric digging into soft tissue, no visible underwear lines, no fabric pulling
 - Around the bottom edge of the bottoms / brief leg openings: the fabric sits FLAT and SMOOTH against the upper thigh, NOT cutting into the flesh, NOT creating a muffin-top
 
-The intended visual story: this is a real curvy woman, AND she looks visibly slimmer / more sculpted / more confident BECAUSE of the swimsuit. The swimsuit makes her body LOOK BETTER than it would without it. The customer sees the BEFORE (her real curves) and the AFTER (how the garment shapes them) in a single image.
+The visual story: ${reference_url ? "this is the EXACT woman from the reference image, and she looks visibly more sculpted / more confident because the swimsuit shapes her body. Her real curves stay; the garment's flattering effect is overlaid on top." : "this is a real curvy woman, AND she looks visibly slimmer / more sculpted / more confident BECAUSE of the swimsuit. The customer sees the BEFORE (her real curves) and the AFTER (how the garment shapes them) in a single image."}
 
 THE GARMENT IS THE HERO: the product must be CLEARLY VISIBLE and READABLE — the viewer should be able to identify the cut, color, neckline, strap style, waistband, ruching, twist details, and any other construction features in less than 2 seconds. The body supports the product, not the other way around.
 ━━━━━━━━━━━━━━━━━━━━━━━━
