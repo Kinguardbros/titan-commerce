@@ -287,7 +287,7 @@ Key patterns:
 | Table | Purpose |
 |-------|---------|
 | `stores` | Multi-store config: shopify_url, admin_token, storefront_token, client_secret (OAuth), currency, name, vendor, `brand_config` JSONB (payment_fees, transaction_fee_pct, logos, etc.) |
-| `products` | Shopify products (synced): handle, title, price, images JSONB, `tags` JSONB (= collection memberships, set by full sync only), `product_type`, `vendor`, `status` (active/archived), `cogs`, `has_size_chart`, `store_id` FK |
+| `products` | Shopify products (synced): handle, title, price, images JSONB, `tags` JSONB (= collection memberships, set by full sync only), `product_type`, `vendor`, `status` (active/archived), `cogs`, `has_size_chart`, `garment_length` (text, `'short' \| 'mid' \| 'long' \| NULL` — populated lazily by Claude Vision on the first v1 generation, cached forever), `store_id` FK |
 | `creatives` | Generated ad creatives (image/video): file_url, storage_path, format, status (generating/pending/approved/rejected/published/failed), `metadata` JSONB (style, audience, model, hook_used, poll info), `product_id`, `story_id`, `store_id` FK |
 | `store_skills` | Compiled per-store knowledge: `skill_type` (brand-voice, audience-personas, product-{slug}, custom-style-{slug}, ...), title, content, `metadata` JSONB. Used by `lib/claude.js` (brand voice) and `lib/higgsfield.js` (`cs_` custom styles). `UNIQUE(store_id, skill_type)`. |
 | `store_knowledge` | Raw extracted insights from uploaded store docs (category, insights, processed_at) — fallback when no compiled skill exists |

@@ -6,6 +6,7 @@ import { V5_PROMPT_BODY } from '../../lib/v5-prompt.js';
 import { V6_PROMPT_BODY } from '../../lib/v6-prompt.js';
 import { V7_PROMPT_BODY } from '../../lib/v7-prompt.js';
 import { V8_PROMPT_BODY_TEMPLATE, detectV8ColorClass, buildV8LightingBlock, buildV8DoNotBlock } from '../../lib/v8-prompt.js';
+import { detectGarmentLength } from '../../lib/garment-length-detector.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
@@ -108,7 +109,7 @@ async function handler(req, res) {
     const v3BeachKey = (custom_prompt || '').match(/\[catalog_beach:([^\]]+)\]/)?.[1]?.trim() || 'sunny';
     // Product Catalog framing → crop key for the avatar reference (full body → null = no crop)
     const catalogFramingLabel = (custom_prompt || '').match(/\[catalog_framing:([^\]]+)\]/)?.[1]?.trim();
-    const catalogFramingKey = isProductCatalog
+    let catalogFramingKey = isProductCatalog
       ? ({ '3/4 body': 'three-quarter', 'Waist up': 'waist-up', 'Detail crop': 'detail' }[catalogFramingLabel] || 'three-quarter')
       : null;
     // Auto-detect tummy-control / high-waist swimwear from the product title (waist sits above the navel)
@@ -139,6 +140,28 @@ async function handler(req, res) {
       : isBraProduct ? 'bra'
       : 'swimsuit';
     const isNonSwimGarment = !isSwimwearProduct && garmentDescriptor !== 'swimsuit';
+
+    // Vision-based garment-length detection for v1. Title keywords aren't reliable enough
+    // ('Lace-Up Floral Skirt Swim Set' falsely matches 'skirt' even though it's a bikini set).
+    // Classify the product image once and cache it on products.garment_length.
+    // 'short' / 'mid' → default above-knee crop (0.65); 'long' → disable crop + full-body framing.
+    let garmentLength = product.garment_length || null;
+    if (isProductCatalog && !garmentLength) {
+      const firstImg = (JSON.parse(product.images || '[]'))[0];
+      if (firstImg) {
+        garmentLength = await detectGarmentLength(firstImg);
+        if (garmentLength) {
+          console.log(`[generate] garment-length detected for ${product.handle}: ${garmentLength}`);
+          // Cache result so subsequent generations skip the Vision call.
+          await supabase.from('products').update({ garment_length: garmentLength }).eq('id', product.id);
+        }
+      }
+    }
+    // For long garments (maxi skirts, maxi dresses, full-length cover-ups): disable the
+    // post-process crop so the finished image keeps the full garment in frame.
+    if (isProductCatalog && garmentLength === 'long') {
+      catalogFramingKey = null;
+    }
 
     // HIGH-WAIST navel-hide block applies ONLY to swimwear (one-pieces, high-waist bikinis, tummy-control).
     // Previously: any Isola product → always inject. NEW: must also be swimwear product (avoid injecting
@@ -281,10 +304,15 @@ async function handler(req, res) {
       const isNonFullFraming = isThreeQuarter || isWaistUp || isDetailCrop;
       // Dedicated, bordered FRAMING block — the avatar reference may show the full body, so the
       // crop must be stated forcefully (the edit model otherwise reproduces the reference framing).
-      const framingBlock = isNonFullFraming
+      // When Vision flagged the garment as 'long' (maxi skirt, maxi dress, ankle-length cover-up),
+      // override into full-body framing so the entire product including the hem is visible.
+      const framingBlock = garmentLength === 'long'
+        ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe garment is LONG (extends to the knee, calf, or ankle). The final photo MUST show the ENTIRE garment from top to bottom hem, plus the model's feet on the sand. FULL BODY shot from the top of the head down to the feet, with a small margin of background above the head and below the feet. The garment's lowest hem (skirt edge, dress hem, cover-up bottom) MUST be fully visible inside the frame with breathing room below it — NEVER cropped, NEVER cut off. If you can see only part of the garment with its hem outside the frame, the crop is WRONG — zoom out further until the entire garment fits.\n━━━━━━━━━━━━━━━━━━━━━━━━`
+        : isNonFullFraming
         ? `\n\n━━━━━━━━━━━━━━━━━━━━━━━━\n=== FRAMING / CROP — THIS IS NOT OPTIONAL ===\nThe model reference image is already cropped to roughly this framing — keep that framing in the final image, do NOT zoom out, do NOT add her lower body back in. ${framingText} ${isThreeQuarter ? 'The BOTTOM EDGE of the final photo is at her mid-calf / just below the knee. Her feet are NOT in the photo. Her ankles are NOT in the photo. There is NO sand at her feet because her feet are below the frame. If you can see her feet or ankles, the crop is WRONG — crop tighter.' : isWaistUp ? 'The BOTTOM EDGE of the final photo is at her hip/waist. Her legs are NOT in the photo. If you can see her knees or feet, the crop is WRONG — crop tighter.' : 'This is a tight crop on the garment midsection ONLY — her head is NOT in the photo, her legs below the upper thigh are NOT in the photo. If you can see her face or her knees, the crop is WRONG — crop tighter.'}\n━━━━━━━━━━━━━━━━━━━━━━━━`
         : '';
-      const framingNegative = isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
+      const framingNegative = garmentLength === 'long' ? ', garment hem cut off, dress hem cropped at frame edge, skirt hem outside frame, partial garment visible, lower edge of garment extending below frame'
+        : isThreeQuarter ? ', full body shot, visible feet, visible ankles, full legs below the calf'
         : isWaistUp ? ', full body, full legs, visible knees, visible feet, visible ankles'
         : isDetailCrop ? ', full body, head visible, face visible, full legs, visible feet'
         : '';
