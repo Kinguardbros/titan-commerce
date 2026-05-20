@@ -12,15 +12,22 @@
 ALTER TABLE store_knowledge ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_skills ENABLE ROW LEVEL SECURITY;
 
+-- Postgres does NOT support "CREATE POLICY IF NOT EXISTS" (only CREATE TABLE / INDEX
+-- support IF NOT EXISTS). DROP POLICY IF EXISTS first to keep the migration idempotent.
 DO $$
 DECLARE
   tbl TEXT;
 BEGIN
   FOR tbl IN SELECT unnest(ARRAY['store_knowledge', 'store_skills'])
   LOOP
-    EXECUTE format('CREATE POLICY IF NOT EXISTS "auth_select_%s" ON %I FOR SELECT TO authenticated USING (true)', tbl, tbl);
-    EXECUTE format('CREATE POLICY IF NOT EXISTS "auth_insert_%s" ON %I FOR INSERT TO authenticated WITH CHECK (true)', tbl, tbl);
-    EXECUTE format('CREATE POLICY IF NOT EXISTS "auth_update_%s" ON %I FOR UPDATE TO authenticated USING (true)', tbl, tbl);
-    EXECUTE format('CREATE POLICY IF NOT EXISTS "auth_delete_%s" ON %I FOR DELETE TO authenticated USING (true)', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "auth_select_%s" ON %I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "auth_insert_%s" ON %I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "auth_update_%s" ON %I', tbl, tbl);
+    EXECUTE format('DROP POLICY IF EXISTS "auth_delete_%s" ON %I', tbl, tbl);
+
+    EXECUTE format('CREATE POLICY "auth_select_%s" ON %I FOR SELECT TO authenticated USING (true)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "auth_insert_%s" ON %I FOR INSERT TO authenticated WITH CHECK (true)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "auth_update_%s" ON %I FOR UPDATE TO authenticated USING (true)', tbl, tbl);
+    EXECUTE format('CREATE POLICY "auth_delete_%s" ON %I FOR DELETE TO authenticated USING (true)', tbl, tbl);
   END LOOP;
 END $$;
