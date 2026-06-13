@@ -126,10 +126,10 @@ Key patterns:
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
-- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `AGENT` (proposals)
+- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals)
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr
-- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~112 lines) → 56 actions across 16 modules in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
+- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~114 lines) → 63 actions across 17 modules in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
 
 ---
 
@@ -186,6 +186,7 @@ Key patterns:
 | `GeneratePanel.jsx` | Older creative gen panel (image + video modes) — still used in some flows |
 | `PhotoStoryModal.jsx` | Photo Story Studio — generates one of 3 multi-shot sets via `storyMode` toggle: BEACH (lifestyle, outdoor with `STORY_SHOTS`), STUDIO (clean white backdrop e-commerce angles with `STUDIO_SHOTS`), CELESTE (close-up studio with warm peach/cream backdrop, intimate apparel style with `CELESTE_SHOTS`). Prompts in `lib/photo-story-prompts.js` |
 | `OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
+| `ReviewsPanel.jsx` + `ReviewDetail.jsx` | Product reviews manager modal (opened from ProductWorkspace topbar): summary header, reviews table, editable detail panel (`ReviewDetail`). Phase 1 = manual add/edit/approve/reject/delete + verified toggle + photo_url preview. No CSV/AI import, photo upload, or Shopify push yet (later phases). |
 | `ImportModal.jsx` | 4-step product import wizard (scrape URL → preview → import → done); collection URLs scrape multiple products |
 | `SizeChartEditor.jsx` | Size chart: read/edit/import from image (Claude Vision) → Shopify metafield |
 | `ProductDetail.jsx` | Full product detail + inline editor (all Shopify fields) — lazy-loaded |
@@ -253,8 +254,9 @@ Key patterns:
 | `avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
 | `sync.js` | `sync_products` — full Shopify product + collections sync (collections via GraphQL Admin API) |
 | `webhooks.js` | `register_webhooks`, `list_webhooks`, `unregister_webhooks` |
+| `reviews.js` | `product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status` — manual product reviews (Phase 1; no outbound push yet) |
 | **API endpoints** (`api/`) — 12 routes (Vercel Hobby limit) | |
-| `system.js` | Thin router (~112 lines) — delegates 56 actions to 16 modules in `lib/actions/` |
+| `system.js` | Thin router (~114 lines) — delegates 63 actions to 17 modules in `lib/actions/` |
 | `auth/login.js` | Password authentication → session token |
 | `auth/shopify.js` | Shopify OAuth callback (HMAC is **hex** here — not base64 like webhooks) |
 | `creatives/generate.js` | Generate image creative (routes by `ai_model` → fal.ai Nano Banana / FLUX / Ideogram, or Higgsfield Soul/Flux Kontext). Contains the standalone **Product Catalog v1 / v2 / v3 / v4 / v5 / v6 / v7** and **Realistic Beach** prompt blocks. v4 + v5 + v6 + v7 import their respective `V4_PROMPT_BODY` / `V5_PROMPT_BODY` / `V6_PROMPT_BODY` / `V7_PROMPT_BODY` and wrap them with reference-roles prefix + product title + conditional HIGH-WAIST navel-hide block. ⚠️ large file, churned heavily — read git history before changing. |
@@ -295,6 +297,7 @@ Key patterns:
 | `store_knowledge` | Raw extracted insights from uploaded store docs (category, insights, processed_at) — fallback when no compiled skill exists |
 | `persona_avatars` | Per-persona reference images for model consistency: persona_name, label, age, description, reference_url, `variants` JSONB, is_active. `UNIQUE(store_id, persona_name)`. |
 | `product_optimizations` | AI optimization proposals: pending/approved/rejected with `original` + `optimized` JSONB |
+| `product_reviews` | Per-product reviews: author, rating (1–5 CHECK), title, body, `photo_url`, `verified`, `review_date`, `source` (manual/csv/ai), `status` (pending/approved/published/rejected), `dirty` (published+edited → awaits re-push), `store_id` + `product_id` FK (product CASCADE). RLS: authenticated SELECT, service-role writes. Phase 1 = manual dashboard entry only. |
 | `events` | Detected events (product_no_creatives, revenue_declining, winner_detected) |
 | `proposals` | Actionable proposals from events: pending/approved/dismissed |
 | `pipeline_log` | All agent/system activity (agent, message, level, metadata, `store_id`) |
@@ -486,6 +489,7 @@ Dashboard → Password gate (Login.jsx)
     │       ├── [+ Image] / [▶ Video] → CreativeStudio → fal.ai / Higgsfield
     │       ├── [✨ Optimize] → OptimizePanel → Claude AI → approval workflow
     │       ├── [Photo Story] → PhotoStoryModal → clean white-studio shot set
+    │       ├── [Reviews] → ReviewsPanel (modal) → manual add/edit/approve/reject/delete reviews (Phase 1, no push)
     │       ├── [Studio →] → navigates to Studio with product pre-selected
     │       ├── Creative grid by style → CreativeDetailModal review
     │       ├── Size Chart (read/edit table + import from image via Claude Vision → Shopify metafield)

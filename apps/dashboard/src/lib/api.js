@@ -493,3 +493,24 @@ export function unregisterWebhooks(storeId) {
     body: JSON.stringify({ store_id: storeId }),
   });
 }
+
+// Product Reviews (Phase 1)
+export function getProductReviews(productId, storeId) {
+  return fetchJSON(`/api/system?action=product_reviews_list&product_id=${productId}&store_id=${storeId}`);
+}
+
+export function addReviewManual(payload) {
+  return fetchJSON('/api/system?action=add_review_manual', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function updateReview(payload) {
+  return fetchJSON('/api/system?action=update_review', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function deleteReview(id) {
+  return fetchJSON('/api/system?action=delete_review', { method: 'POST', body: JSON.stringify({ id }) });
+}
+
+export function setReviewStatus(ids, status) {
+  return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status }) });
+}

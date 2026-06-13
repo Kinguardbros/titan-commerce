@@ -17,6 +17,7 @@ import { update_cogs, manual_adspend } from '../lib/actions/pricing.js';
 import { persona_avatars, generate_avatar, poll_avatar_generations, upload_avatar, set_avatar_reference, set_avatar_active, delete_avatar } from '../lib/actions/avatars.js';
 import { sync_products } from '../lib/actions/sync.js';
 import { register_webhooks, list_webhooks, unregister_webhooks } from '../lib/actions/webhooks.js';
+import { product_reviews_list, add_review_manual, update_review, delete_review, set_review_status } from '../lib/actions/reviews.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -38,6 +39,7 @@ const GET_ACTIONS = {
   poll_avatar_generations,
   list_webhooks,
   poll_generations,
+  product_reviews_list,
 };
 
 const POST_ACTIONS = {
@@ -80,6 +82,10 @@ const POST_ACTIONS = {
   sync_products,
   register_webhooks,
   unregister_webhooks,
+  add_review_manual,
+  update_review,
+  delete_review,
+  set_review_status,
 };
 
 async function handler(req, res) {
