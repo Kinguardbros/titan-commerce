@@ -1,8 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import ReviewDetail from './ReviewDetail';
 import './ReviewsPanel.css';
+
+// Lazy — pulls in the xlsx parser only when the import modal is actually opened.
+const ImportReviews = lazy(() => import('./ImportReviews'));
 
 const STATUS_BADGE = {
   pending: 'rv-badge--pending',
@@ -32,6 +35,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
   const [selected, setSelected] = useState(null); // review object being edited
   const [adding, setAdding] = useState(false);     // new manual review form open
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false); // import sub-modal open
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -113,6 +117,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
               <span className="rv-summary-avg">★ {summary.average || '—'}</span>
               <span className="rv-summary-count">{summary.count} review{summary.count === 1 ? '' : 's'}</span>
             </div>
+            <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
           </div>
         </div>
@@ -174,6 +179,17 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
             />
           )}
         </div>
+
+        {importing && (
+          <Suspense fallback={null}>
+            <ImportReviews
+              storeId={storeId}
+              productId={product.id}
+              onClose={() => setImporting(false)}
+              onImported={fetchReviews}
+            />
+          </Suspense>
+        )}
       </div>
     </div>
   );

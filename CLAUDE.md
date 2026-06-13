@@ -128,15 +128,15 @@ Key patterns:
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
 - Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals)
 - Shopify writes: always log to pipeline_log before and after
-- Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr
-- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~114 lines) → 63 actions across 17 modules in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
+- Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr, import_reviews_csv 20/hr
+- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~114 lines) → 64 actions across 17 modules in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
 
 ---
 
 ## Don't Rules
 
 1. **Don't push to Shopify without approval** — Product Optimizer saves to DB as `pending`, only `approve_optimization` writes to Shopify. (Product *import* and the inline Product Editor write directly — different flows.)
-2. **Don't install new dependencies** without asking first
+2. **Don't install new dependencies** without asking first (approved exceptions: frontend `xlsx`/SheetJS for parsing review imports in-browser — keeps the backend dependency-free)
 3. **Don't use chart libraries** — CSS bars for all charts
 4. **Don't hardcode store-specific data** — all store data from `stores` table, brand voice from `store_skills`
 5. **Don't make files longer than ~300 lines** — extract hooks, utils, sub-components (several files already exceed this; flag, don't silently fix)
@@ -186,7 +186,7 @@ Key patterns:
 | `GeneratePanel.jsx` | Older creative gen panel (image + video modes) — still used in some flows |
 | `PhotoStoryModal.jsx` | Photo Story Studio — generates one of 3 multi-shot sets via `storyMode` toggle: BEACH (lifestyle, outdoor with `STORY_SHOTS`), STUDIO (clean white backdrop e-commerce angles with `STUDIO_SHOTS`), CELESTE (close-up studio with warm peach/cream backdrop, intimate apparel style with `CELESTE_SHOTS`). Prompts in `lib/photo-story-prompts.js` |
 | `OptimizePanel.jsx` | Product optimizer: AI rewrite review + approve/reject/save draft |
-| `ReviewsPanel.jsx` + `ReviewDetail.jsx` | Product reviews manager modal (opened from ProductWorkspace topbar): summary header, reviews table, editable detail panel (`ReviewDetail`). Phase 1 = manual add/edit/approve/reject/delete + verified toggle + photo_url preview. No CSV/AI import, photo upload, or Shopify push yet (later phases). |
+| `ReviewsPanel.jsx` + `ReviewDetail.jsx` + `ImportReviews.jsx` | Product reviews manager modal (opened from ProductWorkspace topbar): summary header, reviews table, editable detail panel (`ReviewDetail`). Phase 1 = manual add/edit/approve/reject/delete + verified toggle + photo_url preview. Phase 3 = **Import** button → `ImportReviews` sub-modal (paste CSV, upload .csv/.xlsx parsed in-browser via `xlsx`/SheetJS, or paste a Google Sheets link) → rows import as `pending`. `ImportReviews` is `React.lazy` so xlsx loads only when import is opened. No AI generation, photo upload, or Shopify push yet (later phases). |
 | `ImportModal.jsx` | 4-step product import wizard (scrape URL → preview → import → done); collection URLs scrape multiple products |
 | `SizeChartEditor.jsx` | Size chart: read/edit/import from image (Claude Vision) → Shopify metafield |
 | `ProductDetail.jsx` | Full product detail + inline editor (all Shopify fields) — lazy-loaded |
@@ -254,9 +254,9 @@ Key patterns:
 | `avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
 | `sync.js` | `sync_products` — full Shopify product + collections sync (collections via GraphQL Admin API) |
 | `webhooks.js` | `register_webhooks`, `list_webhooks`, `unregister_webhooks` |
-| `reviews.js` | `product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status` — manual product reviews (Phase 1; no outbound push yet) |
+| `reviews.js` | `product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status` (Phase 1 manual) + `import_reviews_csv` (Phase 3 bulk: own CSV parser, or fetches a Google Sheets CSV export server-side; all rows insert as `pending`/`source='csv'`, rate-limited 20/hr). No outbound push yet. |
 | **API endpoints** (`api/`) — 12 routes (Vercel Hobby limit) | |
-| `system.js` | Thin router (~114 lines) — delegates 63 actions to 17 modules in `lib/actions/` |
+| `system.js` | Thin router (~114 lines) — delegates 64 actions to 17 modules in `lib/actions/` |
 | `auth/login.js` | Password authentication → session token |
 | `auth/shopify.js` | Shopify OAuth callback (HMAC is **hex** here — not base64 like webhooks) |
 | `creatives/generate.js` | Generate image creative (routes by `ai_model` → fal.ai Nano Banana / FLUX / Ideogram, or Higgsfield Soul/Flux Kontext). Contains the standalone **Product Catalog v1 / v2 / v3 / v4 / v5 / v6 / v7** and **Realistic Beach** prompt blocks. v4 + v5 + v6 + v7 import their respective `V4_PROMPT_BODY` / `V5_PROMPT_BODY` / `V6_PROMPT_BODY` / `V7_PROMPT_BODY` and wrap them with reference-roles prefix + product title + conditional HIGH-WAIST navel-hide block. ⚠️ large file, churned heavily — read git history before changing. |
@@ -367,6 +367,7 @@ Root `package.json` (backend / serverless):
 - `vite` ^8 + `@vitejs/plugin-react`
 - `dompurify` — safe HTML rendering
 - `lucide-react` — icons
+- `xlsx` (SheetJS) — parse uploaded .xlsx/.csv review imports in-browser (Phase 3 reviews import); lazy-loaded so it only ships when the import modal opens
 - `@supabase/supabase-js` — realtime
 - `eslint` + react hooks/refresh plugins
 
@@ -489,7 +490,7 @@ Dashboard → Password gate (Login.jsx)
     │       ├── [+ Image] / [▶ Video] → CreativeStudio → fal.ai / Higgsfield
     │       ├── [✨ Optimize] → OptimizePanel → Claude AI → approval workflow
     │       ├── [Photo Story] → PhotoStoryModal → clean white-studio shot set
-    │       ├── [Reviews] → ReviewsPanel (modal) → manual add/edit/approve/reject/delete reviews (Phase 1, no push)
+    │       ├── [Reviews] → ReviewsPanel (modal) → manual add/edit/approve/reject/delete reviews + [Import] (CSV paste / .csv·.xlsx upload / Google Sheets link → pending). No push yet.
     │       ├── [Studio →] → navigates to Studio with product pre-selected
     │       ├── Creative grid by style → CreativeDetailModal review
     │       ├── Size Chart (read/edit table + import from image via Claude Vision → Shopify metafield)

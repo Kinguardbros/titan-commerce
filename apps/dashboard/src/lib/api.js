@@ -514,3 +514,11 @@ export function deleteReview(id) {
 export function setReviewStatus(ids, status) {
   return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status }) });
 }
+
+// Bulk import (Phase 3) — pass either { csv } (paste / parsed file) or { sheet_url } (Google Sheets).
+export function importReviewsCsv(storeId, productId, payload) {
+  return fetchJSON('/api/system?action=import_reviews_csv', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, ...payload }),
+  });
+}
