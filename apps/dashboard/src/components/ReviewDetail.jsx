@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { uploadReviewPhoto } from '../lib/api';
+import { useToast } from '../hooks/useToast.jsx';
 
 const EMPTY = { author: '', rating: 5, title: '', body: '', review_date: '', photo_url: '', verified: false };
 
 // Right-side detail panel — edit an existing review or fill in a new manual one.
-// Photo is preview-only in F1 (upload arrives in F4); the verified toggle persists now.
-export default function ReviewDetail({ review, isNew, saving, onSave, onApprove, onReject, onDelete, onClose }) {
+// Photo upload (Phase 4) stores to Supabase Storage and sets photo_url on the form.
+export default function ReviewDetail({ review, isNew, saving, storeId, productId, onSave, onApprove, onReject, onDelete, onClose }) {
+  const toast = useToast();
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState(() => ({
     author: review?.author || '',
     rating: review?.rating || 5,
@@ -17,6 +22,28 @@ export default function ReviewDetail({ review, isNew, saving, onSave, onApprove,
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const canSave = form.author.trim() && form.body.trim();
+
+  const handlePhoto = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onerror = () => toast.error('Could not read image');
+    reader.onload = async () => {
+      const base64 = String(reader.result).split(',')[1];
+      setUploading(true);
+      try {
+        const { photo_url } = await uploadReviewPhoto(storeId, productId, base64, file.type);
+        set('photo_url', photo_url);
+        toast.success('Photo uploaded');
+      } catch (err) {
+        console.error('[ReviewDetail] photo upload failed:', err);
+        toast.error(`Upload failed: ${err.message}`);
+      } finally {
+        setUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="rv-detail">
@@ -58,13 +85,22 @@ export default function ReviewDetail({ review, isNew, saving, onSave, onApprove,
         </label>
 
         <label className="rv-field-label">Photo</label>
-        {form.photo_url ? (
+        {form.photo_url && (
           <div className="rv-photo-preview">
             <img src={form.photo_url} alt="Review" />
           </div>
-        ) : (
-          <div className="rv-photo-empty">No photo — upload arrives in a later phase</div>
         )}
+        <div className="rv-photo-controls">
+          <button type="button" className="rv-btn rv-photo-btn" disabled={uploading}
+            onClick={() => fileRef.current?.click()}>
+            {uploading ? 'Uploading…' : form.photo_url ? 'Replace photo' : 'Upload photo'}
+          </button>
+          {form.photo_url && (
+            <button type="button" className="rv-btn rv-photo-btn rv-photo-btn--remove"
+              onClick={() => set('photo_url', '')}>Remove</button>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" hidden onChange={handlePhoto} />
+        </div>
       </div>
 
       <div className="rv-detail-actions">
