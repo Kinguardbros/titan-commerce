@@ -6,6 +6,7 @@ import CreativeEditor from '../components/CreativeEditor';
 import CreativeDetailModal, { mapCreativeToModalData } from '../components/CreativeDetailModal';
 import OptimizePanel from '../components/OptimizePanel';
 import PhotoStoryModal from '../components/PhotoStoryModal';
+import ReviewsPanel from '../components/ReviewsPanel';
 import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShopify, pollGenerations } from '../lib/api';
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
@@ -36,6 +37,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   const [editingCreative, setEditingCreative] = useState(null);
   const [showOptimize, setShowOptimize] = useState(false);
   const [showPhotoStory, setShowPhotoStory] = useState(false);
+  const [showReviews, setShowReviews] = useState(false);
   const [detailKey, setDetailKey] = useState(0);
   const [lightbox, setLightbox] = useState(null); // { images: string[], index: number }
 
@@ -114,6 +116,7 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           <button className="pw-action-btn pw-action-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
           <button className="pw-action-btn pw-action-btn--story" onClick={() => setShowPhotoStory(true)}>Photo Story</button>
           <button className="pw-action-btn pw-action-btn--optimize" onClick={() => setShowOptimize(true)}>Optimize</button>
+          <button className="pw-action-btn pw-action-btn--reviews" onClick={() => setShowReviews(true)}>Reviews</button>
           {onNavigateToStudio && (
             <button className="pw-action-btn pw-action-btn--muted" onClick={() => onNavigateToStudio(product.id)}>Studio</button>
           )}
@@ -269,6 +272,9 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           onClose={() => setShowPhotoStory(false)}
           onCompleted={() => { setShowPhotoStory(false); fetchCreatives(); }}
         />
+      )}
+      {showReviews && (
+        <ReviewsPanel product={product} storeId={storeId} store={store} onClose={() => setShowReviews(false)} />
       )}
 
       {/* Lightbox for Shopify images */}
