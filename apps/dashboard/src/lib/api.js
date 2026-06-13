@@ -522,3 +522,19 @@ export function importReviewsCsv(storeId, productId, payload) {
     body: JSON.stringify({ store_id: storeId, product_id: productId, ...payload }),
   });
 }
+
+// Photo upload (Phase 4) — returns { photo_url }; caller persists it via update/add.
+export function uploadReviewPhoto(storeId, productId, base64, mediaType) {
+  return fetchJSON('/api/system?action=upload_review_photo', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, base64, media_type: mediaType }),
+  });
+}
+
+// AI generation (Phase 4) — count 1–10, tone 'positive' | 'mix' → inserts pending reviews.
+export function generateReviewsAi(storeId, productId, count, tone) {
+  return fetchJSON('/api/system?action=generate_reviews_ai', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, count, tone }),
+  });
+}

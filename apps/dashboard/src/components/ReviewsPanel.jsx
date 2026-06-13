@@ -6,6 +6,7 @@ import './ReviewsPanel.css';
 
 // Lazy — pulls in the xlsx parser only when the import modal is actually opened.
 const ImportReviews = lazy(() => import('./ImportReviews'));
+const GenerateReviews = lazy(() => import('./GenerateReviews'));
 
 const STATUS_BADGE = {
   pending: 'rv-badge--pending',
@@ -36,6 +37,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
   const [adding, setAdding] = useState(false);     // new manual review form open
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false); // import sub-modal open
+  const [generating, setGenerating] = useState(false); // AI generate dialog open
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -117,6 +119,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
               <span className="rv-summary-avg">★ {summary.average || '—'}</span>
               <span className="rv-summary-count">{summary.count} review{summary.count === 1 ? '' : 's'}</span>
             </div>
+            <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
           </div>
@@ -133,6 +136,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
               <table className="rv-table">
                 <thead>
                   <tr>
+                    <th>Photo</th>
                     <th>Author</th>
                     <th>Rating</th>
                     <th>Title</th>
@@ -145,6 +149,11 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
                   {reviews.map((r) => (
                     <tr key={r.id} className={`rv-row${selected?.id === r.id ? ' rv-row--active' : ''}`}
                       onClick={() => { setAdding(false); setSelected(r); }}>
+                      <td className="rv-cell-photo">
+                        {r.photo_url
+                          ? <img className="rv-thumb" src={r.photo_url} alt="" />
+                          : <span className="rv-thumb-empty">—</span>}
+                      </td>
                       <td>
                         <span className="rv-author">{r.author}</span>
                         {r.verified && <span className="rv-verified" title="Verified purchase">✓</span>}
@@ -171,6 +180,8 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
               review={adding ? null : selected}
               isNew={adding}
               saving={saving}
+              storeId={storeId}
+              productId={product.id}
               onSave={handleSave}
               onApprove={() => handleStatus(selected.id, 'approved')}
               onReject={() => handleStatus(selected.id, 'rejected')}
@@ -187,6 +198,16 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
               productId={product.id}
               onClose={() => setImporting(false)}
               onImported={fetchReviews}
+            />
+          </Suspense>
+        )}
+        {generating && (
+          <Suspense fallback={null}>
+            <GenerateReviews
+              storeId={storeId}
+              productId={product.id}
+              onClose={() => setGenerating(false)}
+              onGenerated={fetchReviews}
             />
           </Suspense>
         )}

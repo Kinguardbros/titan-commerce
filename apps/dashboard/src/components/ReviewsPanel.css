@@ -200,6 +200,39 @@
 .rv-import-row .rv-input { flex: 1; }
 .rv-import-actions { border-top: none; padding: 18px 0 0; justify-content: flex-end; }
 
+/* Photo thumbnail (table) */
+.rv-cell-photo { width: 48px; }
+.rv-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid var(--edge); display: block; }
+.rv-thumb-empty { color: var(--text4); font-size: 12px; }
+
+/* Photo controls (detail panel) */
+.rv-photo-controls { display: flex; gap: 8px; margin-top: 8px; }
+.rv-photo-btn { padding: 8px 12px; }
+.rv-photo-btn--remove { color: var(--text4); }
+.rv-photo-btn--remove:hover { color: var(--coral, #EF4444); border-color: rgba(239,68,68,.3); }
+
+/* Generate (AI) dialog */
+.rv-gen-modal { width: 460px; }
+.rv-gen-pills { display: flex; gap: 8px; }
+.rv-gen-pill {
+  flex: 1; background: var(--surface); border: 1px solid var(--edge); color: var(--text);
+  font-family: var(--mono); font-size: 13px; padding: 10px; border-radius: 8px; cursor: pointer; transition: all .2s;
+}
+.rv-gen-pill--on { background: var(--gold); border-color: var(--gold); color: var(--void); }
+.rv-gen-tone { display: flex; flex-direction: column; gap: 8px; }
+.rv-gen-radio {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--edge); border-radius: 8px; padding: 11px 12px;
+  font-family: var(--sans); font-size: 12px; color: var(--text3); transition: all .2s;
+}
+.rv-gen-radio--on { border-color: var(--gold); color: var(--text); }
+.rv-gen-radio input { accent-color: var(--gold); }
+.rv-gen-radio strong { color: var(--text); }
+.rv-gen-note {
+  font-family: var(--mono); font-size: 9px; color: var(--text4); line-height: 1.5;
+  margin-top: 14px; padding: 10px 12px; background: var(--surface); border-radius: 8px;
+}
+
 @media (max-width: 720px) {
   .rv-content { flex-direction: column; }
   .rv-table-wrap--narrow { flex: none; max-height: 30vh; }
