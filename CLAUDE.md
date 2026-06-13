@@ -129,7 +129,7 @@ Key patterns:
 - Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals)
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr, import_reviews_csv 20/hr, generate_reviews 20/hr
-- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~114 lines) → 66 actions across 17 modules in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
+- Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~114 lines) → 66 actions across 21 files in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
 
 ---
 
@@ -254,9 +254,9 @@ Key patterns:
 | `avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
 | `sync.js` | `sync_products` — full Shopify product + collections sync (collections via GraphQL Admin API) |
 | `webhooks.js` | `register_webhooks`, `list_webhooks`, `unregister_webhooks` |
-| `reviews.js` | `product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status` (Phase 1 manual) + `import_reviews_csv` (Phase 3 bulk: own CSV parser, or fetches a Google Sheets CSV export server-side; `pending`/`source='csv'`, rate-limited 20/hr) + `upload_review_photo` (Phase 4: base64 → Supabase Storage `store-docs` `{store}/Reviews/{productId}/`, returns `photo_url`) + `generate_reviews_ai` (Phase 4: Claude `claude-sonnet-4` writes N reviews from product title/desc; `tone` positive/mix; `pending`/`source='ai'`, rate-limited 20/hr; **own prompt, NOT in claude.js**). No outbound push yet. ⚠️ ~350 lines — flagged for future split. |
+| `reviews*.js` | Product reviews, split across 4 modules sharing `reviews-shared.js` (service-role client + `computeSummary`): **`reviews.js`** = Phase 1 core (`product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status` — every query filters `store_id` + `product_id`, so each product gets only its own reviews). **`reviews-import.js`** = `import_reviews_csv` (Phase 3 bulk: own CSV parser, or fetches a Google Sheets CSV export server-side; `pending`/`source='csv'`, rate-limited 20/hr). **`reviews-ai.js`** = `generate_reviews_ai` (Phase 4: Claude `claude-sonnet-4` writes N reviews from product title/desc; `tone` positive/mix; `pending`/`source='ai'`, 20/hr; **own prompt, NOT in claude.js**). **`reviews-photo.js`** = `upload_review_photo` (Phase 4: base64 → Supabase Storage `store-docs` `{store}/Reviews/{productId}/`, returns `photo_url`). No outbound push yet. |
 | **API endpoints** (`api/`) — 12 routes (Vercel Hobby limit) | |
-| `system.js` | Thin router (~114 lines) — delegates 66 actions to 17 modules in `lib/actions/` |
+| `system.js` | Thin router (~114 lines) — delegates 66 actions to 21 files in `lib/actions/` |
 | `auth/login.js` | Password authentication → session token |
 | `auth/shopify.js` | Shopify OAuth callback (HMAC is **hex** here — not base64 like webhooks) |
 | `creatives/generate.js` | Generate image creative (routes by `ai_model` → fal.ai Nano Banana / FLUX / Ideogram, or Higgsfield Soul/Flux Kontext). Contains the standalone **Product Catalog v1 / v2 / v3 / v4 / v5 / v6 / v7** and **Realistic Beach** prompt blocks. v4 + v5 + v6 + v7 import their respective `V4_PROMPT_BODY` / `V5_PROMPT_BODY` / `V6_PROMPT_BODY` / `V7_PROMPT_BODY` and wrap them with reference-roles prefix + product title + conditional HIGH-WAIST navel-hide block. ⚠️ large file, churned heavily — read git history before changing. |
