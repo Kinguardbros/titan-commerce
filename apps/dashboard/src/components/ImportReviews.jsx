@@ -7,6 +7,26 @@ const CSV_EXAMPLE = `author,rating,title,body,date,photo_url,verified
 Maria,5,"Perfect fit","True to size, super comfortable",2024-06-10,,1
 Jane,4,"Nice quality","Good material, runs a bit big",2024-06-08,,`;
 
+// Downloadable template: header + example rows covering every column variant
+// (with/without photo_url, verified true/blank, quoted fields with commas).
+const CSV_TEMPLATE = `author,rating,title,body,date,photo_url,verified
+Maria K.,5,"Perfect fit","True to size and super comfortable, the shaping is amazing.",2024-06-10,https://example.com/photo.jpg,1
+Jane D.,4,"Nice quality","Good material, runs a bit big.",2024-06-08,,
+Sophie M.,5,,"Exactly as pictured and ships fast.",2024-06-02,,1`;
+
+// Trigger a client-side download of the CSV template (no backend, no dependency).
+function downloadTemplate() {
+  const blob = new Blob([CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'reviews-template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // Convert a .xlsx/.csv File into a CSV string in the browser (xlsx = SheetJS).
 // Keeps the backend dependency-free — it only ever receives CSV text.
 function fileToCsv(file) {
@@ -76,6 +96,11 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
         <button className="rv-close" aria-label="Close" onClick={onClose}>✕</button>
         <div className="rv-title">Import Reviews</div>
         <div className="rv-import-sub">Rows import as <strong>pending</strong> — review &amp; approve them after.</div>
+
+        <div className="rv-import-template">
+          <span>New here? Grab the format:</span>
+          <button type="button" className="rv-template-btn" onClick={downloadTemplate}>↓ Download CSV template</button>
+        </div>
 
         <label className="rv-field-label">Paste CSV</label>
         <textarea className="rv-textarea rv-import-textarea" rows={6}
