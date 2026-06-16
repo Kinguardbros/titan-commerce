@@ -538,3 +538,11 @@ export function generateReviewsAi(storeId, productId, count, tone) {
     body: JSON.stringify({ store_id: storeId, product_id: productId, count, tone }),
   });
 }
+
+// Push (Phase 2) — rebuild approved+published reviews into Shopify metafields.
+export function pushReviewsToShopify(storeId, productId) {
+  return fetchJSON('/api/system?action=push_reviews_to_shopify', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId }),
+  });
+}
