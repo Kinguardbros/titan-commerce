@@ -63,7 +63,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
         await addReviewManual({ store_id: storeId, product_id: product.id, ...form });
         toast.success('Review added');
       } else {
-        await updateReview({ id: selected.id, ...form });
+        await updateReview({ id: selected.id, store_id: storeId, ...form });
         toast.success('Review saved');
       }
       closeDetail();
@@ -78,7 +78,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
 
   const handleStatus = async (id, status) => {
     try {
-      await setReviewStatus([id], status);
+      await setReviewStatus([id], status, storeId);
       toast.success(`Review ${status}`);
       closeDetail();
       await fetchReviews();
@@ -90,7 +90,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
 
   const handleDelete = async (id) => {
     try {
-      await deleteReview(id);
+      await deleteReview(id, storeId);
       toast.success('Review deleted');
       closeDetail();
       await fetchReviews();

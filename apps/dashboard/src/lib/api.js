@@ -507,12 +507,12 @@ export function updateReview(payload) {
   return fetchJSON('/api/system?action=update_review', { method: 'POST', body: JSON.stringify(payload) });
 }
 
-export function deleteReview(id) {
-  return fetchJSON('/api/system?action=delete_review', { method: 'POST', body: JSON.stringify({ id }) });
+export function deleteReview(id, storeId) {
+  return fetchJSON('/api/system?action=delete_review', { method: 'POST', body: JSON.stringify({ id, store_id: storeId }) });
 }
 
-export function setReviewStatus(ids, status) {
-  return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status }) });
+export function setReviewStatus(ids, status, storeId) {
+  return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status, store_id: storeId }) });
 }
 
 // Bulk import (Phase 3) — pass either { csv } (paste / parsed file) or { sheet_url } (Google Sheets).
