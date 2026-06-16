@@ -77,8 +77,9 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
     if (!sheetUrl.trim() && !csv.trim()) { toast.error('Paste CSV, upload a file, or add a Sheets URL'); return; }
     setBusy(true);
     try {
-      const { inserted, skipped } = await importReviewsCsv(storeId, productId, payload);
-      toast.success(`Imported ${inserted} review${inserted === 1 ? '' : 's'}${skipped ? ` · ${skipped} skipped` : ''}`);
+      const { inserted, skipped, duplicates } = await importReviewsCsv(storeId, productId, payload);
+      const extra = [skipped ? `${skipped} skipped` : '', duplicates ? `${duplicates} duplicate` : ''].filter(Boolean).join(' · ');
+      toast.success(`Imported ${inserted} review${inserted === 1 ? '' : 's'}${extra ? ` · ${extra}` : ''}`);
       onImported();
       onClose();
     } catch (err) {
