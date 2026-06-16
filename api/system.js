@@ -21,6 +21,7 @@ import { product_reviews_list, add_review_manual, update_review, delete_review, 
 import { import_reviews_csv } from '../lib/actions/reviews-import.js';
 import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo } from '../lib/actions/reviews-photo.js';
+import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -92,6 +93,7 @@ const POST_ACTIONS = {
   import_reviews_csv,
   upload_review_photo,
   generate_reviews_ai,
+  push_reviews_to_shopify,
 };
 
 async function handler(req, res) {

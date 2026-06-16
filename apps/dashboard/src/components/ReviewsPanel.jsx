@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus } from '../lib/api';
+import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus, pushReviewsToShopify } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import ReviewDetail from './ReviewDetail';
 import './ReviewsPanel.css';
@@ -25,10 +25,9 @@ function Stars({ rating }) {
   );
 }
 
-// Phase 1 reviews manager — modal opened from the ProductWorkspace topbar.
-// Manual add / edit / approve / reject / delete. No outbound push (that's F2).
-// `store` is passed by ProductWorkspace and consumed in F2 (Push-to-Shopify admin gate); unused in F1.
-export default function ReviewsPanel({ product, storeId, onClose }) {
+// Reviews manager — modal opened from the ProductWorkspace topbar.
+// Manual/import/AI entry + approval, plus Push to Shopify (F2) when the store has admin access.
+export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const toast = useToast();
   const [reviews, setReviews] = useState([]);
   const [summary, setSummary] = useState({ count: 0, average: 0 });
@@ -38,6 +37,7 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false); // import sub-modal open
   const [generating, setGenerating] = useState(false); // AI generate dialog open
+  const [pushing, setPushing] = useState(false);   // push-to-Shopify in flight
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -100,6 +100,24 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
     }
   };
 
+  // Reviews awaiting (re-)push: approved-but-not-yet-published, or published-then-edited (dirty).
+  const pendingPush = reviews.filter((r) => r.status === 'approved' || r.dirty).length;
+  const canPush = !!store?.has_admin;
+
+  const handlePush = async () => {
+    setPushing(true);
+    try {
+      const { count, average } = await pushReviewsToShopify(storeId, product.id);
+      toast.success(`Pushed ${count} review${count === 1 ? '' : 's'} (★ ${average}) to Shopify`);
+      await fetchReviews();
+    } catch (err) {
+      console.error('[ReviewsPanel] push failed:', err);
+      toast.error(`Push failed: ${err.message}`);
+    } finally {
+      setPushing(false);
+    }
+  };
+
   const detailOpen = adding || selected;
 
   return (
@@ -122,6 +140,12 @@ export default function ReviewsPanel({ product, storeId, onClose }) {
             <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
+            {canPush && (
+              <button className="rv-push-btn" onClick={handlePush} disabled={pushing}>
+                {pushing ? 'Pushing…' : 'Push to Shopify'}
+                {!pushing && pendingPush > 0 && <span className="rv-push-badge">{pendingPush}</span>}
+              </button>
+            )}
           </div>
         </div>
 
