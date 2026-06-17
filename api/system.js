@@ -100,9 +100,15 @@ const POST_ACTIONS = {
 
 // Actions callable cross-origin from the storefront need CORS headers.
 const CORS_ACTIONS = new Set(['submit_review_public']);
+// Allowed storefront origins (live custom domain + Shopify domain for theme previews).
+// STOREFRONT_URL env can hold a comma-separated list to override/extend.
+const ALLOWED_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
+  .split(',').map((o) => o.trim()).filter(Boolean);
 function applyCors(req, res) {
-  const origin = process.env.STOREFRONT_URL || '*';
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  const origin = req.headers.origin;
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  res.setHeader('Access-Control-Allow-Origin', allow);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
