@@ -22,6 +22,7 @@ import { import_reviews_csv } from '../lib/actions/reviews-import.js';
 import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo } from '../lib/actions/reviews-photo.js';
 import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
+import { submit_review_public } from '../lib/actions/reviews-public.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -86,6 +87,7 @@ const POST_ACTIONS = {
   sync_products,
   register_webhooks,
   unregister_webhooks,
+  submit_review_public,
   add_review_manual,
   update_review,
   delete_review,
@@ -96,8 +98,31 @@ const POST_ACTIONS = {
   push_reviews_to_shopify,
 };
 
+// Actions callable cross-origin from the storefront need CORS headers.
+const CORS_ACTIONS = new Set(['submit_review_public']);
+// Allowed storefront origins (live custom domain + Shopify domain for theme previews).
+// STOREFRONT_URL env can hold a comma-separated list to override/extend.
+const ALLOWED_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
+  .split(',').map((o) => o.trim()).filter(Boolean);
+function applyCors(req, res) {
+  const origin = req.headers.origin;
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  res.setHeader('Access-Control-Allow-Origin', allow);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
 async function handler(req, res) {
   const action = req.query.action || req.body?.action;
+
+  // CORS preflight for public storefront actions (must answer before auth/dispatch).
+  if (req.method === 'OPTIONS') {
+    if (CORS_ACTIONS.has(action)) { applyCors(req, res); return res.status(200).end(); }
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  if (CORS_ACTIONS.has(action)) applyCors(req, res);
+
   if (!action) return res.status(400).json({ error: 'action required' });
 
   try {

@@ -13,12 +13,24 @@ function createToken(payload, secret = APP_SECRET) {
 
 // We test verifyAuth by reimporting with controlled env
 let verifyAuth;
+let withAuth;
 beforeEach(async () => {
   vi.stubEnv('APP_SECRET', APP_SECRET);
   vi.resetModules();
   const mod = await import('../lib/auth.js');
   verifyAuth = mod.verifyAuth;
+  withAuth = mod.withAuth;
 });
+
+// Minimal res stub capturing status + json/end.
+function mockRes() {
+  const res = { statusCode: null, body: null };
+  res.status = (c) => { res.statusCode = c; return res; };
+  res.json = (b) => { res.body = b; return res; };
+  res.end = () => res;
+  res.setHeader = () => {};
+  return res;
+}
 
 describe('verifyAuth', () => {
   it('returns null when no token provided', async () => {
@@ -55,5 +67,36 @@ describe('verifyAuth', () => {
   it('rejects malformed token', async () => {
     const req = { headers: { authorization: 'Bearer not-a-valid-token' }, query: {} };
     expect(await verifyAuth(req)).toBeNull();
+  });
+});
+
+describe('withAuth public allow-list', () => {
+  it('lets submit_review_public through WITHOUT a token', async () => {
+    const handler = vi.fn((req, res) => res.status(200).json({ ok: true }));
+    const wrapped = withAuth(handler);
+    const req = { headers: {}, query: { action: 'submit_review_public' }, body: {} };
+    const res = mockRes();
+    await wrapped(req, res);
+    expect(handler).toHaveBeenCalledOnce();
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('still rejects a protected action (delete_review) without a token', async () => {
+    const handler = vi.fn((req, res) => res.status(200).json({ ok: true }));
+    const wrapped = withAuth(handler);
+    const req = { headers: {}, query: { action: 'delete_review' }, body: {} };
+    const res = mockRes();
+    await wrapped(req, res);
+    expect(handler).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('reads the public action from the POST body too', async () => {
+    const handler = vi.fn((req, res) => res.status(200).json({ ok: true }));
+    const wrapped = withAuth(handler);
+    const req = { headers: {}, query: {}, body: { action: 'submit_review_public' } };
+    const res = mockRes();
+    await wrapped(req, res);
+    expect(handler).toHaveBeenCalledOnce();
   });
 });
