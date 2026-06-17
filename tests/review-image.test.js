@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 // reviews-shared.js creates a Supabase client at import time → needs env present.
-let decodeAndValidateImage;
+let decodeAndValidateImage, safePhotoUrl;
 beforeAll(async () => {
   vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
-  ({ decodeAndValidateImage } = await import('../lib/actions/reviews-shared.js'));
+  ({ decodeAndValidateImage, safePhotoUrl } = await import('../lib/actions/reviews-shared.js'));
 });
 
 // Helper: base64 of a buffer with given leading bytes (+ padding to a target length).
@@ -52,5 +52,21 @@ describe('decodeAndValidateImage', () => {
   it('rejects oversized input', () => {
     const r = decodeAndValidateImage(b64([0xFF, 0xD8], 6 * 1024 * 1024), MAX);
     expect(r.error).toMatch(/too large/);
+  });
+});
+
+describe('safePhotoUrl', () => {
+  it('allows https / http URLs', () => {
+    expect(safePhotoUrl('https://x.supabase.co/a.jpg')).toBe('https://x.supabase.co/a.jpg');
+    expect(safePhotoUrl('http://example.com/a.png')).toBe('http://example.com/a.png');
+  });
+  it('blocks javascript: and data: URLs', () => {
+    expect(safePhotoUrl('javascript:alert(1)')).toBeNull();
+    expect(safePhotoUrl('data:text/html,<script>')).toBeNull();
+  });
+  it('returns null for empty / non-URL', () => {
+    expect(safePhotoUrl('')).toBeNull();
+    expect(safePhotoUrl(null)).toBeNull();
+    expect(safePhotoUrl('not a url')).toBeNull();
   });
 });
