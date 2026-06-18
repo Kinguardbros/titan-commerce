@@ -22,7 +22,7 @@ import { import_reviews_csv } from '../lib/actions/reviews-import.js';
 import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo } from '../lib/actions/reviews-photo.js';
 import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
-import { submit_review_public } from '../lib/actions/reviews-public.js';
+import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -45,6 +45,7 @@ const GET_ACTIONS = {
   list_webhooks,
   poll_generations,
   product_reviews_list,
+  review_helpful_counts,
 };
 
 const POST_ACTIONS = {
@@ -88,6 +89,7 @@ const POST_ACTIONS = {
   register_webhooks,
   unregister_webhooks,
   submit_review_public,
+  vote_review_helpful,
   add_review_manual,
   update_review,
   delete_review,
@@ -99,7 +101,7 @@ const POST_ACTIONS = {
 };
 
 // Actions callable cross-origin from the storefront need CORS headers.
-const CORS_ACTIONS = new Set(['submit_review_public']);
+const CORS_ACTIONS = new Set(['submit_review_public', 'vote_review_helpful', 'review_helpful_counts']);
 // Allowed storefront origins (live custom domain + Shopify domain for theme previews).
 // STOREFRONT_URL env can hold a comma-separated list to override/extend.
 const ALLOWED_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
@@ -109,7 +111,7 @@ function applyCors(req, res) {
   const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   res.setHeader('Access-Control-Allow-Origin', allow);
   res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
