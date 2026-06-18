@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus, pushReviewsToShopify } from '../lib/api';
+import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus, pushReviewsToShopify, seedReviewsHelpful } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import ReviewDetail from './ReviewDetail';
 import './ReviewsPanel.css';
@@ -38,6 +38,8 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const [importing, setImporting] = useState(false); // import sub-modal open
   const [generating, setGenerating] = useState(false); // AI generate dialog open
   const [pushing, setPushing] = useState(false);   // push-to-Shopify in flight
+  const [seedOpen, setSeedOpen] = useState(false);
+  const [seedRange, setSeedRange] = useState({ min: 5, max: 50 });
 
   const fetchReviews = useCallback(async () => {
     try {
@@ -118,6 +120,18 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
     }
   };
 
+  const handleSeed = async () => {
+    try {
+      const { updated } = await seedReviewsHelpful(storeId, product.id, seedRange.min, seedRange.max);
+      toast.success(`Seeded helpful on ${updated} review${updated === 1 ? '' : 's'}`);
+      setSeedOpen(false);
+      await fetchReviews();
+    } catch (err) {
+      console.error('[ReviewsPanel] seed failed:', err);
+      toast.error(`Seed failed: ${err.message}`);
+    }
+  };
+
   const detailOpen = adding || selected;
 
   return (
@@ -139,6 +153,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
             </div>
             <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
+            {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
             <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
             {canPush && (
               <button className="rv-push-btn" onClick={handlePush} disabled={pushing}>
@@ -167,6 +182,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                     <th>Body</th>
                     <th>Source</th>
                     <th>Status</th>
+                    <th>Helpful</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -190,6 +206,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                         <span className={`rv-badge ${STATUS_BADGE[r.status] || ''}`}>{r.status}</span>
                         {r.dirty && <span className="rv-changed" title="Edited after publish — awaits re-push">changed</span>}
                       </td>
+                      <td className="rv-cell-helpful">{r.helpful_count || 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -234,6 +251,31 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
               onGenerated={fetchReviews}
             />
           </Suspense>
+        )}
+
+        {seedOpen && (
+          <div className="rv-import-overlay" onClick={() => setSeedOpen(false)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setSeedOpen(false); }}>
+            <div className="rv-import-modal rv-gen-modal" role="dialog" aria-modal="true"
+              aria-label="Seed helpful counts" onClick={(e) => e.stopPropagation()}>
+              <button className="rv-close" aria-label="Close" onClick={() => setSeedOpen(false)}>✕</button>
+              <div className="rv-title">Seed helpful counts</div>
+              <div className="rv-import-sub">Give every review on this product a random helpful count in the range.</div>
+              <div className="rv-seed-range">
+                <label className="rv-field-label">Min
+                  <input className="rv-input" type="number" min="0" value={seedRange.min}
+                    onChange={(e) => setSeedRange((s) => ({ ...s, min: Math.max(0, parseInt(e.target.value, 10) || 0) }))} />
+                </label>
+                <label className="rv-field-label">Max
+                  <input className="rv-input" type="number" min="0" value={seedRange.max}
+                    onChange={(e) => setSeedRange((s) => ({ ...s, max: Math.max(0, parseInt(e.target.value, 10) || 0) }))} />
+                </label>
+              </div>
+              <div className="rv-detail-actions rv-import-actions">
+                <button className="rv-btn rv-btn--save" onClick={handleSeed}>Seed {reviews.length} review{reviews.length === 1 ? '' : 's'}</button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
