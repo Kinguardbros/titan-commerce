@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { uploadReviewPhoto } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 
-const EMPTY = { author: '', rating: 5, title: '', body: '', review_date: '', photo_url: '', verified: false };
+const EMPTY = { author: '', rating: 5, title: '', body: '', review_date: '', photo_url: '', verified: false, helpful_count: 0 };
 
 // Right-side detail panel — edit an existing review or fill in a new manual one.
 // Photo upload (Phase 4) stores to Supabase Storage and sets photo_url on the form.
@@ -18,6 +18,7 @@ export default function ReviewDetail({ review, isNew, saving, storeId, productId
     review_date: review?.review_date || new Date().toISOString().slice(0, 10),
     photo_url: review?.photo_url || '',
     verified: !!review?.verified,
+    helpful_count: review?.helpful_count || 0,
   }));
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -83,6 +84,18 @@ export default function ReviewDetail({ review, isNew, saving, storeId, productId
           <input type="checkbox" checked={form.verified} onChange={(e) => set('verified', e.target.checked)} />
           <span>✓ Verified purchase</span>
         </label>
+
+        <label className="rv-field-label">Helpful count</label>
+        <div className="rv-helpful-row">
+          <button type="button" className="rv-btn rv-helpful-step"
+            onClick={() => set('helpful_count', Math.max(0, (parseInt(form.helpful_count, 10) || 0) - 1))}>−</button>
+          <input className="rv-input rv-helpful-input" type="number" min="0" value={form.helpful_count}
+            onChange={(e) => set('helpful_count', Math.max(0, parseInt(e.target.value, 10) || 0))} />
+          <button type="button" className="rv-btn rv-helpful-step"
+            onClick={() => set('helpful_count', (parseInt(form.helpful_count, 10) || 0) + 1)}>+</button>
+          <button type="button" className="rv-btn rv-helpful-zero"
+            onClick={() => set('helpful_count', 0)}>Zero</button>
+        </div>
 
         <label className="rv-field-label">Photo</label>
         {form.photo_url && (

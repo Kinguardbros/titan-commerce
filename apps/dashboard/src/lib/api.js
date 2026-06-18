@@ -515,6 +515,14 @@ export function setReviewStatus(ids, status, storeId) {
   return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status, store_id: storeId }) });
 }
 
+// Bulk seed helpful_count (random in [min,max]) across a product's reviews.
+export function seedReviewsHelpful(storeId, productId, min, max) {
+  return fetchJSON('/api/system?action=seed_reviews_helpful', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, min, max }),
+  });
+}
+
 // Bulk import (Phase 3) — pass either { csv } (paste / parsed file) or { sheet_url } (Google Sheets).
 export function importReviewsCsv(storeId, productId, payload) {
   return fetchJSON('/api/system?action=import_reviews_csv', {
