@@ -1,6 +1,11 @@
 import { useState, useRef } from 'react';
-import { uploadReviewPhoto } from '../lib/api';
+import { uploadReviewPhoto, deleteReviewPhoto } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
+
+// A photo only needs cleanup if it was uploaded THIS session (not the review's saved one).
+function cleanupOrphan(url, savedUrl) {
+  if (url && url !== savedUrl) deleteReviewPhoto(url).catch(() => {});
+}
 
 const EMPTY = { author: '', rating: 5, title: '', body: '', review_date: '', photo_url: '', verified: false, helpful_count: 0 };
 
@@ -23,6 +28,7 @@ export default function ReviewDetail({ review, isNew, saving, storeId, productId
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const canSave = form.author.trim() && form.body.trim();
+  const savedPhoto = review?.photo_url || ''; // the persisted URL — never clean this up
 
   const handlePhoto = (e) => {
     const file = e.target.files?.[0];
@@ -33,6 +39,7 @@ export default function ReviewDetail({ review, isNew, saving, storeId, productId
       const base64 = String(reader.result).split(',')[1];
       setUploading(true);
       try {
+        cleanupOrphan(form.photo_url, savedPhoto); // replacing → delete the previous unsaved upload
         const { photo_url } = await uploadReviewPhoto(storeId, productId, base64, file.type);
         set('photo_url', photo_url);
         toast.success('Photo uploaded');
@@ -110,7 +117,7 @@ export default function ReviewDetail({ review, isNew, saving, storeId, productId
           </button>
           {form.photo_url && (
             <button type="button" className="rv-btn rv-photo-btn rv-photo-btn--remove"
-              onClick={() => set('photo_url', '')}>Remove</button>
+              onClick={() => { cleanupOrphan(form.photo_url, savedPhoto); set('photo_url', ''); }}>Remove</button>
           )}
           <input ref={fileRef} type="file" accept="image/*" hidden onChange={handlePhoto} />
         </div>

@@ -20,7 +20,7 @@ import { register_webhooks, list_webhooks, unregister_webhooks } from '../lib/ac
 import { product_reviews_list, add_review_manual, update_review, delete_review, set_review_status, seed_reviews_helpful } from '../lib/actions/reviews.js';
 import { import_reviews_csv } from '../lib/actions/reviews-import.js';
 import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
-import { upload_review_photo } from '../lib/actions/reviews-photo.js';
+import { upload_review_photo, delete_review_photo } from '../lib/actions/reviews-photo.js';
 import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
 import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
 
@@ -97,6 +97,7 @@ const POST_ACTIONS = {
   seed_reviews_helpful,
   import_reviews_csv,
   upload_review_photo,
+  delete_review_photo,
   generate_reviews_ai,
   push_reviews_to_shopify,
 };
