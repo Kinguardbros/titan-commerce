@@ -1,7 +1,12 @@
 import crypto from 'crypto';
 
 const APP_PASSWORD = process.env.APP_PASSWORD;
-const APP_SECRET = process.env.APP_SECRET || 'default-secret';
+// Fail closed if APP_SECRET is missing — never sign tokens with a known default.
+function appSecret() {
+  const s = process.env.APP_SECRET;
+  if (!s) throw new Error('APP_SECRET is not set');
+  return s;
+}
 
 export default function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -19,7 +24,7 @@ export default function handler(req, res) {
   };
   const payloadStr = JSON.stringify(payload);
   const token = Buffer.from(payloadStr).toString('base64')
-    + '.' + crypto.createHmac('sha256', APP_SECRET).update(payloadStr).digest('hex');
+    + '.' + crypto.createHmac('sha256', appSecret()).update(payloadStr).digest('hex');
 
   return res.status(200).json({ token });
 }

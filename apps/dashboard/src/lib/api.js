@@ -539,6 +539,14 @@ export function uploadReviewPhoto(storeId, productId, base64, mediaType) {
   });
 }
 
+// Remove an orphaned Storage photo (uploaded then removed/replaced without saving).
+export function deleteReviewPhoto(photoUrl) {
+  return fetchJSON('/api/system?action=delete_review_photo', {
+    method: 'POST',
+    body: JSON.stringify({ photo_url: photoUrl }),
+  });
+}
+
 // AI generation (Phase 4) — count 1–10, tone 'positive' | 'mix' → inserts pending reviews.
 export function generateReviewsAi(storeId, productId, count, tone) {
   return fetchJSON('/api/system?action=generate_reviews_ai', {
