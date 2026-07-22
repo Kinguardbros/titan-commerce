@@ -70,7 +70,11 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     // Happens on initial mount before StoreProvider has resolved activeStore.
     if (!storeId) return;
     try {
-      const result = await getProducts(storeId, { page, limit: PAGE_SIZE });
+      // status/list.js excludes archived products unless show_archived=true is passed —
+      // forward it whenever a non-active status chip is selected so Archived/Draft aren't
+      // silently filtered out of an incomplete (active-only) dataset.
+      const showArchived = statusFilter !== 'all' && statusFilter !== 'active';
+      const result = await getProducts(storeId, { page, limit: PAGE_SIZE, show_archived: showArchived });
       if (result) {
         setAllProducts((prev) => append ? [...prev, ...result.products] : result.products);
         setTotalProducts(result.total);
@@ -83,7 +87,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [storeId]);
+  }, [storeId, statusFilter]);
 
   useEffect(() => {
     if (!storeId) return;
@@ -93,11 +97,16 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   // Searching or filtering operates client-side over loaded products only — so load the
   // full catalog whenever a search query or any filter is active, otherwise results are
   // limited to page 1 (e.g. a collection chip would only show products from the first 50).
-  const anyFilterActive = collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all';
+  // statusFilter is included: selecting a status chip (e.g. Archived/Draft) must also trigger
+  // the full-catalog load, otherwise the client-side status filter only ever sees page 1.
+  const anyFilterActive = collectionFilter !== 'all' || priceFilter !== 'all' || creativesFilter !== 'all' || audienceFilter !== 'all' || statusFilter !== 'all';
   useEffect(() => {
     if (!storeId) return;
     if (((search && search.length >= 2) || anyFilterActive) && hasMore) {
-      getAllProducts(storeId).then((products) => {
+      // products/list.js excludes archived products by default — must pass show_archived
+      // whenever a non-active status is selected, otherwise Archived/Draft never come back.
+      const showArchived = statusFilter !== 'all' && statusFilter !== 'active';
+      getAllProducts(storeId, showArchived).then((products) => {
         if (products?.length) { setAllProducts(products); setHasMore(false); setTotalProducts(products.length); }
       }).catch(() => {});
     }

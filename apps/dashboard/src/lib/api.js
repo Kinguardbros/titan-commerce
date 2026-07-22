@@ -97,11 +97,12 @@ export function convertToVideo(creativeId) {
 }
 
 // Products
-export async function getProducts(storeId, { page, limit } = {}) {
+export async function getProducts(storeId, { page, limit, show_archived } = {}) {
   const params = [];
   if (storeId) params.push(`store_id=${storeId}`);
   if (page) params.push(`page=${page}`);
   if (limit) params.push(`limit=${limit}`);
+  if (show_archived) params.push(`show_archived=true`);
   const qs = params.length ? `?${params.join('&')}` : '';
   const result = await fetchJSON(`/api/products/list${qs}`);
   // Support both paginated { products, total, page, pages } and legacy array responses
@@ -110,8 +111,8 @@ export async function getProducts(storeId, { page, limit } = {}) {
 }
 
 // Convenience: fetch all products (used by Shopify pricing which needs full list)
-export async function getAllProducts(storeId) {
-  const result = await getProducts(storeId, { limit: 200 });
+export async function getAllProducts(storeId, show_archived) {
+  const result = await getProducts(storeId, { limit: 200, show_archived });
   return result.products || [];
 }
 
