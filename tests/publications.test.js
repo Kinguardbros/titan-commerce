@@ -169,3 +169,58 @@ describe('bulk_make_unlisted', () => {
     expect(body.failed).toEqual([{ id: 10, error: expect.stringContaining('boom') }]);
   });
 });
+
+describe('bulk_make_listed', () => {
+  let bulk_make_listed;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    supabaseState.updated = [];
+    supabaseState.logged = [];
+    getStoreMock.mockReset();
+    rateLimitMock.mockReset().mockResolvedValue(true);
+    graphqlMock.mockReset();
+    updateProductStatusMock.mockReset();
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/actions/publications.js');
+    bulk_make_listed = mod.bulk_make_listed;
+  });
+
+  it('happy path: publishes products and sets publication_online_store=true', async () => {
+    getStoreMock.mockResolvedValue({
+      id: 's1', admin_token: 't', shopify_url: 'x.myshopify.com',
+      online_store_publication_id: 'gid://shopify/Publication/1',
+    });
+    updateProductStatusMock.mockResolvedValue({ product: {} });
+    graphqlMock.mockResolvedValue({
+      data: { publishablePublish: { userErrors: [] } },
+    });
+    const { req, res } = mockReqRes({ store_id: 's1', product_shopify_ids: [10, 20] });
+    await bulk_make_listed(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(supabaseState.updated).toHaveLength(2);
+    expect(supabaseState.updated[0].patch).toMatchObject({
+      status: 'active', publication_online_store: true,
+    });
+    expect(supabaseState.logged[0].message).toContain('listed');
+  });
+
+  it('partial success on publishablePublish userErrors', async () => {
+    getStoreMock.mockResolvedValue({
+      id: 's1', admin_token: 't', shopify_url: 'x.myshopify.com',
+      online_store_publication_id: 'gid://shopify/Publication/1',
+    });
+    updateProductStatusMock.mockResolvedValue({ product: {} });
+    graphqlMock
+      .mockResolvedValueOnce({ data: { publishablePublish: { userErrors: [] } } })
+      .mockResolvedValueOnce({
+        data: { publishablePublish: { userErrors: [{ message: 'archived' }] } },
+      });
+    const { req, res } = mockReqRes({ store_id: 's1', product_shopify_ids: [10, 20] });
+    await bulk_make_listed(req, res);
+    const body = res.json.mock.calls[0][0];
+    expect(body.updated).toBe(1);
+    expect(body.failed).toEqual([{ id: 20, error: expect.stringContaining('archived') }]);
+  });
+});
