@@ -562,3 +562,55 @@ export function pushReviewsToShopify(storeId, productId) {
     body: JSON.stringify({ store_id: storeId, product_id: productId }),
   });
 }
+
+// Publications Manager
+export function bulkMakeUnlisted(storeId, productShopifyIds) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'bulk_make_unlisted',
+      store_id: storeId,
+      product_shopify_ids: productShopifyIds,
+    }),
+  });
+}
+
+export function bulkMakeListed(storeId, productShopifyIds) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'bulk_make_listed',
+      store_id: storeId,
+      product_shopify_ids: productShopifyIds,
+    }),
+  });
+}
+
+// CSV export — cannot use fetchJSON because response is text/csv, not JSON.
+// Downloads via anchor with object URL.
+export async function exportProductsCsv(storeId, filters = {}) {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/system`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action: 'export_products_csv', store_id: storeId, filters }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.hint || body.details || body.error || `Export failed (${res.status})`);
+  }
+  const blob = await res.blob();
+  // Extract filename from Content-Disposition
+  const cd = res.headers.get('Content-Disposition') || '';
+  const m = cd.match(/filename="([^"]+)"/);
+  const filename = m ? m[1] : `products-${storeId}-${new Date().toISOString().slice(0, 10)}.csv`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

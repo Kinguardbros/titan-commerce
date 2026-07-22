@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { getProducts, getAllProducts, syncProducts, refreshSizeCharts } from '../lib/api';
+import { getProducts, getAllProducts, syncProducts, refreshSizeCharts, bulkMakeUnlisted, bulkMakeListed, exportProductsCsv } from '../lib/api';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
+import StatusFilter from '../components/products/StatusFilter';
+import SelectionToolbar from '../components/products/SelectionToolbar';
+import BulkConfirmModal from '../components/products/BulkConfirmModal';
 import './Products.css';
 
 const ImportModal = lazy(() => import('../components/ImportModal'));
@@ -57,6 +60,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   const [totalProducts, setTotalProducts] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(() => new Set()); // Shopify product IDs
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [bulkModal, setBulkModal] = useState(null); // null | { mode: 'unlist'|'list', items }
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const fetchProducts = useCallback(async (page = 1, append = false) => {
     // Guard: never fetch without storeId — backend would return ALL stores' products (cross-store leak).
@@ -164,6 +171,10 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       list = list.filter((p) => (p.audiences || []).includes(audienceFilter));
     }
 
+    if (statusFilter !== 'all') {
+      list = list.filter((p) => p.status === statusFilter);
+    }
+
     list = [...list].sort((a, b) => {
       switch (sortBy) {
         case 'name_asc': return a.title.localeCompare(b.title);
@@ -176,7 +187,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     });
 
     return list;
-  }, [allProducts, search, collectionFilter, priceFilter, creativesFilter, audienceFilter, sortBy]);
+  }, [allProducts, search, collectionFilter, priceFilter, creativesFilter, audienceFilter, statusFilter, sortBy]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -211,6 +222,58 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     }
   };
 
+  const toggleSelect = useCallback((shopifyId) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(shopifyId)) next.delete(shopifyId); else next.add(shopifyId);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const openBulk = useCallback((mode) => {
+    const items = allProducts
+      .filter((p) => selectedIds.has(p.shopify_id))
+      .map((p) => ({ id: p.shopify_id, title: p.title }));
+    setBulkModal({ mode, items });
+  }, [allProducts, selectedIds]);
+
+  const runBulk = useCallback(async () => {
+    if (!bulkModal) return;
+    setBulkBusy(true);
+    try {
+      const ids = bulkModal.items.map((i) => i.id);
+      const fn = bulkModal.mode === 'unlist' ? bulkMakeUnlisted : bulkMakeListed;
+      const result = await fn(storeId, ids);
+      const verb = bulkModal.mode === 'unlist' ? 'unlisted' : 'listed';
+      if (result.failed?.length > 0) {
+        toast.info(`${result.updated} ${verb}, ${result.failed.length} failed`);
+      } else {
+        toast.success(`${result.updated} products ${verb}`);
+      }
+      setBulkModal(null);
+      clearSelection();
+      // Refetch first page so DB status/publication changes surface in UI
+      fetchProducts(1, false);
+    } catch (err) {
+      toast.error(`Bulk failed: ${err.message}`);
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [bulkModal, storeId, toast, clearSelection, fetchProducts]);
+
+  const handleExportCsv = useCallback(async () => {
+    try {
+      await exportProductsCsv(storeId, {
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+      });
+      toast.success('CSV downloaded');
+    } catch (err) {
+      toast.error(`Export failed: ${err.message}`);
+    }
+  }, [storeId, statusFilter, toast]);
+
   return (
     <div className="products-page">
       <div className="products-header">
@@ -235,6 +298,9 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           <button className="products-sync-btn" onClick={handleRefreshSizeCharts} disabled={refreshingSC} title="Check Shopify for size chart metafields">
             {refreshingSC ? 'Checking...' : '📏 Size Charts'}
           </button>
+          <button className="products-sync-btn" onClick={handleExportCsv} title="Download filtered products as CSV">
+            Export CSV
+          </button>
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}
           </button>
@@ -243,6 +309,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       </div>
 
       <div className="pf-bar">
+        <StatusFilter value={statusFilter} onChange={setStatusFilter} />
         <div className="pf-group">
           <div className="pf-label">Collection</div>
           <div className="pf-chips">
@@ -318,6 +385,23 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
         </div>
       </div>
 
+      <SelectionToolbar
+        selectedCount={selectedIds.size}
+        onMakeUnlisted={() => openBulk('unlist')}
+        onMakeListed={() => openBulk('list')}
+        onExportCsv={handleExportCsv}
+        onClear={clearSelection}
+      />
+      <BulkConfirmModal
+        open={!!bulkModal}
+        title={bulkModal?.mode === 'unlist' ? 'Make Unlisted' : 'Make Listed'}
+        items={bulkModal?.items || []}
+        confirmLabel={bulkModal?.mode === 'unlist' ? 'Unlist' : 'List'}
+        busy={bulkBusy}
+        onConfirm={runBulk}
+        onCancel={() => setBulkModal(null)}
+      />
+
       {loading ? (
         <SkeletonGrid count={8} />
       ) : filtered.length === 0 ? (
@@ -335,6 +419,14 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
             <div className="products-grid">
               {filtered.map((p) => (
                 <div key={p.id} className="product-card" onClick={() => onSelectProduct(p)}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(p.shopify_id)}
+                    onChange={(e) => { e.stopPropagation(); toggleSelect(p.shopify_id); }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Select ${p.title}`}
+                    className="products-row-checkbox"
+                  />
                   <div className="product-card-img">
                     {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : <span className="product-card-no-img">No image</span>}
                     {isNew(p) && <span className="product-card-badge product-card-badge--new">New</span>}
@@ -356,10 +448,20 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           {viewMode === 'list' && (
             <div className="products-table-wrap">
               <table className="products-table">
-                <thead><tr><th></th><th>Product</th><th>Price</th><th>Creatives</th><th>Size</th><th>COGS</th><th></th></tr></thead>
+                <thead><tr><th></th><th></th><th>Product</th><th>Price</th><th>Creatives</th><th>Size</th><th>COGS</th><th></th></tr></thead>
                 <tbody>
                   {filtered.map((p) => (
                     <tr key={p.id} onClick={() => onSelectProduct(p)}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.shopify_id)}
+                          onChange={(e) => { e.stopPropagation(); toggleSelect(p.shopify_id); }}
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Select ${p.title}`}
+                          className="products-row-checkbox"
+                        />
+                      </td>
                       <td><div className="products-table-img">{p.image_url && <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" />}</div></td>
                       <td className="products-table-name">{p.title}{isNew(p) && <span className="pill" style={{ marginLeft: 6, background: 'var(--accent-primary-soft)', color: 'var(--accent-primary)', fontSize: 9, padding: '2px 6px' }}>New</span>}</td>
                       <td>${p.price || '—'}</td>
@@ -378,6 +480,14 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
             <div className="products-cards">
               {filtered.map((p) => (
                 <div key={p.id} className="products-card-row" role="button" tabIndex={0} aria-label={`Open ${p.title}`} onClick={() => onSelectProduct(p)} onKeyDown={(e) => { if (e.key === 'Enter') onSelectProduct(p); }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(p.shopify_id)}
+                    onChange={(e) => { e.stopPropagation(); toggleSelect(p.shopify_id); }}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Select ${p.title}`}
+                    className="products-row-checkbox"
+                  />
                   <div className="products-card-img">
                     {p.image_url ? <img src={p.image_url} alt={p.title} loading="lazy" className="products-lazy-img" /> : null}
                   </div>
