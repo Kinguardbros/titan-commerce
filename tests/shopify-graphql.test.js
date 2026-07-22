@@ -66,3 +66,52 @@ describe('createShopifyClient — graphql()', () => {
     await expect(client.graphql('{ __typename }')).rejects.toThrow(/500/);
   });
 });
+
+describe('getOnlineStorePublicationId', () => {
+  let getOnlineStorePublicationId;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/shopify-publications.js');
+    getOnlineStorePublicationId = mod.getOnlineStorePublicationId;
+  });
+
+  it('returns the GID of the publication named "Online Store"', async () => {
+    const client = {
+      graphql: vi.fn().mockResolvedValue({
+        data: {
+          publications: {
+            edges: [
+              { node: { id: 'gid://shopify/Publication/1', name: 'Point of Sale' } },
+              { node: { id: 'gid://shopify/Publication/2', name: 'Online Store' } },
+              { node: { id: 'gid://shopify/Publication/3', name: 'Shop' } },
+            ],
+          },
+        },
+      }),
+    };
+    const id = await getOnlineStorePublicationId(client);
+    expect(id).toBe('gid://shopify/Publication/2');
+    expect(client.graphql).toHaveBeenCalledWith(expect.stringContaining('publications(first:'));
+  });
+
+  it('returns null when there is no Online Store publication', async () => {
+    const client = {
+      graphql: vi.fn().mockResolvedValue({
+        data: { publications: { edges: [{ node: { id: 'gid://x/1', name: 'POS' } }] } },
+      }),
+    };
+    const id = await getOnlineStorePublicationId(client);
+    expect(id).toBeNull();
+  });
+
+  it('returns null when GraphQL returns errors', async () => {
+    const client = {
+      graphql: vi.fn().mockResolvedValue({ errors: [{ message: 'nope' }] }),
+    };
+    const id = await getOnlineStorePublicationId(client);
+    expect(id).toBeNull();
+  });
+});

@@ -9,6 +9,7 @@ const SCOPES = [
   'write_metaobjects', 'write_metaobject_definitions',
   'read_metaobjects', 'read_metaobject_definitions',
   'write_discounts', 'read_discounts', 'read_reports',
+  'read_publications', 'write_publications',
 ].join(',');
 
 const REDIRECT_URI = (process.env.APP_URL || 'https://titan-commerce.vercel.app') + '/api/auth/shopify';
