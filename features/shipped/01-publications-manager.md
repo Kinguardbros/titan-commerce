@@ -1,11 +1,11 @@
 ---
 id: feature-01
 slug: publications-manager
-status: active
+status: shipped
 appetite: medium              # 4 dev-days
 owner: dan
 created: 2026-07-23
-shipped: null
+shipped: 2026-07-23
 flag:
   name: feature.publications_manager.enabled
   tool: env-var               # Titan nemá PostHog → process.env.FEATURE_PUBLICATIONS_MANAGER
@@ -248,3 +248,4 @@ instrumentation:
 
 - `2026-07-23` Spec created + self-reviewed against CLAUDE.md.
 - `2026-07-23` Post-explore fixes: flat snake_case actions; `PUBLISHER` agent (already in registry); auth = password gate → store isolation via `getStore(store_id)` from body; `SelectionToolbar.jsx` extracted (Products.jsx has zero selection UI); CSV `visibility` = human-readable `draft|listed|unlisted|archived`.
+- `2026-07-23` Shipped code (Tasks 1-9). Awaiting Dan's manual E2E (SQL migration, Isola reauthorize, backfill, sync, smoke tests). Deploy after /pre-deploy-audit.
