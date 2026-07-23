@@ -34,7 +34,13 @@ for (const store of stores || []) {
     continue;
   }
   const client = createShopifyClient(store.shopify_url, store.admin_token);
-  const pubId = await getOnlineStorePublicationId(client);
+  let pubId = null;
+  try {
+    pubId = await getOnlineStorePublicationId(client);
+  } catch (err) {
+    console.error(`[fail] ${store.name}: GraphQL call threw — ${err.message} (reauthorize app in Shopify Admin?)`);
+    continue;
+  }
   if (!pubId) {
     console.error(`[fail] ${store.name}: could not resolve Online Store publication (reauthorize with new scopes?)`);
     continue;
