@@ -597,6 +597,39 @@ export function bulkMakeListed(storeId, productShopifyIds) {
   });
 }
 
+// Users & Permissions
+export function listUsers() {
+  return fetchJSON('/api/system?action=users_list');
+}
+
+export function createUser(payload) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_user', ...payload }),
+  });
+}
+
+export function updateUser(payload) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_user', ...payload }),
+  });
+}
+
+export function deleteUser(userId) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_user', user_id: userId }),
+  });
+}
+
+export function resetPassword(userId) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'reset_password', user_id: userId }),
+  });
+}
+
 // CSV export — cannot use fetchJSON because response is text/csv, not JSON.
 // Downloads via anchor with object URL.
 export async function exportProductsCsv(storeId, filters = {}) {

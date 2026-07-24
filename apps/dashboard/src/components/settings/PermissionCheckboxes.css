@@ -1,0 +1,31 @@
+.permission-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permission-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.permission-checkbox-row input[type='checkbox'] {
+  margin-top: 2px;
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.permission-checkbox-key {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.permission-checkbox-label {
+  color: var(--text4);
+}
