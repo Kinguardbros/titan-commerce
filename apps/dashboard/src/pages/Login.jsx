@@ -29,7 +29,8 @@ export default function Login({ onSuccess }) {
       const { token } = await res.json();
       localStorage.setItem('auth_token', token);
       onSuccess();
-    } catch {
+    } catch (err) {
+      console.error('[Login] Connection error:', err?.message || err);
       setError('Connection error');
       setLoading(false);
     }
