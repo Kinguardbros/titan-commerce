@@ -19,9 +19,11 @@ vi.mock('@supabase/supabase-js', () => ({
 const getStoreMock = vi.fn();
 vi.mock('../lib/store-context.js', () => ({ getStore: getStoreMock }));
 
-function mockReqRes(body) {
+const ADMIN_USER = { role: 'admin', permissions: [], store_access: [] };
+
+function mockReqRes(body, user = ADMIN_USER) {
   const headers = {};
-  const req = { body, headers: {} };
+  const req = { body, headers: {}, user };
   const res = {
     _status: 200,
     _body: null,
@@ -122,5 +124,21 @@ describe('export_products_csv', () => {
     await export_products_csv(req, res);
     const cd = res._headers['content-disposition'];
     expect(cd).toMatch(/attachment; filename="products-isola-\d{4}-\d{2}-\d{2}\.csv"/);
+  });
+
+  it('403s without products:publications', async () => {
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com' });
+    const user = { role: 'member', permissions: ['products:read'], store_access: ['s1'] };
+    const { req, res } = mockReqRes({ store_id: 's1' }, user);
+    await export_products_csv(req, res);
+    expect(res._status).toBe(403);
+  });
+
+  it('403s when store not in store_access', async () => {
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com' });
+    const user = { role: 'member', permissions: ['products:publications'], store_access: ['s2'] };
+    const { req, res } = mockReqRes({ store_id: 's1' }, user);
+    await export_products_csv(req, res);
+    expect(res._status).toBe(403);
   });
 });
