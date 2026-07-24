@@ -96,20 +96,34 @@ describe('Wave 2 — spot-check permission gates', () => {
     expect(adminBody.map((s) => s.id)).toEqual(['s1', 's2']);
   });
 
-  // Additional spot-checks beyond the brief's minimum 7 — covering admin-only gates on
-  // creatives.js (poll_generations/cleanup_stale) and the docs.js store_name→store_id
-  // resolution path, since those two files have non-standard structure vs the rest of Wave 2.
+  // Additional spot-checks beyond the brief's minimum 7 — covering the docs.js
+  // store_name→store_id resolution path (non-standard structure vs the rest of Wave 2)
+  // and creatives.js poll_generations/cleanup_stale gates.
+  //
+  // poll_generations was relaxed from admin-only to creatives:generate (T6 concern fix):
+  // ProductWorkspace.jsx/Studio.jsx poll this endpoint on an interval for ANY logged-in
+  // user to finalize their OWN pending generations. Admin-only gating meant a member with
+  // creatives:generate could start a generation but never see it resolve — appeared stuck
+  // forever. cleanup_stale stays admin-only (housekeeping, not user-invoked).
 
-  it('poll_generations: 403s for non-admin', async () => {
+  it('poll_generations: 403s for member without creatives:generate', async () => {
     const { poll_generations } = await import('../lib/actions/creatives.js');
     const { req, res } = mockReqRes({ query: { store_id: 's1' }, user: READER });
     await poll_generations(req, res);
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
+  it('poll_generations: allows member with creatives:generate', async () => {
+    const { poll_generations } = await import('../lib/actions/creatives.js');
+    const GENERATOR = { role: 'member', permissions: ['creatives:generate'], store_access: ['s1'] };
+    // No store_id — takes the query-without-.eq() path, keeping the shared mock's chain simple.
+    const { req, res } = mockReqRes({ query: {}, user: GENERATOR });
+    await poll_generations(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(403);
+  });
+
   it('poll_generations: passes gate for admin', async () => {
     const { poll_generations } = await import('../lib/actions/creatives.js');
-    // No store_id — takes the query-without-.eq() path, keeping the shared mock's chain simple.
     const { req, res } = mockReqRes({ query: {}, user: ADMIN });
     await poll_generations(req, res);
     expect(res.status).not.toHaveBeenCalledWith(403);
