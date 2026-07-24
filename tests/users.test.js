@@ -176,6 +176,7 @@ describe('lib/actions/users.js', () => {
     });
 
     it('happy path: patches role/permissions/store_access/active, never touches username or password', async () => {
+      usersState._single = { role: 'member', active: true };
       usersState._updateResult = {
         id: 'u2', username: 'jana', password_hash: 'salt:hash', role: 'member',
         permissions: ['products:read'], store_access: [], active: false,
@@ -186,6 +187,24 @@ describe('lib/actions/users.js', () => {
       const body = res.json.mock.calls[0][0];
       expect(body.user.password_hash).toBeUndefined();
       expect(body.user.active).toBe(false);
+    });
+
+    it('400s when deactivating the last active admin (active:false)', async () => {
+      usersState._single = { role: 'admin', active: true };
+      usersState.rows = [{ id: 'admin-1', role: 'admin', active: true }];
+      const { req, res } = mockReqRes({ user_id: 'admin-1', active: false }, ADMIN_USER);
+      await update_user(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toMatch(/last active admin/i);
+    });
+
+    it("400s when demoting the last active admin (role:'member')", async () => {
+      usersState._single = { role: 'admin', active: true };
+      usersState.rows = [{ id: 'admin-1', role: 'admin', active: true }];
+      const { req, res } = mockReqRes({ user_id: 'admin-1', role: 'member' }, ADMIN_USER);
+      await update_user(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toMatch(/last active admin/i);
     });
   });
 
