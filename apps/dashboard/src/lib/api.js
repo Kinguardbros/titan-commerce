@@ -22,6 +22,11 @@ async function fetchJSON(url, options = {}) {
     throw new Error('Rate limit — too many requests. Wait a minute and try again.');
   }
 
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.hint || body.error || 'You don\'t have permission to do that');
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.hint || body.details || body.error || `Request failed (${res.status})`);
