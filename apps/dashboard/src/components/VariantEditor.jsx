@@ -1,7 +1,18 @@
 import { useState, useMemo } from 'react';
+import { useUser } from '../hooks/useUser.jsx';
 import './VariantEditor.css';
 
+// Client-side mirror of lib/permissions.js hasPermission — cosmetic gating only,
+// backend re-checks on every write (update_product_full).
+function hasEditPermission(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return Array.isArray(user.permissions) && user.permissions.includes('products:edit');
+}
+
 export default function VariantEditor({ variants, options, editing, onChange }) {
+  const { user } = useUser();
+  const canEdit = hasEditPermission(user);
   const [expanded, setExpanded] = useState({});
   const [allExpanded, setAllExpanded] = useState(false);
 
@@ -69,11 +80,11 @@ export default function VariantEditor({ variants, options, editing, onChange }) 
                   <tr key={v.id}>
                     <td className="ve-variant-name">{label || v.title}</td>
                     <td>
-                      {editing ? <input className="ve-input" value={v.price || ''} onChange={(e) => handleChange(v.id, 'price', e.target.value)} />
+                      {editing ? <input className="ve-input" disabled={!canEdit} value={v.price || ''} onChange={(e) => handleChange(v.id, 'price', e.target.value)} />
                         : <span className="ve-price">${v.price}</span>}
                     </td>
                     <td>
-                      {editing ? <input className="ve-input" value={v.sku || ''} onChange={(e) => handleChange(v.id, 'sku', e.target.value)} />
+                      {editing ? <input className="ve-input" disabled={!canEdit} value={v.sku || ''} onChange={(e) => handleChange(v.id, 'sku', e.target.value)} />
                         : <span className="ve-sku">{v.sku || '—'}</span>}
                     </td>
                     <td><span className={`ve-inv${(v.inventory_quantity || 0) <= 5 ? ' ve-inv--low' : ''}`}>{v.inventory_quantity ?? '—'}</span></td>
@@ -129,6 +140,7 @@ export default function VariantEditor({ variants, options, editing, onChange }) 
                   group={group}
                   open={open}
                   editing={editing}
+                  canEdit={canEdit}
                   totalInv={totalInv}
                   onToggle={() => toggleGroup(group.label)}
                   onGroupPriceChange={(val) => handleGroupPriceChange(group.label, val)}
@@ -144,7 +156,7 @@ export default function VariantEditor({ variants, options, editing, onChange }) 
   );
 }
 
-function GroupRows({ group, open, editing, totalInv, onToggle, onGroupPriceChange, onVariantChange, secondOption }) {
+function GroupRows({ group, open, editing, canEdit, totalInv, onToggle, onGroupPriceChange, onVariantChange, secondOption }) {
   return (
     <>
       {/* Group header row */}
@@ -156,7 +168,7 @@ function GroupRows({ group, open, editing, totalInv, onToggle, onGroupPriceChang
         </td>
         <td>
           {editing && group.price !== null ? (
-            <input className="ve-input" value={group.price || ''} onClick={(e) => e.stopPropagation()}
+            <input className="ve-input" disabled={!canEdit} value={group.price || ''} onClick={(e) => e.stopPropagation()}
               onChange={(e) => onGroupPriceChange(e.target.value)} />
           ) : (
             <span className="ve-price">{group.price ? `$ ${group.price}` : 'varies'}</span>
@@ -180,7 +192,7 @@ function GroupRows({ group, open, editing, totalInv, onToggle, onGroupPriceChang
             </td>
             <td>
               {editing ? (
-                <input className="ve-input" value={v.price || ''} onChange={(e) => onVariantChange(v.id, 'price', e.target.value)} />
+                <input className="ve-input" disabled={!canEdit} value={v.price || ''} onChange={(e) => onVariantChange(v.id, 'price', e.target.value)} />
               ) : (
                 <span className="ve-price">$ {v.price}</span>
               )}

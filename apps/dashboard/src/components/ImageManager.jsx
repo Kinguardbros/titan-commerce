@@ -1,9 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useUser } from '../hooks/useUser.jsx';
 import './ImageManager.css';
 
 const VISIBLE_COUNT = 8;
 
+// Client-side mirror of lib/permissions.js hasPermission — cosmetic gating only,
+// backend re-checks on every write (update_product_full).
+function hasImagesPermission(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return Array.isArray(user.permissions) && user.permissions.includes('products:images');
+}
+
 export default function ImageManager({ images, editing, onChange }) {
+  const { user } = useUser();
+  const canEditImages = hasImagesPermission(user);
+  const canDrag = editing && canEditImages;
   const [expanded, setExpanded] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const [dropIndex, setDropIndex] = useState(null);
@@ -68,17 +80,17 @@ export default function ImageManager({ images, editing, onChange }) {
             <div
               key={img.id || i}
               className={cls}
-              draggable={editing}
-              onDragStart={editing ? handleDragStart(i) : undefined}
-              onDragOver={editing ? handleDragOver(i) : undefined}
-              onDrop={editing ? handleDrop(i) : undefined}
-              onDragEnd={editing ? handleDragEnd : undefined}
+              draggable={canDrag}
+              onDragStart={canDrag ? handleDragStart(i) : undefined}
+              onDragOver={canDrag ? handleDragOver(i) : undefined}
+              onDrop={canDrag ? handleDrop(i) : undefined}
+              onDragEnd={canDrag ? handleDragEnd : undefined}
             >
               <img src={src} alt="" className="imgm-thumb" loading="lazy" draggable={false} />
               {i === 0 && <span className="imgm-badge">Cover</span>}
               <div className="imgm-actions">
                 <button className="imgm-action" onClick={(e) => { e.stopPropagation(); openLightbox(i); }} title="Zoom">⛶</button>
-                {editing && <button className="imgm-action imgm-action--delete" onClick={(e) => { e.stopPropagation(); handleDelete(i); }} title="Remove">x</button>}
+                {editing && <button className="imgm-action imgm-action--delete" disabled={!canEditImages} onClick={(e) => { e.stopPropagation(); handleDelete(i); }} title="Remove">x</button>}
               </div>
             </div>
           );
@@ -88,7 +100,7 @@ export default function ImageManager({ images, editing, onChange }) {
         )}
       </div>
       {editing && allImages.length > 1 && (
-        <div className="imgm-hint">Drag images to reorder. First image is the cover.</div>
+        <div className="imgm-hint">{canEditImages ? 'Drag images to reorder. First image is the cover.' : "You don't have permission to edit images."}</div>
       )}
 
       {lightbox !== null && (() => {

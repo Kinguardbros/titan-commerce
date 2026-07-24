@@ -5,6 +5,7 @@ import { useToast } from '../hooks/useToast.jsx';
 import StatusFilter from '../components/products/StatusFilter';
 import SelectionToolbar from '../components/products/SelectionToolbar';
 import BulkConfirmModal from '../components/products/BulkConfirmModal';
+import PermissionGate from '../components/PermissionGate';
 import './Products.css';
 
 const ImportModal = lazy(() => import('../components/ImportModal'));
@@ -307,9 +308,11 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           <button className="products-sync-btn" onClick={handleRefreshSizeCharts} disabled={refreshingSC} title="Check Shopify for size chart metafields">
             {refreshingSC ? 'Checking...' : '📏 Size Charts'}
           </button>
-          <button className="products-sync-btn" onClick={handleExportCsv} title="Download filtered products as CSV">
-            Export CSV
-          </button>
+          <PermissionGate perm="products:publications">
+            <button className="products-sync-btn" onClick={handleExportCsv} title="Download filtered products as CSV">
+              Export CSV
+            </button>
+          </PermissionGate>
           <button className="products-sync-btn" onClick={handleSync} disabled={syncing}>
             {syncing ? 'Syncing...' : 'Sync Shopify'}
           </button>
@@ -394,13 +397,15 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
         </div>
       </div>
 
-      <SelectionToolbar
-        selectedCount={selectedIds.size}
-        onMakeUnlisted={() => openBulk('unlist')}
-        onMakeListed={() => openBulk('list')}
-        onExportCsv={handleExportCsv}
-        onClear={clearSelection}
-      />
+      <PermissionGate perm="products:publications">
+        <SelectionToolbar
+          selectedCount={selectedIds.size}
+          onMakeUnlisted={() => openBulk('unlist')}
+          onMakeListed={() => openBulk('list')}
+          onExportCsv={handleExportCsv}
+          onClear={clearSelection}
+        />
+      </PermissionGate>
       <BulkConfirmModal
         open={!!bulkModal}
         title={bulkModal?.mode === 'unlist' ? 'Make Unlisted' : 'Make Listed'}

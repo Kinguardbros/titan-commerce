@@ -6,12 +6,23 @@ import ImageManager from './ImageManager';
 import MetafieldEditor from './MetafieldEditor';
 import SizeChartEditor from './SizeChartEditor';
 import { useToast } from '../hooks/useToast.jsx';
+import { useUser } from '../hooks/useUser.jsx';
 import './ProductDetail.css';
 
 const STATUS_OPTIONS = ['active', 'draft', 'archived'];
 
+// Client-side mirror of lib/permissions.js hasPermission — cosmetic gating only,
+// backend re-checks on every write (update_product_full).
+function hasEditPermission(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return Array.isArray(user.permissions) && user.permissions.includes('products:edit');
+}
+
 export default function ProductDetail({ product, storeId, store }) {
   const toast = useToast();
+  const { user } = useUser();
+  const canEdit = hasEditPermission(user);
   const [detail, setDetail] = useState(null);
   const [metafields, setMetafields] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,7 +153,7 @@ export default function ProductDetail({ product, storeId, store }) {
           {/* Title */}
           <div className="pd-card">
             <div className="pd-field-label">Title</div>
-            <input className="pd-input pd-input--title" value={title}
+            <input className="pd-input pd-input--title" disabled={!canEdit} value={title}
               onChange={(e) => { setTitle(e.target.value); markDirty(); }} />
           </div>
 
@@ -150,14 +161,14 @@ export default function ProductDetail({ product, storeId, store }) {
           <div className="pd-card">
             <div className="pd-field-label">Description</div>
             <div className="pd-desc-toolbar">
-              <button className="pd-toolbar-btn" title="Bold" onClick={() => { setDescription((d) => d + '<strong></strong>'); markDirty(); }}><b>B</b></button>
-              <button className="pd-toolbar-btn" title="Italic" onClick={() => { setDescription((d) => d + '<em></em>'); markDirty(); }}><i>I</i></button>
-              <button className="pd-toolbar-btn" title="Underline" onClick={() => { setDescription((d) => d + '<u></u>'); markDirty(); }}><u>U</u></button>
+              <button className="pd-toolbar-btn" disabled={!canEdit} title="Bold" onClick={() => { setDescription((d) => d + '<strong></strong>'); markDirty(); }}><b>B</b></button>
+              <button className="pd-toolbar-btn" disabled={!canEdit} title="Italic" onClick={() => { setDescription((d) => d + '<em></em>'); markDirty(); }}><i>I</i></button>
+              <button className="pd-toolbar-btn" disabled={!canEdit} title="Underline" onClick={() => { setDescription((d) => d + '<u></u>'); markDirty(); }}><u>U</u></button>
               <span className="pd-toolbar-sep" />
-              <button className="pd-toolbar-btn" title="List" onClick={() => { setDescription((d) => d + '\n<ul>\n<li></li>\n</ul>'); markDirty(); }}>List</button>
-              <button className="pd-toolbar-btn" title="Link" onClick={() => { setDescription((d) => d + '<a href=""></a>'); markDirty(); }}>Link</button>
+              <button className="pd-toolbar-btn" disabled={!canEdit} title="List" onClick={() => { setDescription((d) => d + '\n<ul>\n<li></li>\n</ul>'); markDirty(); }}>List</button>
+              <button className="pd-toolbar-btn" disabled={!canEdit} title="Link" onClick={() => { setDescription((d) => d + '<a href=""></a>'); markDirty(); }}>Link</button>
             </div>
-            <textarea className="pd-textarea pd-textarea--desc" rows={10} value={description}
+            <textarea className="pd-textarea pd-textarea--desc" disabled={!canEdit} rows={10} value={description}
               onChange={(e) => { setDescription(e.target.value); markDirty(); }} />
           </div>
 
@@ -179,7 +190,7 @@ export default function ProductDetail({ product, storeId, store }) {
           {/* Status */}
           <div className="pd-card">
             <div className="pd-field-label">Status</div>
-            <select className={`pd-select pd-select--status ${statusColor}`} value={status}
+            <select className={`pd-select pd-select--status ${statusColor}`} disabled={!canEdit} value={status}
               onChange={(e) => { setStatus(e.target.value); markDirty(); }}>
               {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
@@ -190,17 +201,17 @@ export default function ProductDetail({ product, storeId, store }) {
             <div className="pd-card-heading">Product organization</div>
             <div className="pd-org-field">
               <div className="pd-field-label">Product type</div>
-              <input className="pd-input" value={productType}
+              <input className="pd-input" disabled={!canEdit} value={productType}
                 onChange={(e) => { setProductType(e.target.value); markDirty(); }} placeholder="e.g. Swimsuit" />
             </div>
             <div className="pd-org-field">
               <div className="pd-field-label">Vendor</div>
-              <input className="pd-input" value={vendor}
+              <input className="pd-input" disabled={!canEdit} value={vendor}
                 onChange={(e) => { setVendor(e.target.value); markDirty(); }} placeholder="e.g. Elegance House" />
             </div>
             <div className="pd-org-field">
               <div className="pd-field-label">Tags</div>
-              <TagInput tags={tags} onChange={(t) => { setTags(t); markDirty(); }} />
+              <TagInput tags={tags} disabled={!canEdit} onChange={(t) => { setTags(t); markDirty(); }} />
             </div>
           </div>
 
@@ -243,11 +254,11 @@ export default function ProductDetail({ product, storeId, store }) {
           <div className="pd-seo-edit">
             <div className="pd-org-field">
               <div className="pd-field-label">Meta title <span className="pd-char-hint">{seoTitle.length}/70</span></div>
-              <input className="pd-input" value={seoTitle} onChange={(e) => { setSeoTitle(e.target.value); markDirty(); }} maxLength={70} />
+              <input className="pd-input" disabled={!canEdit} value={seoTitle} onChange={(e) => { setSeoTitle(e.target.value); markDirty(); }} maxLength={70} />
             </div>
             <div className="pd-org-field">
               <div className="pd-field-label">Meta description <span className="pd-char-hint">{seoDesc.length}/160</span></div>
-              <textarea className="pd-textarea" rows={3} value={seoDesc} onChange={(e) => { setSeoDesc(e.target.value); markDirty(); }} maxLength={160} />
+              <textarea className="pd-textarea" disabled={!canEdit} rows={3} value={seoDesc} onChange={(e) => { setSeoDesc(e.target.value); markDirty(); }} maxLength={160} />
             </div>
           </div>
         )}
@@ -259,7 +270,7 @@ export default function ProductDetail({ product, storeId, store }) {
           <div className="pd-save-bar-inner">
             <span className="pd-save-bar-text">Unsaved changes</span>
             <button className="pd-discard-btn" onClick={handleDiscard}>Discard</button>
-            <button className="pd-save-btn" onClick={handleSave} disabled={saving || dbOnly}>{saving ? 'Saving...' : dbOnly ? 'Read-only' : 'Save'}</button>
+            <button className="pd-save-btn" onClick={handleSave} disabled={saving || dbOnly || !canEdit}>{saving ? 'Saving...' : dbOnly ? 'Read-only' : !canEdit ? 'No permission' : 'Save'}</button>
           </div>
         </div>
       )}

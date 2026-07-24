@@ -11,6 +11,7 @@ import { approveAd, rejectAd, updateCreative, convertToVideo, pushCreativeToShop
 import Breadcrumbs from '../components/Breadcrumbs';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
+import PermissionGate from '../components/PermissionGate';
 import './ProductWorkspace.css';
 
 const ProductDetail = lazy(() => import('../components/ProductDetail'));
@@ -112,10 +113,14 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
           { label: product.title },
         ]} />
         <div className="pw-topbar-actions">
-          <button className="pw-action-btn" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
-          <button className="pw-action-btn pw-action-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+          <PermissionGate perm="creatives:generate">
+            <button className="pw-action-btn" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
+            <button className="pw-action-btn pw-action-btn--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+          </PermissionGate>
           <button className="pw-action-btn pw-action-btn--story" onClick={() => setShowPhotoStory(true)}>Photo Story</button>
-          <button className="pw-action-btn pw-action-btn--optimize" onClick={() => setShowOptimize(true)}>Optimize</button>
+          <PermissionGate perm="products:edit">
+            <button className="pw-action-btn pw-action-btn--optimize" onClick={() => setShowOptimize(true)}>Optimize</button>
+          </PermissionGate>
           <button className="pw-action-btn pw-action-btn--reviews" onClick={() => setShowReviews(true)}>Reviews</button>
           {onNavigateToStudio && (
             <button className="pw-action-btn pw-action-btn--muted" onClick={() => onNavigateToStudio(product.id)}>Studio</button>
@@ -226,10 +231,12 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
             {generating.length === 0 && pending.length === 0 && approved.length === 0 && !(isAllMedia && shopifyImages.length > 0) && (
               <div className="pw-empty">
                 <div>No {STYLES.find((s) => s.key === activeStyle)?.label.toLowerCase()} yet</div>
-                <div className="pw-empty-actions">
-                  <button className="pw-action-btn-sm" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
-                  <button className="pw-action-btn-sm pw-action-btn-sm--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
-                </div>
+                <PermissionGate perm="creatives:generate">
+                  <div className="pw-empty-actions">
+                    <button className="pw-action-btn-sm" onClick={() => { setGenerateMode('image'); setShowGenerate(true); }}>+ Image</button>
+                    <button className="pw-action-btn-sm pw-action-btn-sm--video" onClick={() => { setGenerateMode('video'); setShowGenerate(true); }}>+ Video</button>
+                  </div>
+                </PermissionGate>
               </div>
             )}
           </>

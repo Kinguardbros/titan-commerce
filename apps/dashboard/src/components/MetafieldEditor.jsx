@@ -1,7 +1,18 @@
 import { useState } from 'react';
+import { useUser } from '../hooks/useUser.jsx';
 import './MetafieldEditor.css';
 
+// Client-side mirror of lib/permissions.js hasPermission — cosmetic gating only,
+// backend re-checks on every write (update_product_full).
+function hasEditPermission(user) {
+  if (!user) return false;
+  if (user.role === 'admin') return true;
+  return Array.isArray(user.permissions) && user.permissions.includes('products:edit');
+}
+
 export default function MetafieldEditor({ metafields, editing, onChange }) {
+  const { user } = useUser();
+  const canEdit = hasEditPermission(user);
   const [newNs, setNewNs] = useState('custom');
   const [newKey, setNewKey] = useState('');
   const [newVal, setNewVal] = useState('');
@@ -30,7 +41,7 @@ export default function MetafieldEditor({ metafields, editing, onChange }) {
         <div key={m.id || `${m.namespace}.${m.key}`} className="mfe-row">
           <span className="mfe-key">{m.namespace}.{m.key}</span>
           {editing ? (
-            <textarea className="mfe-value-edit" value={m.value || ''} onChange={(e) => handleChange(i, 'value', e.target.value)} rows={1} />
+            <textarea className="mfe-value-edit" disabled={!canEdit} value={m.value || ''} onChange={(e) => handleChange(i, 'value', e.target.value)} rows={1} />
           ) : (
             <span className="mfe-value">{(m.value || '').slice(0, 120)}{m.value?.length > 120 ? '...' : ''}</span>
           )}
@@ -38,10 +49,10 @@ export default function MetafieldEditor({ metafields, editing, onChange }) {
       ))}
       {editing && (
         <div className="mfe-add">
-          <input className="mfe-add-input mfe-add-ns" value={newNs} onChange={(e) => setNewNs(e.target.value)} placeholder="namespace" />
-          <input className="mfe-add-input" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="key" />
-          <input className="mfe-add-input mfe-add-val" value={newVal} onChange={(e) => setNewVal(e.target.value)} placeholder="value" />
-          <button className="mfe-add-btn" onClick={handleAdd} disabled={!newKey.trim()}>+</button>
+          <input className="mfe-add-input mfe-add-ns" disabled={!canEdit} value={newNs} onChange={(e) => setNewNs(e.target.value)} placeholder="namespace" />
+          <input className="mfe-add-input" disabled={!canEdit} value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="key" />
+          <input className="mfe-add-input mfe-add-val" disabled={!canEdit} value={newVal} onChange={(e) => setNewVal(e.target.value)} placeholder="value" />
+          <button className="mfe-add-btn" onClick={handleAdd} disabled={!canEdit || !newKey.trim()}>+</button>
         </div>
       )}
     </div>
