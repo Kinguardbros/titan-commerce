@@ -2,16 +2,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
-    from: () => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      order: vi.fn().mockReturnThis(),
-      not: vi.fn().mockReturnThis(),
-      limit: vi.fn(async () => ({ data: [], error: null })),
-      single: vi.fn(async () => ({ data: null, error: null })),
-      insert: vi.fn(async () => ({ error: null })),
-      update: vi.fn().mockReturnThis(),
-    }),
+    from: () => {
+      // Supabase's real query builder is thenable AND chainable at every step (e.g.
+      // .limit(20).eq('store_id', x) is valid — .eq() after .limit() further narrows
+      // the query). Mirror that here: `limit` returns an object that is both awaitable
+      // (resolves to {data:[],error:null}) and still has a chainable `.eq`.
+      const limitResult = Object.assign(Promise.resolve({ data: [], error: null }), {
+        eq: vi.fn().mockReturnThis(),
+      });
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        not: vi.fn().mockReturnThis(),
+        limit: vi.fn(() => limitResult),
+        single: vi.fn(async () => ({ data: null, error: null })),
+        insert: vi.fn(async () => ({ error: null })),
+        update: vi.fn().mockReturnThis(),
+      };
+    },
   }),
 }));
 vi.mock('../lib/store-context.js', () => ({ getStore: vi.fn().mockResolvedValue({ id: 's1', admin_token: 't', shopify_url: 'x.myshopify.com' }), getAllStores: vi.fn().mockResolvedValue([]) }));
@@ -113,20 +122,38 @@ describe('Wave 2 — spot-check permission gates', () => {
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('poll_generations: allows member with creatives:generate', async () => {
+  it('poll_generations: allows member with creatives:generate and matching store_id', async () => {
     const { poll_generations } = await import('../lib/actions/creatives.js');
     const GENERATOR = { role: 'member', permissions: ['creatives:generate'], store_access: ['s1'] };
-    // No store_id — takes the query-without-.eq() path, keeping the shared mock's chain simple.
-    const { req, res } = mockReqRes({ query: {}, user: GENERATOR });
+    const { req, res } = mockReqRes({ query: { store_id: 's1' }, user: GENERATOR });
     await poll_generations(req, res);
     expect(res.status).not.toHaveBeenCalledWith(403);
   });
 
-  it('poll_generations: passes gate for admin', async () => {
+  it('poll_generations: passes gate for admin without store_id', async () => {
     const { poll_generations } = await import('../lib/actions/creatives.js');
     const { req, res } = mockReqRes({ query: {}, user: ADMIN });
     await poll_generations(req, res);
     expect(res.status).not.toHaveBeenCalledWith(403);
+  });
+
+  // T6 review Critical fix: poll_generations is a WRITE (finalizes/retries/fails creatives) —
+  // an unscoped or wrong-store call previously let a member mutate creatives across stores
+  // they don't have access to (or ALL stores, if store_id was omitted entirely).
+  it('poll_generations: rejects member without store_id (cross-store mutation risk)', async () => {
+    const { poll_generations } = await import('../lib/actions/creatives.js');
+    const GENERATOR = { role: 'member', permissions: ['creatives:generate'], store_access: ['s1'] };
+    const { req, res } = mockReqRes({ query: {}, user: GENERATOR });
+    await poll_generations(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('poll_generations: rejects member for wrong store', async () => {
+    const { poll_generations } = await import('../lib/actions/creatives.js');
+    const GENERATOR = { role: 'member', permissions: ['creatives:generate'], store_access: ['s1'] };
+    const { req, res } = mockReqRes({ query: { store_id: 's2' }, user: GENERATOR });
+    await poll_generations(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
   });
 
   it('profit_summary: 403s for non-admin caller with no store_id (would otherwise leak cross-store P&L)', async () => {
@@ -141,5 +168,36 @@ describe('Wave 2 — spot-check permission gates', () => {
     const { req, res } = mockReqRes({ body: { store_name: 'Isola', file_name: 'a.pdf', file_data: 'AA==' }, user: READER });
     await upload_store_doc(req, res);
     expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  // T6 review Important fix: pipeline_log had ZERO permission or store gates — any
+  // authenticated user (even with zero permissions) could see 50 pipeline log entries
+  // across ALL stores if they omitted store_id.
+  it('pipeline_log: 403s without products:read', async () => {
+    const { pipeline_log } = await import('../lib/actions/pipeline.js');
+    const { req, res } = mockReqRes({ query: { store_id: 's1' }, user: NO_PERMS });
+    await pipeline_log(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('pipeline_log: rejects member without store_id (cross-store leak risk)', async () => {
+    const { pipeline_log } = await import('../lib/actions/pipeline.js');
+    const { req, res } = mockReqRes({ query: {}, user: READER });
+    await pipeline_log(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('pipeline_log: rejects member for wrong store', async () => {
+    const { pipeline_log } = await import('../lib/actions/pipeline.js');
+    const { req, res } = mockReqRes({ query: { store_id: 's2' }, user: READER });
+    await pipeline_log(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('pipeline_log: allows admin without store_id', async () => {
+    const { pipeline_log } = await import('../lib/actions/pipeline.js');
+    const { req, res } = mockReqRes({ query: {}, user: ADMIN });
+    await pipeline_log(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(403);
   });
 });
