@@ -22,6 +22,8 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 
 -- Defense-in-depth only — backend uses the service-role key (bypasses RLS by design,
 -- per CLAUDE.md). This policy protects against a leaked anon/authenticated key.
-CREATE POLICY IF NOT EXISTS "authenticated_select_users" ON users
+-- Postgres has no CREATE POLICY IF NOT EXISTS — use DROP + CREATE for idempotency.
+DROP POLICY IF EXISTS "authenticated_select_users" ON users;
+CREATE POLICY "authenticated_select_users" ON users
   FOR SELECT
   USING (auth.role() = 'authenticated');
