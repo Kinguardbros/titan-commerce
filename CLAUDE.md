@@ -158,7 +158,7 @@ Key patterns:
 | Shopify | `Shopify.jsx` | ShopifyDashboard (KPIs, revenue chart, top products, traffic, orders) + inline Pricing (bulk price editor) |
 | Studio | `Studio.jsx` | Branded content + product creatives via `CreativeStudio` component (style picker, model, pose, framing, count) + collapsible **Bulk Generate** panel (multi-product) + `CreativeDetailModal` review |
 | Avatars | `Avatars.jsx` | Persona avatars: per-persona reference photos for model consistency. `AvatarBuilder` (generate / "From Photo" / custom builder), `AvatarDetail` (manage variants, set reference) |
-| Products | `Products.jsx` → `ProductWorkspace.jsx` | Paginated product grid (50/page, load more, filters, sort, search, sync, import, 3 view modes) → per-product workspace (creatives by style via `CreativeStudio`, optimize via `OptimizePanel`, PhotoStory via `PhotoStoryModal`, size chart, full product detail + editor) |
+| Products | `Products.jsx` → `ProductWorkspace.jsx` | Paginated product grid (50/page, load more, filters, sort, search, sync, import, 3 view modes) → per-product workspace (creatives by style via `CreativeStudio`, optimize via `OptimizePanel`, PhotoStory via `PhotoStoryModal`, size chart, full product detail + editor); bulk publications management (Make Unlisted / Make Listed) + CSV export |
 | Profit | `Profit.jsx` | P&L dashboard: daily revenue/returns/COGS/shipping/per-gateway fees/adspend/profit, accuracy indicators, COGS management, manual adspend, CSV export, storage cleanup |
 
 > `apps/dashboard/src/pages/Overview.jsx` is **dead code** (superseded by `Cockpit.jsx`) — safe to delete.
@@ -216,7 +216,8 @@ Key patterns:
 | `claude.js` | Claude API wrapper — dynamic per-store brand system prompt from `store_skills` (fallback: generic + store name), `optimizeProduct()` |
 | `higgsfield.js` | Higgsfield image/video generation + `buildStyledPrompt()` (built-in styles + `cs_` custom styles from `store_skills`) + per-store brand context + feedback learning. ⚠️ large file, fragile prompt logic. |
 | `fal.js` | fal.ai image generation — `generateFal()`, `submitFalJob()` (fire-and-forget), `checkFalJob()` (poll). `buildFalBody()` per-model bodies; **forces `resolution: "2K"` for Nano Banana**. |
-| `shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) |
+| `shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) + `graphql()` for Publications mutations |
+| `shopify-publications.js` | `getOnlineStorePublicationId(client)` — one-shot GraphQL lookup of the Online Store publication GID |
 | `meta-api.js` | Meta Marketing API: read-only (insights, campaigns, active ads) |
 | `supabase.js` | Supabase server-side client (service role) |
 | `scraper-utils.js` | Product scraping + hook/headline generation |
@@ -253,6 +254,8 @@ Key patterns:
 | `pricing.js` | `update_cogs`, `manual_adspend` |
 | `avatars.js` | `persona_avatars`, `generate_avatar`, `upload_avatar`, `set_avatar_reference`, `delete_avatar` |
 | `sync.js` | `sync_products` — full Shopify product + collections sync (collections via GraphQL Admin API) |
+| `publications.js` | `bulk_make_unlisted`, `bulk_make_listed` — GraphQL `publishablePublish`/`publishableUnpublish` on Online Store publication, per-product try/catch |
+| `exports.js` | `export_products_csv` — RFC 4180 + UTF-8 BOM, whitelisted columns (title, product_url, visibility) |
 | `webhooks.js` | `register_webhooks`, `list_webhooks`, `unregister_webhooks` |
 | `reviews*.js` | Product reviews, split across 6 action modules + `reviews-shared.js` (service-role client + `computeSummary` + shared image/photo helpers `decodeAndValidateImage` / `uploadReviewImage` / `safePhotoUrl` / `deleteReviewPhoto` / `flagProductNeedsRepush`): **`reviews.js`** = Phase 1 core (`product_reviews_list`, `add_review_manual`, `update_review`, `delete_review`, `set_review_status`, `seed_reviews_helpful` — every query filters `store_id` (+ `product_id`); id-based mutations **require `store_id`**. `update_review` can also set `helpful_count`; `seed_reviews_helpful` gives a product's reviews a random helpful_count in [min,max] via the `seed_reviews_helpful` RPC). **`reviews-import.js`** = `import_reviews_csv` (Phase 3 bulk: own CSV parser, or fetches a Google Sheets CSV export server-side; `pending`/`source='csv'`, rate-limited 20/hr). **`reviews-ai.js`** = `generate_reviews_ai` (Phase 4: Claude `claude-sonnet-4` writes N reviews from product title/desc; `tone` positive/mix; `pending`/`source='ai'`, 20/hr; **own prompt, NOT in claude.js**). **`reviews-photo.js`** = `upload_review_photo` (Phase 4: base64 → Supabase Storage `store-docs` `{store}/Reviews/{productId}/`, returns `photo_url`; UUID + magic-byte + 8 MB validation). **`reviews-push.js`** = `push_reviews_to_shopify` (Phase 2: idempotent rebuild of `custom.reviews_json` (incl. each review's `id` + `helpful_count` for storefront voting) + `custom.reviews_summary` from approved+published reviews; gated on `hasAdminAccess`, skips archived/un-synced products; marks pushed reviews `published`, clears `dirty`). **`reviews-public.js`** = `submit_review_public` + `vote_review_helpful` (PUBLIC POST — `{review_id}` → atomic `increment_review_helpful` RPC; IP 30/hr + global 500/hr; "already voted" held client-side via localStorage) + `review_helpful_counts` (PUBLIC GET — `{shopify_product_id}` → live `[{id, helpful_count}]` so storefront shows current counts between pushes). `submit_review_public` (**PUBLIC/unauthenticated** storefront submission — maps Shopify `product_id` → TC store/product, inserts `pending`/`source='web'`; per-IP rate-limit 5/hr (keyed on non-spoofable `x-real-ip`) + global cap `review_submit_global` 200/hr + honeypot `company` + HTML strip + length caps; duplicate submit answered gracefully (dedup pre-check before any photo upload, + `23505` catch → `200 {duplicate:true}`); optional `email`; optional `photo_base64` (Wave 2) validated via shared `decodeAndValidateImage` (magic-byte JPEG/PNG/WebP, 5 MB cap) + `uploadReviewImage` → Storage; visitor resizes client-side first). `delete_review` / `set_review_status` flag a product for re-push when a **published** review is removed/rejected (badge surfaces staleness) and `delete_review` removes the photo from Storage. `add_review_manual`/`update_review`/CSV import run `photo_url` through `safePhotoUrl` (http(s) only — blocks `javascript:`/`data:` XSS). |
 | **API endpoints** (`api/`) — 12 routes (Vercel Hobby limit) | |
@@ -271,7 +274,7 @@ Key patterns:
 | **Agents** (`agents/`) — pipeline agent specs (not all wired yet) | |
 | `scraper.md` | SCRAPER: URL scraping → structured ad briefs for FORGE |
 | `forge.md` | FORGE: ad creative generation from briefs |
-| `publisher.md` | PUBLISHER: push approved creatives to Meta Ads (future) |
+| `publisher.md` | PUBLISHER: push approved creatives to Meta Ads (future). **PUBLISHER agent name itself is wired** — used today by `lib/actions/publications.js` bulk Shopify Online Store publish/unpublish (`pipeline_log` agent=`PUBLISHER`); the Meta Ads push described here remains future. |
 | `looper.md` | LOOPER: Meta performance scoring → feedback to FORGE (future) |
 | `style-analyzer.md` | STYLE_ANALYZER: Claude Vision visual style extraction |
 | **Product knowledge skills** (`.claude/skills/`) | |
@@ -289,8 +292,8 @@ Key patterns:
 
 | Table | Purpose |
 |-------|---------|
-| `stores` | Multi-store config: shopify_url, admin_token, storefront_token, client_secret (OAuth), currency, name, vendor, `brand_config` JSONB (payment_fees, transaction_fee_pct, logos, etc.) |
-| `products` | Shopify products (synced): handle, title, price, images JSONB, `tags` JSONB (= collection memberships, set by full sync only), `product_type`, `vendor`, `status` (active/archived), `cogs`, `has_size_chart`, `garment_length` (text, `'short' \| 'mid' \| 'long' \| NULL` — populated lazily by Claude Vision on the first v1 generation, cached forever), `store_id` FK |
+| `stores` | Multi-store config: shopify_url, admin_token, storefront_token, client_secret (OAuth), currency, name, vendor, `brand_config` JSONB (payment_fees, transaction_fee_pct, logos, etc.), `online_store_publication_id` (GraphQL GID for Online Store publication) |
+| `products` | Shopify products (synced): handle, title, price, images JSONB, `tags` JSONB (= collection memberships, set by full sync only), `product_type`, `vendor`, `status` (active/archived), `cogs`, `has_size_chart`, `garment_length` (text, `'short' \| 'mid' \| 'long' \| NULL` — populated lazily by Claude Vision on the first v1 generation, cached forever), `store_id` FK, `publication_online_store` (BOOLEAN, cached Online Store publication state; false = unlisted) |
 | `creatives` | Generated ad creatives (image/video): file_url, storage_path, format, status (generating/pending/approved/rejected/published/failed), `metadata` JSONB (style, audience, model, hook_used, poll info), `product_id`, `story_id`, `store_id` FK |
 | `store_skills` | Compiled per-store knowledge: `skill_type` (brand-voice, audience-personas, product-{slug}, custom-style-{slug}, ...), title, content, `metadata` JSONB. Used by `lib/claude.js` (brand voice) and `lib/higgsfield.js` (`cs_` custom styles). `UNIQUE(store_id, skill_type)`. |
 | `store_knowledge` | Raw extracted insights from uploaded store docs (category, insights, processed_at) — fallback when no compiled skill exists |
@@ -311,6 +314,7 @@ Key patterns:
 ### RLS & migrations
 - All tables have RLS enabled (`sql/enable-rls-all.sql`). Service-role bypasses RLS — backend uses service role.
 - Migrations are individual `sql/*.sql` files (run in order in Supabase SQL Editor). `sql/schema.sql` is the original base; the `add-*.sql` files layer on top.
+- `sql/add-publications-manager.sql` — adds `stores.online_store_publication_id` + `products.publication_online_store`.
 - Realtime enabled on relevant tables (`sql/enable-realtime.sql`, `sql/enable-delete-realtime.sql`).
 
 ### Indexes
@@ -520,7 +524,7 @@ Dashboard → Password gate (Login.jsx)
 | 🟢 LOW | `pages/Overview.jsx` is dead code | Superseded by `Cockpit.jsx` — delete |
 | 🟢 LOW | Product docs drag & drop upload (Supabase Storage) | Future |
 | 🟢 LOW | Product Optimizer — auto-detect unoptimized imports | Future |
-| 🟢 LOW | PUBLISHER agent (auto-publish to Meta) / LOOPER agent (performance scoring loop) | Future |
+| 🟢 LOW | PUBLISHER agent auto-publish to **Meta** / LOOPER agent (performance scoring loop) | Future — PUBLISHER is now wired for Shopify Online Store bulk publish/unpublish (`lib/actions/publications.js`); only the Meta Ads auto-publish use case remains unbuilt |
 | 🟢 LOW | TikTok/Pinterest API integration (replace manual adspend) | Future |
 | 🟢 LOW | Full mobile responsive design | Partial |
 | 🟢 LOW | `getAllProducts` caps at 200 | Filters/search incomplete for stores >200 products (none currently) |

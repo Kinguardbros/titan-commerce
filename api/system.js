@@ -23,6 +23,8 @@ import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo, delete_review_photo } from '../lib/actions/reviews-photo.js';
 import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
 import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
+import { export_products_csv } from '../lib/actions/exports.js';
+import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publications.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -100,6 +102,9 @@ const POST_ACTIONS = {
   delete_review_photo,
   generate_reviews_ai,
   push_reviews_to_shopify,
+  export_products_csv,
+  bulk_make_unlisted,
+  bulk_make_listed,
 };
 
 // Actions callable cross-origin from the storefront need CORS headers.

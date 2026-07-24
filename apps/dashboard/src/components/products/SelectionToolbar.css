@@ -1,0 +1,66 @@
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  margin: 12px 0;
+  background: var(--surface-2, #1a1a1e);
+  border: 1px solid var(--border, #2a2a30);
+  border-radius: 8px;
+}
+
+.selection-toolbar__count {
+  font-weight: 600;
+  color: var(--text-primary, #eee);
+}
+
+.selection-toolbar__actions {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.selection-toolbar__btn {
+  background: transparent;
+  color: var(--text-primary, #eee);
+  border: 1px solid var(--border, #2a2a30);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.selection-toolbar__btn--primary {
+  background: var(--accent, #6c5ce7);
+  border-color: var(--accent, #6c5ce7);
+  color: #fff;
+}
+
+.selection-toolbar__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--surface-2, #1a1a1e);
+  border: 1px solid var(--border, #2a2a30);
+  border-radius: 6px;
+  min-width: 220px;
+  z-index: 20;
+  overflow: hidden;
+}
+
+.selection-toolbar__menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  background: transparent;
+  color: var(--text-primary, #eee);
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.selection-toolbar__menu button:hover {
+  background: var(--surface-3, #26262c);
+}
