@@ -55,52 +55,65 @@ describe('export_products_csv', () => {
   });
 
   it('returns CSV with header only when 0 rows (never 404)', async () => {
-    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com' });
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com', shopify_handle: 'isola' });
     productsRows.rows = [];
     const { req, res } = mockReqRes({ store_id: 's1' });
     await export_products_csv(req, res);
     expect(res._status).toBe(200);
     expect(res._headers['content-type']).toContain('text/csv');
     // Body starts with UTF-8 BOM + header row
-    expect(res._body.startsWith('﻿title,product_url,visibility')).toBe(true);
+    expect(res._body.startsWith('﻿title,admin_url,visibility')).toBe(true);
     // Only header (+ trailing newline)
     expect(res._body.split('\n').filter(Boolean)).toHaveLength(1);
   });
 
   it('maps visibility correctly from status + publication_online_store', async () => {
-    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com' });
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com', shopify_handle: 'isola' });
     productsRows.rows = [
-      { title: 'A', product_url: 'https://x/a', status: 'archived', publication_online_store: true },
-      { title: 'B', product_url: 'https://x/b', status: 'draft', publication_online_store: true },
-      { title: 'C', product_url: 'https://x/c', status: 'active', publication_online_store: false },
-      { title: 'D', product_url: 'https://x/d', status: 'active', publication_online_store: true },
-      { title: 'E', product_url: 'https://x/e', status: 'active', publication_online_store: null },
+      { title: 'A', shopify_id: 111, status: 'archived', publication_online_store: true },
+      { title: 'B', shopify_id: 222, status: 'draft', publication_online_store: true },
+      { title: 'C', shopify_id: 333, status: 'active', publication_online_store: false },
+      { title: 'D', shopify_id: 444, status: 'active', publication_online_store: true },
+      { title: 'E', shopify_id: 555, status: 'active', publication_online_store: null },
     ];
     const { req, res } = mockReqRes({ store_id: 's1' });
     await export_products_csv(req, res);
     const lines = res._body.split('\n');
-    expect(lines[1]).toBe('A,https://x/a,archived');
-    expect(lines[2]).toBe('B,https://x/b,draft');
-    expect(lines[3]).toBe('C,https://x/c,unlisted');
-    expect(lines[4]).toBe('D,https://x/d,listed');
+    const AB = 'https://admin.shopify.com/store/isola/products';
+    expect(lines[1]).toBe(`A,${AB}/111,archived`);
+    expect(lines[2]).toBe(`B,${AB}/222,draft`);
+    expect(lines[3]).toBe(`C,${AB}/333,unlisted`);
+    expect(lines[4]).toBe(`D,${AB}/444,listed`);
     // null publication_online_store on active → listed (legacy default)
-    expect(lines[5]).toBe('E,https://x/e,listed');
+    expect(lines[5]).toBe(`E,${AB}/555,listed`);
   });
 
   it('RFC 4180-escapes titles with quotes, commas, and newlines', async () => {
-    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com' });
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'isola.myshopify.com', shopify_handle: 'isola' });
     productsRows.rows = [
-      { title: 'Say "hi"', product_url: 'https://x/a', status: 'active', publication_online_store: true },
-      { title: 'Red, White & Blue', product_url: 'https://x/b', status: 'active', publication_online_store: true },
-      { title: 'Multi\nline', product_url: 'https://x/c', status: 'active', publication_online_store: true },
+      { title: 'Say "hi"', shopify_id: 1, status: 'active', publication_online_store: true },
+      { title: 'Red, White & Blue', shopify_id: 2, status: 'active', publication_online_store: true },
+      { title: 'Multi\nline', shopify_id: 3, status: 'active', publication_online_store: true },
     ];
     const { req, res } = mockReqRes({ store_id: 's1' });
     await export_products_csv(req, res);
     const lines = res._body.split(/\r?\n/);
-    expect(lines[1]).toBe('"Say ""hi""",https://x/a,listed');
-    expect(lines[2]).toBe('"Red, White & Blue",https://x/b,listed');
+    const AB = 'https://admin.shopify.com/store/isola/products';
+    expect(lines[1]).toBe(`"Say ""hi""",${AB}/1,listed`);
+    expect(lines[2]).toBe(`"Red, White & Blue",${AB}/2,listed`);
     // Newline inside a quoted field — line split will not cleanly separate; assert it's quoted
     expect(res._body).toContain('"Multi\nline"');
+  });
+
+  it('falls back to shopify_url subdomain admin URL when shopify_handle missing', async () => {
+    getStoreMock.mockResolvedValue({ id: 's1', slug: 'isola', shopify_url: 'xsmcwa-i9.myshopify.com' });
+    productsRows.rows = [
+      { title: 'A', shopify_id: 999, status: 'active', publication_online_store: true },
+    ];
+    const { req, res } = mockReqRes({ store_id: 's1' });
+    await export_products_csv(req, res);
+    const lines = res._body.split('\n');
+    expect(lines[1]).toBe('A,https://xsmcwa-i9.myshopify.com/admin/products/999,listed');
   });
 
   it('sets Content-Disposition filename with store slug + today date', async () => {
