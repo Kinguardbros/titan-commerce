@@ -77,6 +77,9 @@ describe('system.js routing', () => {
       query: { action, ...extra },
       body: { action, ...extra },
       headers: {},
+      // Admin bypasses all permission/store-access gates — these tests exercise routing
+      // and response shape, not the permission layer (see wave2-permissions.test.js / T6).
+      user: { role: 'admin', permissions: [], store_access: [] },
     };
     const res = {
       status: vi.fn().mockReturnThis(),
