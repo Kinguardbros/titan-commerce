@@ -113,4 +113,11 @@ describe('system.js routing', () => {
     const responseData = res.json.mock.calls[0][0];
     expect(responseData[0].has_admin).toBe(true);
   });
+
+  it('me echoes req.user (populated by withAuth)', async () => {
+    const { req, res } = mockReqRes('GET', 'me');
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ user: req.user });
+  });
 });

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { StoreProvider, useActiveStore } from './hooks/useActiveStore.jsx';
 import { ToastProvider, useToast } from './hooks/useToast.jsx';
+import { UserProvider } from './hooks/useUser.jsx';
 import Login from './pages/Login';
 import Tooltip from './components/Tooltip';
 import NotificationBell from './components/NotificationBell';
@@ -232,7 +233,9 @@ export default function App() {
   return (
     <StoreProvider>
       <ToastProvider>
-        <AppContent />
+        <UserProvider>
+          <AppContent />
+        </UserProvider>
       </ToastProvider>
     </StoreProvider>
   );

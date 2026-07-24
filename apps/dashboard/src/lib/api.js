@@ -137,6 +137,11 @@ export function getStores() {
   return fetchJSON('/api/system?action=stores_list');
 }
 
+// Current authenticated user (master fallback or real user row)
+export function getMe() {
+  return fetchJSON('/api/system?action=me');
+}
+
 // Shopify
 export function getShopifyOverview(days = 7, storeId) {
   return fetchJSON(`/api/shopify/overview?days=${days}${storeId ? `&store_id=${storeId}` : ''}`);
