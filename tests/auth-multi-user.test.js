@@ -36,7 +36,8 @@ const supabaseFromMock = vi.fn((table) => {
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: supabaseFromMock }) }));
 
 const verifyPasswordMock = vi.fn();
-vi.mock('../lib/password.js', () => ({ verifyPassword: verifyPasswordMock }));
+const hashPasswordMock = vi.fn(async () => 'dummy-salt:dummy-hash');
+vi.mock('../lib/password.js', () => ({ verifyPassword: verifyPasswordMock, hashPassword: hashPasswordMock }));
 
 const rateLimitMock = vi.fn().mockResolvedValue(true);
 vi.mock('../lib/rate-limit.js', () => ({ rateLimit: rateLimitMock }));
@@ -181,5 +182,15 @@ describe('api/auth/login — new flow', () => {
     const res = mockRes();
     await handler(req, res);
     expect(res.statusCode).toBe(429);
+  });
+
+  it('unknown username still runs a password verification (constant-time defense)', async () => {
+    usersState.row = null;
+    verifyPasswordMock.mockResolvedValue(false);
+    const req = { method: 'POST', body: { username: 'nonexistent', password: 'wrongpass' }, headers: { 'x-real-ip': '1.1.1.1' } };
+    const res = mockRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
+    expect(verifyPasswordMock).toHaveBeenCalledWith('wrongpass', 'dummy-salt:dummy-hash');
   });
 });

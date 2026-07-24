@@ -1,10 +1,16 @@
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { verifyPassword } from '../../lib/password.js';
+import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { rateLimit } from '../../lib/rate-limit.js';
 
 const APP_PASSWORD = process.env.APP_PASSWORD;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// Constant-time login defense: unknown-username and inactive-user paths must pay the
+// same scrypt cost as a wrong-password check, or response latency leaks which usernames
+// exist (timing side channel — T4 review Important). Computed once at module load
+// (cold start); the value itself is irrelevant, it's never compared against anything real.
+const dummyHashPromise = hashPassword('constant-time-dummy-input');
 
 // Fail closed if APP_SECRET is missing — never sign tokens with a known default.
 function appSecret() {
@@ -65,10 +71,12 @@ export default async function handler(req, res) {
     .single();
 
   if (error || !user) {
+    await verifyPassword(password, await dummyHashPromise); // pay the same scrypt cost as a real check
     await logFailedLogin(username, ip, 'unknown username');
     return res.status(401).json({ error: 'Invalid credentials' });
   }
   if (!user.active) {
+    await verifyPassword(password, await dummyHashPromise); // pay the same scrypt cost as a real check
     await logFailedLogin(username, ip, 'inactive user');
     return res.status(401).json({ error: 'Invalid credentials' });
   }
