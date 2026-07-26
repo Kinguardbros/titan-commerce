@@ -1,0 +1,134 @@
+.user-form-backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay, rgba(0, 0, 0, 0.6));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(480px, 92vw);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.user-form-title {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.user-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text2);
+}
+
+.user-form input,
+.user-form select {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--sans);
+}
+
+.user-form input:focus,
+.user-form select:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.user-form input:disabled,
+.user-form select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.user-form-readonly {
+  font-family: var(--mono);
+  color: var(--text4);
+}
+
+.user-form fieldset {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
+.user-form fieldset legend {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text4);
+  padding: 0 4px;
+}
+
+.user-form-admin-note {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text4);
+  background: var(--gold-glow);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.user-form-active {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.user-form-active input[type='checkbox'] {
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.user-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.user-form-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.user-form-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.user-form-submit {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+  color: var(--void) !important;
+  font-weight: 600;
+}

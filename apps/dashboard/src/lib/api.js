@@ -22,6 +22,11 @@ async function fetchJSON(url, options = {}) {
     throw new Error('Rate limit — too many requests. Wait a minute and try again.');
   }
 
+  if (res.status === 403) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.hint || body.error || 'You don\'t have permission to do that');
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.hint || body.details || body.error || `Request failed (${res.status})`);
@@ -135,6 +140,11 @@ export function getKPIs() {
 // Stores
 export function getStores() {
   return fetchJSON('/api/system?action=stores_list');
+}
+
+// Current authenticated user (master fallback or real user row)
+export function getMe() {
+  return fetchJSON('/api/system?action=me');
 }
 
 // Shopify
@@ -584,6 +594,39 @@ export function bulkMakeListed(storeId, productShopifyIds) {
       store_id: storeId,
       product_shopify_ids: productShopifyIds,
     }),
+  });
+}
+
+// Users & Permissions
+export function listUsers() {
+  return fetchJSON('/api/system?action=users_list');
+}
+
+export function createUser(payload) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_user', ...payload }),
+  });
+}
+
+export function updateUser(payload) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_user', ...payload }),
+  });
+}
+
+export function deleteUser(userId) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_user', user_id: userId }),
+  });
+}
+
+export function resetPassword(userId) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'reset_password', user_id: userId }),
   });
 }
 

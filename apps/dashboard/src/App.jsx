@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { StoreProvider, useActiveStore } from './hooks/useActiveStore.jsx';
 import { ToastProvider, useToast } from './hooks/useToast.jsx';
+import { UserProvider, useUser } from './hooks/useUser.jsx';
 import Login from './pages/Login';
 import Tooltip from './components/Tooltip';
 import NotificationBell from './components/NotificationBell';
@@ -13,8 +14,19 @@ const ProductWorkspace = lazy(() => import('./pages/ProductWorkspace'));
 const Studio = lazy(() => import('./pages/Studio'));
 const Profit = lazy(() => import('./pages/Profit'));
 const Avatars = lazy(() => import('./pages/Avatars'));
+const Settings = lazy(() => import('./pages/Settings'));
 
-const TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
+const ALL_TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
+
+function visibleTabs(user) {
+  if (!user) return [];
+  if (user.role === 'admin') return [...ALL_TABS, 'Settings'];
+  const perms = user.permissions || [];
+  const tabs = [];
+  if (perms.includes('products:read')) tabs.push('Cockpit', 'Shopify', 'Products', 'Profit');
+  if (perms.includes('creatives:generate')) tabs.push('Studio', 'Avatars');
+  return ALL_TABS.filter((t) => tabs.includes(t));
+}
 
 function isTokenValid() {
   const token = localStorage.getItem('auth_token');
@@ -27,6 +39,8 @@ function isTokenValid() {
 
 function AppContent() {
   const { stores, activeStore, switchStore, refreshStores } = useActiveStore();
+  const { user } = useUser();
+  const TABS = visibleTabs(user);
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') || 'Cockpit';
@@ -209,6 +223,7 @@ function AppContent() {
             {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
             {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
             {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}
+            {activeTab === 'Settings' && user?.role === 'admin' && <Settings />}
           </Suspense>
         </main>
       </div>
@@ -230,10 +245,12 @@ export default function App() {
   if (!authenticated) return <Login onSuccess={() => setAuthenticated(true)} />;
 
   return (
-    <StoreProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </StoreProvider>
+    <UserProvider>
+      <StoreProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </StoreProvider>
+    </UserProvider>
   );
 }

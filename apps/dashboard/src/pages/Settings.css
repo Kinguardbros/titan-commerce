@@ -1,0 +1,19 @@
+.settings-page { padding: 0; }
+
+.settings-page h1 {
+  font-family: var(--display);
+  font-size: 20px;
+  background: var(--gold-text, none);
+  background: linear-gradient(135deg, var(--gold) 0%, #dfc06e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 24px;
+}
+
+.settings-page-loading {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text4);
+  padding: 40px 0;
+  text-align: center;
+}

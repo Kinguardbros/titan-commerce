@@ -2,6 +2,7 @@ import { useState } from 'react';
 import './Login.css';
 
 export default function Login({ onSuccess }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
@@ -16,11 +17,11 @@ export default function Login({ onSuccess }) {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password, remember }),
+        body: JSON.stringify({ username: username.trim() || undefined, password, remember }),
       });
 
       if (!res.ok) {
-        setError('Invalid password');
+        setError('Invalid username or password');
         setLoading(false);
         return;
       }
@@ -28,7 +29,8 @@ export default function Login({ onSuccess }) {
       const { token } = await res.json();
       localStorage.setItem('auth_token', token);
       onSuccess();
-    } catch {
+    } catch (err) {
+      console.error('[Login] Connection error:', err?.message || err);
       setError('Connection error');
       setLoading(false);
     }
@@ -45,11 +47,19 @@ export default function Login({ onSuccess }) {
 
         <input
           className="login-input"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Username (leave blank for master login)"
+          autoFocus
+        />
+
+        <input
+          className="login-input"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Password"
-          autoFocus
         />
 
         <label className="login-remember">

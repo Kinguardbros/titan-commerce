@@ -1,0 +1,273 @@
+.users-manager { padding: 0; }
+
+.users-manager-loading {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text4);
+  padding: 40px 0;
+  text-align: center;
+}
+
+.users-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.users-manager-header h2 {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0;
+}
+
+.users-manager-create-btn {
+  background: var(--gold);
+  color: var(--void);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.users-manager-create-btn:hover { background: #b8a050; }
+
+.users-table-wrap {
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.users-table th,
+.users-table td {
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--edge);
+  color: var(--text2);
+}
+
+.users-table th {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text4);
+  font-weight: 500;
+}
+
+.users-table tbody tr:last-child td { border-bottom: none; }
+.users-table tbody tr:hover { background: var(--raised); }
+
+.users-table-empty {
+  text-align: center;
+  color: var(--text4);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 24px !important;
+}
+
+.users-role-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+.users-role-badge--admin {
+  color: var(--gold);
+  background: var(--gold-glow);
+  border: 1px solid rgba(201, 168, 76, 0.2);
+}
+
+.users-role-badge--member {
+  color: var(--text2);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+}
+
+.users-active-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.users-active-dot.is-active { background: var(--emerald); }
+.users-active-dot.is-inactive { background: var(--coral); }
+
+.users-table-actions {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.users-table-actions button {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--sans);
+}
+
+.users-table-actions button:hover { border-color: var(--gold); color: var(--text); }
+
+.users-table-delete:hover {
+  border-color: var(--coral) !important;
+  color: var(--coral) !important;
+}
+
+/* Delete confirmation modal */
+.user-delete-backdrop {
+  position: fixed; inset: 0;
+  background: var(--bg-overlay, rgba(0,0,0,0.6));
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.user-delete-modal {
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  width: min(420px, 92vw);
+  padding: 20px;
+}
+
+.user-delete-title {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.user-delete-modal p { color: var(--text2); font-size: 13px; margin: 0 0 16px; }
+
+.user-delete-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.user-delete-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+.user-delete-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.user-delete-confirm {
+  background: var(--coral) !important;
+  border-color: var(--coral) !important;
+  color: #fff !important;
+}
+
+/* Temp password modal */
+.temp-pw-backdrop {
+  position: fixed; inset: 0;
+  background: var(--bg-overlay, rgba(0,0,0,0.6));
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.temp-pw-modal {
+  background: var(--deep);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  width: min(440px, 92vw);
+  padding: 20px;
+}
+
+.temp-pw-title {
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  margin: 0 0 6px;
+}
+
+.temp-pw-warning {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--coral);
+  margin: 0 0 14px;
+}
+
+.temp-pw-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.temp-pw-value {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--gold);
+  letter-spacing: 0.5px;
+  word-break: break-all;
+}
+
+.temp-pw-copy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--edge);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+
+.temp-pw-copy:hover { border-color: var(--gold); color: var(--gold); }
+
+.temp-pw-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.temp-pw-actions button {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: none;
+  background: var(--gold);
+  color: var(--void);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}

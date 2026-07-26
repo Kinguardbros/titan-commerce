@@ -1,0 +1,25 @@
+.store-access-checkboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.store-access-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+}
+
+.store-access-checkbox-row input[type='checkbox'] {
+  accent-color: var(--gold);
+  cursor: pointer;
+}
+
+.store-access-empty {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text4);
+}

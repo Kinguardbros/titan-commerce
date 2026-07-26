@@ -77,6 +77,9 @@ describe('system.js routing', () => {
       query: { action, ...extra },
       body: { action, ...extra },
       headers: {},
+      // Admin bypasses all permission/store-access gates — these tests exercise routing
+      // and response shape, not the permission layer (see wave2-permissions.test.js / T6).
+      user: { role: 'admin', permissions: [], store_access: [] },
     };
     const res = {
       status: vi.fn().mockReturnThis(),
@@ -109,5 +112,12 @@ describe('system.js routing', () => {
     await handler(req, res);
     const responseData = res.json.mock.calls[0][0];
     expect(responseData[0].has_admin).toBe(true);
+  });
+
+  it('me echoes req.user (populated by withAuth)', async () => {
+    const { req, res } = mockReqRes('GET', 'me');
+    await handler(req, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ user: req.user });
   });
 });

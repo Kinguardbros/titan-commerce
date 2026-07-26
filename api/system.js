@@ -25,6 +25,7 @@ import { push_reviews_to_shopify } from '../lib/actions/reviews-push.js';
 import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
 import { export_products_csv } from '../lib/actions/exports.js';
 import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publications.js';
+import { me, users_list, create_user, update_user, delete_user, reset_password } from '../lib/actions/users.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -48,6 +49,8 @@ const GET_ACTIONS = {
   poll_generations,
   product_reviews_list,
   review_helpful_counts,
+  users_list,
+  me,
 };
 
 const POST_ACTIONS = {
@@ -105,6 +108,10 @@ const POST_ACTIONS = {
   export_products_csv,
   bulk_make_unlisted,
   bulk_make_listed,
+  create_user,
+  update_user,
+  delete_user,
+  reset_password,
 };
 
 // Actions callable cross-origin from the storefront need CORS headers.

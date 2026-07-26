@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import crypto from 'crypto';
 
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({ from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: { code: 'PGRST116' } }) }) }) }) }),
+}));
+
 const APP_SECRET = 'test-secret';
 
 // Helper to create valid tokens
@@ -38,18 +42,24 @@ describe('verifyAuth', () => {
     expect(await verifyAuth(req)).toBeNull();
   });
 
-  it('authenticates valid Bearer token', async () => {
-    const token = createToken({ expires: Date.now() + 60000 });
+  it('authenticates a valid master Bearer token', async () => {
+    const token = createToken({ master: true, expires: Date.now() + 60000 });
     const req = { headers: { authorization: `Bearer ${token}` }, query: {} };
     const result = await verifyAuth(req);
-    expect(result).toEqual({ authenticated: true });
+    expect(result).toEqual({ master: true, role: 'admin' });
   });
 
-  it('authenticates valid query token', async () => {
-    const token = createToken({ expires: Date.now() + 60000 });
+  it('authenticates a valid master query token', async () => {
+    const token = createToken({ master: true, expires: Date.now() + 60000 });
     const req = { headers: {}, query: { token } };
     const result = await verifyAuth(req);
-    expect(result).toEqual({ authenticated: true });
+    expect(result).toEqual({ master: true, role: 'admin' });
+  });
+
+  it('returns null for a token with neither master nor user_id', async () => {
+    const token = createToken({ expires: Date.now() + 60000 });
+    const req = { headers: { authorization: `Bearer ${token}` }, query: {} };
+    expect(await verifyAuth(req)).toBeNull();
   });
 
   it('rejects expired token', async () => {

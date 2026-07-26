@@ -33,8 +33,10 @@ vi.mock('../lib/shopify-admin.js', () => ({
   }),
 }));
 
-function mockReqRes(body) {
-  const req = { body, headers: {} };
+const ADMIN_USER = { role: 'admin', permissions: [], store_access: [] };
+
+function mockReqRes(body, user = ADMIN_USER) {
+  const req = { body, headers: {}, user };
   const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
   return { req, res };
 }
@@ -222,5 +224,42 @@ describe('bulk_make_listed', () => {
     const body = res.json.mock.calls[0][0];
     expect(body.updated).toBe(1);
     expect(body.failed).toEqual([{ id: 20, error: expect.stringContaining('archived') }]);
+  });
+});
+
+describe('bulk_make_unlisted / bulk_make_listed — permission checks', () => {
+  let bulk_make_unlisted;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    getStoreMock.mockReset();
+    rateLimitMock.mockReset().mockResolvedValue(true);
+    graphqlMock.mockReset();
+    updateProductStatusMock.mockReset();
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/actions/publications.js');
+    bulk_make_unlisted = mod.bulk_make_unlisted;
+  });
+
+  it('403s without products:publications', async () => {
+    const user = { role: 'member', permissions: ['products:edit'], store_access: ['s1'] };
+    const { req, res } = mockReqRes({ store_id: 's1', product_shopify_ids: [1] }, user);
+    await bulk_make_unlisted(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('403s when store not in store_access', async () => {
+    const user = { role: 'member', permissions: ['products:publications'], store_access: ['s2'] };
+    const { req, res } = mockReqRes({ store_id: 's1', product_shopify_ids: [1] }, user);
+    await bulk_make_unlisted(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('passes the permission gate for admin (falls through to existing 400 store-not-found logic)', async () => {
+    getStoreMock.mockResolvedValue(null);
+    const { req, res } = mockReqRes({ store_id: 's1', product_shopify_ids: [1] });
+    await bulk_make_unlisted(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(403);
   });
 });
