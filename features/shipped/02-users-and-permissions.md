@@ -1,11 +1,11 @@
 ---
 id: feature-02
 slug: users-and-permissions
-status: active
+status: shipped
 appetite: medium              # 4 dev-days
 owner: dan
 created: 2026-07-24
-shipped: null
+shipped: 2026-07-27
 flag:
   name: feature.users_and_permissions.enabled
   tool: env-var                # Titan nemá PostHog → process.env.FEATURE_USERS_AND_PERMISSIONS
@@ -248,3 +248,5 @@ instrumentation:
 ## Changelog (append-only)
 
 - `2026-07-24` Spec created + self-reviewed. Post-review locks: bcryptjs chosen, PERMISSION_LIST finalized (6 perms), depends_on cleared (feature-01 shipped).
+- `2026-07-26` Pre-plan lock override: `crypto.scrypt` (Node built-in, zero-dep) chosen over `bcryptjs` — no node-gyp risk on Vercel serverless.
+- `2026-07-27` Shipped (bb1f07a on main). 17 commits total, 168/168 tests, 4 mid-flight fixes (T1 SQL POLICY, T3 last-admin protection, T4 timing defense, T6 poll_generations+pipeline_log gate, T7 catch{} log). First admin `dan` bootstrapped via `scripts/create-first-admin.mjs`. Login smoke passed post-deploy.

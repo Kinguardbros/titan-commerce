@@ -73,7 +73,7 @@ Skills in `.claude/skills/` are product-knowledge mentors — they advise, you d
 - **AI — Text:** Anthropic Claude API (`claude-sonnet-4-20250514`) for product optimization, product-skill auto-generation, Claude Vision (size chart parsing, style analysis)
 - **E-commerce:** Shopify Admin API (REST v2024-01 + some GraphQL Admin v2024-01) — MUST use `{handle}.myshopify.com` URLs (not custom domains)
 - **Ads:** Meta Marketing API (v21.0) — read-only, awaiting credentials
-- **Auth:** Password-based session tokens (`APP_PASSWORD` env var), `withAuth()` middleware on all endpoints
+- **Auth:** Per-user login (username+password) with `crypto.scrypt` password hashing; `APP_PASSWORD` retained as master fallback backdoor. `withAuth()` middleware on all endpoints. See users table + RBAC below.
 - **Design:** Nextbyte Dark Luxe — Michroma (gradient headings), Plus Jakarta Sans (body), Space Mono (data). Light/dark theme toggle (`data-theme` attr on `<html>`, persisted in localStorage `titan-theme`).
 
 ---
@@ -310,6 +310,7 @@ Key patterns:
 | `winner_refs` | LOOPER feedback (winning hooks/headlines for FORGE) |
 | `product_docs` | Per-product document uploads (future) |
 | `rate_limits` | Persistent rate limiting (key + created_at), indexed by key+time |
+| `users` | Per-user auth: `username` UNIQUE, `password_hash` (scrypt via `lib/password.js`), `role` CHECK IN ('admin','member'), `permissions` TEXT[] (closed set from `lib/permissions.js`), `store_access` UUID[] (which stores user sees), `active` BOOL, `full_name`, `email` (optional), `last_login`. Admin trumps permissions/store_access. See RBAC section below. Migration: `sql/add-users-and-permissions.sql`. |
 
 ### RLS & migrations
 - All tables have RLS enabled (`sql/enable-rls-all.sql`). Service-role bypasses RLS — backend uses service role.
@@ -383,8 +384,18 @@ Root `package.json` (backend / serverless):
 Every query filters by `store_id`. Frontend passes active store ID to all API calls. Store switcher in header changes context for the entire dashboard. `stores_list` strips `admin_token` and returns `has_admin` boolean.
 
 ### Auth Flow
-Password gate → `api/auth/login.js` → HMAC session token (with `expires`) → stored in localStorage `auth_token` → `withAuth()` middleware validates on every API call. No Supabase Auth for dashboard users. **`APP_SECRET` fails closed** — auth throws if it is unset (never falls back to a default), so a missing env var blocks token signing rather than allowing forgeable tokens.
-- **Public allow-list:** `withAuth` (`lib/auth.js`) checks a hardcoded `PUBLIC_ACTIONS` Set FIRST — those actions skip the token check (for unauthenticated storefront calls). Currently `submit_review_public`, `vote_review_helpful`, `review_helpful_counts`. Keep this list tiny/audited; CORS for those actions handled in `system.js` (`CORS_ACTIONS` + OPTIONS preflight, origin from `STOREFRONT_URL` env). Test coverage in `tests/auth.test.js` asserts a protected action still 401s without a token.
+`api/auth/login.js` accepts `{username, password, remember}` → username lookup in `users` table → `verifyPassword` (scrypt) → HMAC session token with `{user_id, role, permissions, store_access, created, expires}` → stored in localStorage `auth_token` → `withAuth()` middleware fetches full user from DB on every request (freshness for permission changes, kicks out deactivated users). **`APP_SECRET` fails closed.**
+- **Master fallback (kill-switch):** If body omits `username` and `password === APP_PASSWORD`, sign token with `{master:true, admin:true}` — `verifyAuth` skips DB lookup, returns `{master:true, role:'admin'}`. Always works even if `users` table is empty/broken. Never remove — safety net.
+- **Rate limits (login):** `login_attempts:${ip}` 10/hr, `login_attempts:${username}` 5/15min (credential stuffing), `login_attempts_global` 200/hr. IP from `req.headers['x-real-ip']` (Vercel non-spoofable). Constant-time defense: unknown-username path runs dummy `verifyPassword` to hide timing.
+- **Public allow-list:** `PUBLIC_ACTIONS` Set skips auth for storefront actions (`submit_review_public`, `vote_review_helpful`, `review_helpful_counts`).
+
+### RBAC (Users & Permissions)
+Every action in `lib/actions/*` starts with `hasPermission(req.user, 'X')` → 403 if false, then `hasStoreAccess(req.user, store_id)` → 403 if store not in `user.store_access`. Both from `lib/permissions.js`. Admin trumps: `role='admin'` → both helpers return `true` unconditionally.
+- **`PERMISSION_LIST` (closed set):** `products:read`, `products:edit`, `products:images`, `products:publications`, `creatives:generate`, `admin:users` (implicit for admin).
+- **First admin bootstrap:** `node scripts/create-first-admin.mjs <username> <password> [full_name]` — one-shot, idempotent, uses `lib/password.js` scrypt.
+- **Admin UI:** Settings tab (admin-only) → `apps/dashboard/src/components/settings/UsersManager.jsx` — create/edit/delete users, reset passwords (temp password shown to admin for manual copy).
+- **Frontend gating:** `PermissionGate` component + `useUser()` hook filter tabs (App.jsx), store switcher (`useActiveStore` filtered by `user.store_access`), and per-button visibility (Products.jsx family). Client-side is cosmetic — backend enforces truth.
+- **Last-admin protection:** `update_user`/`delete_user` block demote/deactivate/delete if it would drop active admin count to 0. TOCTOU-racy (documented follow-up).
 
 ### Brand Voice (Dynamic Per-Store)
 `lib/claude.js` builds the system prompt dynamically: loads `brand-voice` skill from `store_skills` → falls back to generic prompt + store name. No hardcoded brand references. Store name/vendor injected from `stores` table. Product-specific knowledge loaded from `store_skills` (`product-{slug}`) when a product name is available; auto-generated from product photos via Claude Vision if missing.
