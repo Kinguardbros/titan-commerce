@@ -1,11 +1,11 @@
 ---
 id: feature-03
 slug: amazon-reviews-scraper
-status: active
+status: shipped-with-limitation
 appetite: medium              # 4-5 dev-days
 owner: dan
 created: 2026-07-28
-shipped: null
+shipped: 2026-07-29
 flag:
   name: feature.amazon_reviews_scraper.enabled
   tool: env-var                # Titan nemá PostHog → process.env.FEATURE_AMAZON_REVIEWS_SCRAPER
@@ -248,3 +248,4 @@ instrumentation:   [amazon_reviews_imported_count event, guardrail alert (block 
 
 - `2026-07-28` Spec created + self-reviewed. D-09 port, D-10 HTTP MVP.
 - `2026-07-29` Rename "Yomi VPS" → "TC scraper VPS" (Yomi stopped, box repurposed). Add D-11 Docker, D-12 sync-max-10, D-13 Titan-inserts, D-14 VPS+swap. **Alethe VPS 147.93.56.72 = NEVER touch pro Titan work.**
+- `2026-07-29` **SHIPPED WITH LIMITATION.** All code deployed (backend actions + frontend tab + Docker container). E2E smoke revealed Amazon aggressively blocks Hetzner datacenter IP (Puppeteer + stealth insufficient). Feature flag flipped to FALSE — Amazon tab hidden in UI. VPS container stopped. Superseded by **feature-04-amazon-userscript** (browser-side Tampermonkey approach uses Dan's residential IP + logged Amazon session, bypasses block entirely). All feature-03 infrastructure preserved for future revival if paid residential proxy ever added.

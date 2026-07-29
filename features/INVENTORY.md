@@ -6,7 +6,7 @@ Capability map for Titan Commerce. IDs are monotonic; slugs never reuse.
 |---|---|---|---|---|---|---|---|
 | feature-01 | publications-manager | shipped | medium (4d) | dan | feature.publications_manager.enabled | 2026-07-23 | 2026-07-23 |
 | feature-02 | users-and-permissions | shipped | medium (4d) | dan | feature.users_and_permissions.enabled | 2026-07-24 | 2026-07-27 |
-| feature-03 | amazon-reviews-scraper | active | medium (4-5d) | dan | feature.amazon_reviews_scraper.enabled | 2026-07-28 | — |
+| feature-03 | amazon-reviews-scraper | shipped-with-limitation | medium (4-5d) | dan | feature.amazon_reviews_scraper.enabled (OFF) | 2026-07-28 | 2026-07-29 |
 
 ## Build waves
 
