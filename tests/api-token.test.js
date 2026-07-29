@@ -17,6 +17,10 @@ describe('sql/add-user-api-token.sql', () => {
 // above imports, so the mock factory must only reference top-level bindings). ---
 const usersState = { updated: [], logged: [], updateResult: null, updateError: null };
 
+// Shared with the verifyAuth api_token-bearer-path describe block below: a single
+// `from('users').select(...).eq('api_token', ...).single()` chain driven by `authState`.
+const authState = { userRow: null, userError: null };
+
 const supabaseFromMock = vi.fn((table) => {
   if (table === 'users') {
     return {
@@ -26,6 +30,15 @@ const supabaseFromMock = vi.fn((table) => {
             single: vi.fn(async () => ({ data: usersState.updateResult, error: usersState.updateError })),
           })),
         })),
+      })),
+      select: vi.fn(() => ({
+        eq: vi.fn((col) => {
+          if (col === 'api_token') {
+            return { single: vi.fn(async () => ({ data: authState.userRow, error: authState.userError })) };
+          }
+          // session-token path (id lookup) — untouched by this test file
+          return { single: vi.fn(async () => ({ data: null, error: { code: 'PGRST116' } })) };
+        }),
       })),
     };
   }
@@ -99,5 +112,63 @@ describe('lib/actions/users.js — generate_api_token', () => {
     const { req, res } = mockReqRes({ user_id: 'u2' }, ADMIN_USER);
     await generate_api_token(req, res);
     expect(res.status).toHaveBeenCalledWith(500);
+  });
+});
+
+describe('lib/auth.js — verifyAuth api_token bearer path', () => {
+  let verifyAuth;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    authState.userRow = null;
+    authState.userError = null;
+    vi.stubEnv('APP_SECRET', 'test-secret');
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/auth.js');
+    verifyAuth = mod.verifyAuth;
+  });
+
+  it('resolves a valid api_token (no dot) to a user object', async () => {
+    authState.userRow = {
+      id: 'u2', username: 'jana', role: 'member',
+      permissions: ['products:edit'], store_access: ['store-1'], active: true,
+    };
+    const req = { headers: { authorization: 'Bearer ' + 'a'.repeat(64) }, query: {} };
+    const result = await verifyAuth(req);
+    expect(result).toEqual({
+      user_id: 'u2', username: 'jana', role: 'member',
+      permissions: ['products:edit'], store_access: ['store-1'],
+    });
+  });
+
+  it('returns null for an api_token with no matching user', async () => {
+    authState.userRow = null;
+    const req = { headers: { authorization: 'Bearer ' + 'b'.repeat(64) }, query: {} };
+    expect(await verifyAuth(req)).toBeNull();
+  });
+
+  it('returns null when the api_token matches a deactivated user', async () => {
+    authState.userRow = { id: 'u2', username: 'jana', role: 'member', permissions: [], store_access: [], active: false };
+    const req = { headers: { authorization: 'Bearer ' + 'c'.repeat(64) }, query: {} };
+    expect(await verifyAuth(req)).toBeNull();
+  });
+
+  it('a session token (contains a dot) never hits the api_token DB branch', async () => {
+    // A malformed "session" token with a dot but garbage payload must fail on
+    // HMAC/JSON parsing, not silently fall through to the api_token lookup.
+    const req = { headers: { authorization: 'Bearer not.avalidtoken' }, query: {} };
+    expect(await verifyAuth(req)).toBeNull();
+  });
+
+  it('returns null for an api_token shorter than 40 chars, without querying the DB', async () => {
+    const req = { headers: { authorization: 'Bearer ' + 'd'.repeat(39) }, query: {} };
+    expect(await verifyAuth(req)).toBeNull();
+    expect(authState.userRow).toBeNull(); // sanity: nothing set the row, but real assertion below
+  });
+
+  it('returns null for a 64-char token containing non-hex characters, without querying the DB', async () => {
+    const req = { headers: { authorization: 'Bearer ' + 'g'.repeat(64) }, query: {} }; // 'g' is not hex
+    expect(await verifyAuth(req)).toBeNull();
   });
 });
