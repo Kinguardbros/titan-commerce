@@ -320,13 +320,29 @@
     }
   }
 
+  // Only these hosts may receive the bearer api_token. Blocks socially-engineered
+  // "change your Titan URL to https://faster-mirror.example" token exfiltration (I-4).
+  const ALLOWED_TITAN_HOSTS = ['titan-commerce.vercel.app', 'localhost:3000', 'localhost:5173'];
+
   function promptForUrl() {
     const current = GM_getValue('TITAN_URL', DEFAULT_TITAN_URL);
     const next = window.prompt('Titan dashboard URL:', current);
-    if (next && next.trim()) {
-      GM_setValue('TITAN_URL', next.trim().replace(/\/$/, ''));
-      window.alert('Titan URL saved.');
+    if (next === null) return; // cancelled
+    const trimmed = next.trim().replace(/\/$/, '');
+    if (!trimmed) return;
+    let host;
+    try {
+      host = new URL(trimmed).host;
+    } catch {
+      window.alert('Invalid URL — must be a full https:// URL');
+      return;
     }
+    if (!ALLOWED_TITAN_HOSTS.includes(host)) {
+      window.alert(`URL host "${host}" not allowed. Only titan-commerce.vercel.app is permitted (or localhost:3000 / localhost:5173 for dev).`);
+      return;
+    }
+    GM_setValue('TITAN_URL', trimmed);
+    window.alert('Titan URL saved.');
   }
 
   GM_registerMenuCommand('Configure Titan API token', promptForToken);
