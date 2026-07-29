@@ -1,0 +1,21 @@
+services:
+  titan-scraper:
+    build: .
+    container_name: titan-scraper
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    env_file:
+      - .env
+    mem_limit: 1g
+    volumes:
+      - puppeteer-cache:/app/node_modules/.cache/puppeteer
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  puppeteer-cache:
