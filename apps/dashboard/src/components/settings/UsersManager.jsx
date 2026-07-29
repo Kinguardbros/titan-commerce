@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { listUsers, createUser, updateUser, deleteUser, resetPassword } from '../../lib/api';
+import { listUsers, createUser, updateUser, deleteUser, resetPassword, generateApiToken } from '../../lib/api';
 import { useActiveStore } from '../../hooks/useActiveStore.jsx';
 import { useToast } from '../../hooks/useToast.jsx';
 import UserForm from './UserForm';
+import ApiTokenDisplayModal from './ApiTokenDisplayModal';
 import './UsersManager.css';
 
 function timeAgo(dateStr) {
@@ -82,6 +83,7 @@ export default function UsersManager() {
   const [editingUser, setEditingUser] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
   const [tempPasswordResult, setTempPasswordResult] = useState(null);
+  const [apiTokenResult, setApiTokenResult] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -150,6 +152,15 @@ export default function UsersManager() {
     }
   };
 
+  const handleGenerateApiToken = async (user) => {
+    try {
+      const { api_token } = await generateApiToken(user.id);
+      setApiTokenResult({ username: user.username, api_token });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const storeNames = (ids) => (ids || []).map((id) => stores.find((s) => s.id === id)?.name || id).join(', ') || '—';
 
   if (loading) return <div className="users-manager-loading">Loading users…</div>;
@@ -206,6 +217,7 @@ export default function UsersManager() {
                 <td className="users-table-actions">
                   <button type="button" onClick={() => { setEditingUser(u); setFormOpen(true); }}>Edit</button>
                   <button type="button" onClick={() => handleResetPassword(u)}>Reset password</button>
+                  <button type="button" onClick={() => handleGenerateApiToken(u)}>Generate API token</button>
                   <button type="button" className="users-table-delete" onClick={() => setDeletingUser(u)}>Delete</button>
                 </td>
               </tr>
@@ -235,6 +247,10 @@ export default function UsersManager() {
 
       {tempPasswordResult && (
         <TempPasswordModal result={tempPasswordResult} onClose={() => setTempPasswordResult(null)} />
+      )}
+
+      {apiTokenResult && (
+        <ApiTokenDisplayModal result={apiTokenResult} onClose={() => setApiTokenResult(null)} />
       )}
     </div>
   );

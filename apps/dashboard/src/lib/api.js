@@ -646,6 +646,13 @@ export function resetPassword(userId) {
   });
 }
 
+export function generateApiToken(userId) {
+  return fetchJSON('/api/system', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'generate_api_token', user_id: userId }),
+  });
+}
+
 // CSV export — cannot use fetchJSON because response is text/csv, not JSON.
 // Downloads via anchor with object URL.
 export async function exportProductsCsv(storeId, filters = {}) {

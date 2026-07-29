@@ -1,0 +1,64 @@
+.api-token-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.api-token-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+}
+
+.api-token-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.api-token-warning {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.api-token-value-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface-hover);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.api-token-value {
+  flex: 1;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.api-token-copy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.api-token-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.api-token-actions {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
