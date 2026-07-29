@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { importReviewsCsv } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
+import AmazonImport from './AmazonImport';
 
 const CSV_EXAMPLE = `author,rating,title,body,date,photo_url,verified
 Maria,5,"Perfect fit","True to size, super comfortable",2024-06-10,,1
@@ -46,10 +47,18 @@ function fileToCsv(file) {
   });
 }
 
-// Phase 3 bulk import — paste CSV, upload .csv/.xlsx, or pull a Google Sheet.
+const TABS = [
+  { key: 'csv', label: 'Paste CSV' },
+  { key: 'upload', label: 'Upload File' },
+  { key: 'sheets', label: 'Google Sheets' },
+  { key: 'amazon', label: 'Amazon' },
+];
+
+// Phase 3 bulk import (CSV/Upload/Sheets) + Phase 5 Amazon scrape import.
 // All rows land as pending for review. No outbound push.
 export default function ImportReviews({ storeId, productId, onClose, onImported }) {
   const toast = useToast();
+  const [tab, setTab] = useState('csv');
   const [csv, setCsv] = useState('');
   const [sheetUrl, setSheetUrl] = useState('');
   const [fileName, setFileName] = useState('');
@@ -98,37 +107,74 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
         <div className="rv-title">Import Reviews</div>
         <div className="rv-import-sub">Rows import as <strong>pending</strong> — review &amp; approve them after.</div>
 
-        <div className="rv-import-template">
-          <span>New here? Grab the format:</span>
-          <button type="button" className="rv-template-btn" onClick={downloadTemplate}>↓ Download CSV template</button>
+        <div className="rv-import-tabs">
+          {TABS.map((t) => (
+            <button key={t.key} type="button"
+              className={`rv-import-tab${tab === t.key ? ' rv-import-tab--active' : ''}`}
+              onClick={() => setTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
         </div>
 
-        <label className="rv-field-label">Paste CSV</label>
-        <textarea className="rv-textarea rv-import-textarea" rows={6}
-          value={csv}
-          onChange={(e) => { setCsv(e.target.value); setSheetUrl(''); setFileName(''); }}
-          placeholder={CSV_EXAMPLE} />
-        <div className="rv-import-meta">
-          {fileName ? <span>📄 {fileName}</span> : <span>Columns: author, rating, title, body, date, photo_url, verified</span>}
-          {rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}</span>}
-        </div>
+        {tab !== 'amazon' && (
+          <div className="rv-import-template">
+            <span>New here? Grab the format:</span>
+            <button type="button" className="rv-template-btn" onClick={downloadTemplate}>↓ Download CSV template</button>
+          </div>
+        )}
 
-        <div className="rv-import-row">
-          <button className="rv-btn rv-import-file-btn" onClick={() => fileRef.current?.click()}>
-            Upload .csv / .xlsx
-          </button>
-          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleFile} />
-          <span className="rv-import-or">or</span>
-          <input className="rv-input" placeholder="Paste Google Sheets link (shared: anyone with link)"
-            value={sheetUrl}
-            onChange={(e) => { setSheetUrl(e.target.value); if (e.target.value) { setCsv(''); setFileName(''); } }} />
-        </div>
+        {tab === 'csv' && (
+          <>
+            <label className="rv-field-label">Paste CSV</label>
+            <textarea className="rv-textarea rv-import-textarea" rows={6}
+              value={csv}
+              onChange={(e) => { setCsv(e.target.value); setSheetUrl(''); setFileName(''); }}
+              placeholder={CSV_EXAMPLE} />
+            <div className="rv-import-meta">
+              <span>Columns: author, rating, title, body, date, photo_url, verified</span>
+              {rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}</span>}
+            </div>
+            <div className="rv-detail-actions rv-import-actions">
+              <button className="rv-btn rv-btn--save" disabled={busy} onClick={handleImport}>
+                {busy ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          </>
+        )}
 
-        <div className="rv-detail-actions rv-import-actions">
-          <button className="rv-btn rv-btn--save" disabled={busy} onClick={handleImport}>
-            {busy ? 'Importing…' : 'Import'}
-          </button>
-        </div>
+        {tab === 'upload' && (
+          <>
+            <button className="rv-btn rv-import-file-btn" onClick={() => fileRef.current?.click()}>
+              Upload .csv / .xlsx
+            </button>
+            <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleFile} />
+            {fileName && <div className="rv-import-meta"><span>📄 {fileName}</span>{rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}</span>}</div>}
+            <div className="rv-detail-actions rv-import-actions">
+              <button className="rv-btn rv-btn--save" disabled={busy || !csv.trim()} onClick={handleImport}>
+                {busy ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {tab === 'sheets' && (
+          <>
+            <label className="rv-field-label">Google Sheets link</label>
+            <input className="rv-input" placeholder="Paste Google Sheets link (shared: anyone with link)"
+              value={sheetUrl}
+              onChange={(e) => { setSheetUrl(e.target.value); if (e.target.value) { setCsv(''); setFileName(''); } }} />
+            <div className="rv-detail-actions rv-import-actions">
+              <button className="rv-btn rv-btn--save" disabled={busy || !sheetUrl.trim()} onClick={handleImport}>
+                {busy ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          </>
+        )}
+
+        {tab === 'amazon' && (
+          <AmazonImport storeId={storeId} productId={productId} onImported={() => { onImported(); onClose(); }} />
+        )}
       </div>
     </div>
   );
