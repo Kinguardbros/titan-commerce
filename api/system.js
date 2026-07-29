@@ -118,19 +118,33 @@ const POST_ACTIONS = {
   generate_api_token,
 };
 
-// Actions callable cross-origin from the storefront need CORS headers.
-const CORS_ACTIONS = new Set(['submit_review_public', 'vote_review_helpful', 'review_helpful_counts']);
-// Allowed storefront origins (live custom domain + Shopify domain for theme previews).
-// STOREFRONT_URL env can hold a comma-separated list to override/extend.
-const ALLOWED_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
+// Actions callable cross-origin need CORS headers — each maps to the specific
+// origins it trusts (NOT a single shared allow-list). Storefront actions get the
+// storefront's own domain(s); import_amazon_reviews gets Amazon's domain(s) only.
+// Note: for the userscript's actual request, GM_xmlhttpRequest bypasses browser-side
+// CORS enforcement entirely — the real authorization gate is the bearer api_token
+// check in verifyAuth. This CORS entry exists for correctness/defense-in-depth (e.g.
+// if a future integration calls this action via plain fetch() from a browser tab).
+const STOREFRONT_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
   .split(',').map((o) => o.trim()).filter(Boolean);
-function applyCors(req, res) {
+const AMAZON_USERSCRIPT_ORIGINS = (process.env.AMAZON_USERSCRIPT_ORIGINS || 'https://www.amazon.com,https://smile.amazon.com')
+  .split(',').map((o) => o.trim()).filter(Boolean);
+
+const CORS_ACTIONS = {
+  submit_review_public: STOREFRONT_ORIGINS,
+  vote_review_helpful: STOREFRONT_ORIGINS,
+  review_helpful_counts: STOREFRONT_ORIGINS,
+  import_amazon_reviews: AMAZON_USERSCRIPT_ORIGINS,
+};
+
+function applyCors(req, res, action) {
+  const allowedOrigins = CORS_ACTIONS[action] || [];
   const origin = req.headers.origin;
-  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  const allow = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
   res.setHeader('Access-Control-Allow-Origin', allow);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
 async function handler(req, res) {
@@ -138,10 +152,10 @@ async function handler(req, res) {
 
   // CORS preflight for public storefront actions (must answer before auth/dispatch).
   if (req.method === 'OPTIONS') {
-    if (CORS_ACTIONS.has(action)) { applyCors(req, res); return res.status(200).end(); }
+    if (CORS_ACTIONS[action]) { applyCors(req, res, action); return res.status(200).end(); }
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (CORS_ACTIONS.has(action)) applyCors(req, res);
+  if (CORS_ACTIONS[action]) applyCors(req, res, action);
 
   if (!action) return res.status(400).json({ error: 'action required' });
 
