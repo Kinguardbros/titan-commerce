@@ -273,3 +273,17 @@
 .rv-seed-range { display: flex; gap: 16px; }
 .rv-seed-range label { flex: 1; }
 .rv-seed-range input { margin-top: 6px; }
+
+/* Import Reviews — tab nav (CSV / Upload / Sheets / Amazon) */
+.rv-import-tabs { display: flex; gap: 6px; margin-bottom: 10px; border-bottom: 1px solid var(--edge); }
+.rv-import-tab {
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text3);
+  font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .5px;
+  cursor: pointer;
+}
+.rv-import-tab:hover { color: var(--text); }
+.rv-import-tab--active { color: var(--gold); border-bottom-color: var(--gold); }
