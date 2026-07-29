@@ -574,6 +574,22 @@ export function pushReviewsToShopify(storeId, productId) {
   });
 }
 
+// Amazon review import — scrape a product page for a preview list (not saved yet).
+export function scrapeAmazonPreview(storeId, productId, amazonUrl, maxReviews) {
+  return fetchJSON('/api/system?action=scrape_amazon_preview', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, amazon_url: amazonUrl, max_reviews: maxReviews }),
+  });
+}
+
+// Amazon review import — insert the user-selected subset of a preview as pending reviews.
+export function importAmazonReviews(storeId, productId, reviews) {
+  return fetchJSON('/api/system?action=import_amazon_reviews', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, reviews }),
+  });
+}
+
 // Publications Manager
 export function bulkMakeUnlisted(storeId, productShopifyIds) {
   return fetchJSON('/api/system', {
