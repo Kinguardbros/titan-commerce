@@ -188,5 +188,29 @@ describe('lib/actions/reviews-amazon.js', () => {
       await import_amazon_reviews(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
     });
+
+    it('I-3 SSRF: rejects a non-Amazon photo host (e.g. cloud metadata IP) without fetching it', async () => {
+      const ssrf = { ...SAMPLE_REVIEW, photo_urls: ['http://169.254.169.254/latest/meta-data/'] };
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [ssrf] }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(supabaseState.inserted).toHaveLength(1);
+      expect(supabaseState.inserted[0].photo_url).toBeNull();
+    });
+
+    it('I-3 SSRF: allows an Amazon CDN photo host and fetches it', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]).buffer,
+      });
+      const allowed = { ...SAMPLE_REVIEW, photo_urls: ['https://m.media-amazon.com/images/I/foo.jpg'] };
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [allowed] }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(fetchMock).toHaveBeenCalledWith('https://m.media-amazon.com/images/I/foo.jpg', expect.any(Object));
+      expect(supabaseState.inserted).toHaveLength(1);
+      expect(supabaseState.inserted[0].photo_url).toBe('https://storage.test/photo.jpg');
+    });
   });
 });

@@ -36,10 +36,19 @@ describe('auth fails closed without APP_SECRET', () => {
 });
 
 describe('public action sets stay in parity', () => {
-  it('PUBLIC_ACTIONS (auth.js) and CORS_ACTIONS (system.js) list the same actions', () => {
+  // CORS_ACTIONS (system.js) is a per-action origin map: { actionName: string[] }.
+  // Every unauthenticated PUBLIC_ACTIONS entry (auth.js) must also get CORS headers
+  // (a browser calling it cross-origin needs ACAO), but CORS_ACTIONS may legitimately
+  // contain MORE entries — e.g. import_amazon_reviews needs CORS for the Amazon
+  // userscript's origin but is NOT public (it still requires bearer api_token auth).
+  it('every PUBLIC_ACTIONS (auth.js) action is present as a CORS_ACTIONS (system.js) key', () => {
     const pub = read('lib/auth.js').match(/PUBLIC_ACTIONS = new Set\(\[([^\]]*)\]/)[1];
-    const cors = read('api/system.js').match(/CORS_ACTIONS = new Set\(\[([^\]]*)\]/)[1];
+    const corsBlock = read('api/system.js').match(/const CORS_ACTIONS = \{([\s\S]*?)\n\};/)[1];
     const norm = (s) => s.split(',').map((x) => x.trim().replace(/['"]/g, '')).filter(Boolean).sort();
-    expect(norm(pub)).toEqual(norm(cors));
+    const pubActions = norm(pub);
+    const corsKeys = [...corsBlock.matchAll(/^\s*([a-zA-Z0-9_]+):/gm)].map((m) => m[1]).sort();
+    for (const action of pubActions) {
+      expect(corsKeys).toContain(action);
+    }
   });
 });

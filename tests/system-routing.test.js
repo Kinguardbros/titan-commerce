@@ -121,3 +121,108 @@ describe('system.js routing', () => {
     expect(res.json).toHaveBeenCalledWith({ user: req.user });
   });
 });
+
+describe('CORS per-action origins', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    vi.stubEnv('APP_SECRET', 'test-secret');
+    vi.stubEnv('STOREFRONT_URL', 'https://isolaswim.com,https://swimwear-brand.myshopify.com');
+    vi.stubEnv('AMAZON_USERSCRIPT_ORIGINS', '');
+    // api/system.js does not export applyCors directly (it's a module-private
+    // function) — these tests exercise it indirectly via the OPTIONS preflight
+    // response, matching how the file is actually invoked in production.
+  });
+
+  it('import_amazon_reviews preflight allows https://www.amazon.com', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'OPTIONS', query: { action: 'import_amazon_reviews' }, headers: { origin: 'https://www.amazon.com' }, body: {} };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://www.amazon.com');
+  });
+
+  it('import_amazon_reviews preflight rejects an untrusted origin (falls back to first allowed)', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'OPTIONS', query: { action: 'import_amazon_reviews' }, headers: { origin: 'https://evil.example.com' }, body: {} };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).not.toBe('https://evil.example.com');
+  });
+
+  it('submit_review_public preflight still allows the storefront origin (unchanged)', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'OPTIONS', query: { action: 'submit_review_public' }, headers: { origin: 'https://isolaswim.com' }, body: {} };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://isolaswim.com');
+  });
+
+  it('submit_review_public preflight does NOT allow amazon.com (origins are per-action, not shared)', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'OPTIONS', query: { action: 'submit_review_public' }, headers: { origin: 'https://www.amazon.com' }, body: {} };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).not.toBe('https://www.amazon.com');
+  });
+
+  it('Access-Control-Allow-Headers includes both Content-Type and Authorization', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'OPTIONS', query: { action: 'import_amazon_reviews' }, headers: { origin: 'https://www.amazon.com' }, body: {} };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Headers']).toContain('Content-Type');
+    expect(headers['Access-Control-Allow-Headers']).toContain('Authorization');
+  });
+
+  it('non-CORS action (product_detail) gets no Access-Control-Allow-Origin header', async () => {
+    const mod = await import('../api/system.js');
+    const handler = mod.default;
+    const headers = {};
+    const req = { method: 'GET', query: { action: 'product_detail' }, headers: { origin: 'https://isolaswim.com' }, body: {}, user: { role: 'admin', permissions: [], store_access: [] } };
+    const res = {
+      setHeader: vi.fn((k, v) => { headers[k] = v; }),
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+  });
+});

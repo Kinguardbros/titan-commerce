@@ -1,0 +1,6 @@
+.az-guide { display: flex; flex-direction: column; gap: 14px; }
+.az-guide-sub { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.az-guide-steps { display: flex; flex-direction: column; gap: 14px; padding-left: 20px; margin: 0; }
+.az-guide-steps li { font-size: 13px; line-height: 1.6; }
+.az-guide-action { margin-top: 8px; }
+.az-guide-steps code { background: var(--bg-surface-hover); padding: 2px 6px; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 12px; }
