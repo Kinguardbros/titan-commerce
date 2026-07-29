@@ -145,10 +145,17 @@ export async function scrapeAmazonReviews(amazonUrl, maxReviews) {
     let retriedBlock = false;
 
     while (collected.length < cap && pageNumber <= 10) {
-      await page.goto(reviewsUrl(asin, pageNumber), {
+      const navResponse = await page.goto(reviewsUrl(asin, pageNumber), {
         waitUntil: 'domcontentloaded',
         timeout: PAGE_NAV_TIMEOUT_MS,
       });
+
+      if (navResponse && navResponse.status() === 429) {
+        const err = new Error('Amazon rate-limited this request (429) — wait 5 minutes and try again');
+        err.status = 503;
+        err.retryAfter = 300;
+        throw err;
+      }
 
       await page
         .waitForSelector(SELECTORS.reviewCard, { timeout: PAGE_NAV_TIMEOUT_MS })
