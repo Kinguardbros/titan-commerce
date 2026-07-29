@@ -28,6 +28,289 @@
     };
   }
 
+  // "John Smith" -> "John S." ; single-token/emoji-only/empty -> "Anonymous".
+  // Mirrors the Titan-side copy in lib/actions/reviews-amazon.js (D-07) — this
+  // client-side copy runs first so raw full names never leave the browser.
+  function anonymizeAuthor(fullName) {
+    if (!fullName || typeof fullName !== 'string') return 'Anonymous';
+    const trimmed = fullName.trim();
+    if (!trimmed) return 'Anonymous';
+    if (trimmed.length === 1 || !/[a-zA-Z]/.test(trimmed)) return 'Anonymous';
+    const parts = trimmed.split(/\s+/);
+    const first = parts[0];
+    const lastInitial = parts.length > 1 ? parts[parts.length - 1][0]?.toUpperCase() : '';
+    return lastInitial ? `${first} ${lastInitial}.` : first;
+  }
+
+  function parseRating(text) {
+    const first = String(text || '').trim().split(' ')[0].replace(',', '.');
+    const n = parseFloat(first);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function parseHelpfulCount(text) {
+    const s = String(text || '').trim();
+    if (!s) return 0;
+    if (/^one person found this helpful/i.test(s)) return 1;
+    const m = s.match(/(\d[\d,]*)/);
+    return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
+  }
+
+  function upgradePhotoUrl(url) {
+    return url.replace(/\._[A-Z]{2}\d+_?\./, '._SL1600_.');
+  }
+
+  // Reuses feature-03's data-hook selector knowledge (lib/actions/reviews-amazon.js's
+  // sibling VPS scraper, /root/titan-scraper/parser.js) — same DOM shape, different
+  // execution context (real browser DOM here, not Puppeteer).
+  const SELECTORS = {
+    reviewCard: 'div[data-hook="review"]',
+    starRating: 'i[data-hook="review-star-rating"] span.a-icon-alt',
+    author: 'span.a-profile-name',
+    reviewTitle: 'a[data-hook="review-title"] span:not([class*="a-color-secondary"])',
+    reviewBody: 'span[data-hook="review-body"] span',
+    verifiedBadge: 'span[data-hook="avp-badge"]',
+    photos: 'div[data-hook="review-image-tile-section"] img',
+    helpfulText: 'span[data-hook="helpful-vote-statement"]',
+    reviewDate: 'span[data-hook="review-date"]',
+    nextPageLink: 'ul.a-pagination li.a-last a',
+  };
+
+  function extractReviewsFromDom() {
+    const cards = Array.from(document.querySelectorAll(SELECTORS.reviewCard));
+    return cards.map((card) => {
+      const starEl = card.querySelector(SELECTORS.starRating);
+      const authorEl = card.querySelector(SELECTORS.author);
+      const titleEl = card.querySelector(SELECTORS.reviewTitle);
+      const bodyEl = card.querySelector(SELECTORS.reviewBody);
+      const verifiedEl = card.querySelector(SELECTORS.verifiedBadge);
+      const helpfulEl = card.querySelector(SELECTORS.helpfulText);
+      const dateEl = card.querySelector(SELECTORS.reviewDate);
+      const photoEls = Array.from(card.querySelectorAll(SELECTORS.photos));
+
+      const rating = parseRating(starEl?.textContent?.trim());
+      if (rating === null) return null;
+
+      return {
+        author: anonymizeAuthor(authorEl?.textContent?.trim()),
+        rating,
+        title: (titleEl?.textContent?.trim() || '').slice(0, 200),
+        body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
+        verified: !!verifiedEl,
+        photo_urls: photoEls.map((img) => img.getAttribute('src')).filter(Boolean).slice(0, 1).map(upgradePhotoUrl),
+        helpful_count: parseHelpfulCount(helpfulEl?.textContent?.trim()),
+        review_date: dateEl?.textContent?.trim() || '',
+      };
+    }).filter(Boolean);
+  }
+
+  function gmFetch(url, options) {
+    return new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        method: options.method || 'GET',
+        url,
+        headers: options.headers || {},
+        data: options.body,
+        timeout: 55000,
+        onload: (resp) => resolve(resp),
+        onerror: (err) => reject(new Error('Network error: ' + (err?.error || 'request failed'))),
+        ontimeout: () => reject(new Error('Request timed out')),
+      });
+    });
+  }
+
+  // Fetches up to maxReviews across paginated /product-reviews/{asin} pages by
+  // navigating the actual browser tab (document.location) would lose script state,
+  // so instead we fetch each page's HTML via GM_xmlhttpRequest and parse it with
+  // DOMParser — keeps everything in one script execution, no page reloads.
+  async function scrapeReviews(asin, maxReviews) {
+    const collected = [];
+    let pageNumber = 1;
+    const { titanUrl } = getConfig(); // not used for scraping, kept for symmetry — Amazon URL below
+    void titanUrl;
+
+    while (collected.length < maxReviews && pageNumber <= 10) {
+      const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
+      const resp = await gmFetch(url, { method: 'GET' });
+      if (resp.status >= 400) break;
+
+      const doc = new DOMParser().parseFromString(resp.responseText, 'text/html');
+      const cards = Array.from(doc.querySelectorAll(SELECTORS.reviewCard));
+      if (cards.length === 0) break;
+
+      // Reuse the same extraction logic against the parsed page instead of the live DOM.
+      const pageReviews = cards.map((card) => {
+        const starEl = card.querySelector(SELECTORS.starRating);
+        const authorEl = card.querySelector(SELECTORS.author);
+        const titleEl = card.querySelector(SELECTORS.reviewTitle);
+        const bodyEl = card.querySelector(SELECTORS.reviewBody);
+        const verifiedEl = card.querySelector(SELECTORS.verifiedBadge);
+        const helpfulEl = card.querySelector(SELECTORS.helpfulText);
+        const dateEl = card.querySelector(SELECTORS.reviewDate);
+        const photoEls = Array.from(card.querySelectorAll(SELECTORS.photos));
+        const rating = parseRating(starEl?.textContent?.trim());
+        if (rating === null) return null;
+        return {
+          author: anonymizeAuthor(authorEl?.textContent?.trim()),
+          rating,
+          title: (titleEl?.textContent?.trim() || '').slice(0, 200),
+          body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
+          verified: !!verifiedEl,
+          photo_urls: photoEls.map((img) => img.getAttribute('src')).filter(Boolean).slice(0, 1).map(upgradePhotoUrl),
+          helpful_count: parseHelpfulCount(helpfulEl?.textContent?.trim()),
+          review_date: dateEl?.textContent?.trim() || '',
+        };
+      }).filter(Boolean);
+
+      for (const r of pageReviews) {
+        if (collected.length >= maxReviews) break;
+        collected.push(r);
+      }
+
+      const hasNext = !!doc.querySelector(SELECTORS.nextPageLink);
+      if (!hasNext) break;
+      pageNumber += 1;
+    }
+
+    return collected.slice(0, maxReviews);
+  }
+
+  async function fetchProducts(titanUrl, token, storeId) {
+    const resp = await gmFetch(`${titanUrl}/api/products/list?store_id=${encodeURIComponent(storeId)}&limit=200`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (resp.status >= 400) throw new Error(`Failed to load products (HTTP ${resp.status})`);
+    const body = JSON.parse(resp.responseText);
+    return body.products || [];
+  }
+
+  async function fetchStores(titanUrl, token) {
+    const resp = await gmFetch(`${titanUrl}/api/system?action=stores_list`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (resp.status >= 400) throw new Error(`Failed to load stores (HTTP ${resp.status})`);
+    const body = JSON.parse(resp.responseText);
+    // stores_list returns a bare array (not { stores: [...] }) — see lib/actions/stores.js:
+    // the frontend StoreProvider .find()/.map()s the response body directly, so wrapping
+    // it would break the dashboard's store switcher. Handle both shapes defensively in
+    // case that ever changes, but the bare-array case is the real current contract.
+    return Array.isArray(body) ? body : (body.stores || []);
+  }
+
+  function submitImport(titanUrl, token, storeId, productId, reviews) {
+    return gmFetch(`${titanUrl}/api/system?action=import_amazon_reviews`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ store_id: storeId, product_id: productId, reviews }),
+    });
+  }
+
+  function showToast(message, isError) {
+    const el = document.createElement('div');
+    el.textContent = message;
+    el.style.cssText = [
+      'position:fixed', 'bottom:80px', 'right:24px', 'z-index:100000',
+      `background:${isError ? '#5a1a1a' : '#1a3a1a'}`, 'color:#fff',
+      'border-radius:8px', 'padding:12px 18px', 'font-size:13px', 'max-width:320px',
+      'box-shadow:0 4px 12px rgba(0,0,0,0.4)',
+    ].join(';');
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 6000);
+  }
+
+  async function openImportModal(asin) {
+    const { token, titanUrl } = getConfig();
+
+    let stores;
+    try {
+      stores = await fetchStores(titanUrl, token);
+    } catch (err) {
+      showToast(`Could not load stores: ${err.message}`, true);
+      return;
+    }
+    if (!stores.length) {
+      showToast('No stores available for your account.', true);
+      return;
+    }
+
+    const storeNames = stores.map((s, i) => `${i + 1}. ${s.name}`).join('\n');
+    const storeChoice = window.prompt(`Select a store (enter number):\n${storeNames}`, '1');
+    const storeIdx = parseInt(storeChoice, 10) - 1;
+    if (!Number.isFinite(storeIdx) || !stores[storeIdx]) {
+      showToast('Import cancelled — no store selected.', true);
+      return;
+    }
+    const store = stores[storeIdx];
+
+    let products;
+    try {
+      products = await fetchProducts(titanUrl, token, store.id);
+    } catch (err) {
+      showToast(`Could not load products: ${err.message}`, true);
+      return;
+    }
+
+    const search = window.prompt('Search Titan products by title (leave blank to list first 20):', '');
+    const filtered = (search
+      ? products.filter((p) => p.title.toLowerCase().includes(search.toLowerCase()))
+      : products
+    ).slice(0, 20);
+
+    if (!filtered.length) {
+      showToast('No matching products found.', true);
+      return;
+    }
+
+    const productNames = filtered.map((p, i) => `${i + 1}. ${p.title}`).join('\n');
+    const productChoice = window.prompt(`Select a product (enter number):\n${productNames}`, '1');
+    const productIdx = parseInt(productChoice, 10) - 1;
+    if (!Number.isFinite(productIdx) || !filtered[productIdx]) {
+      showToast('Import cancelled — no product selected.', true);
+      return;
+    }
+    const product = filtered[productIdx];
+
+    const maxInput = window.prompt('How many reviews to import? (max 10)', '10');
+    const maxReviews = Math.min(10, Math.max(1, parseInt(maxInput, 10) || 10));
+
+    showToast(`Scraping up to ${maxReviews} reviews…`, false);
+    let reviews;
+    try {
+      reviews = await scrapeReviews(asin, maxReviews);
+    } catch (err) {
+      showToast(`Scrape failed: ${err.message}`, true);
+      return;
+    }
+
+    if (!reviews.length) {
+      showToast('0 reviews found — DOM may have changed, check console.', true);
+      console.warn('[titan-userscript] 0 reviews scraped for ASIN', asin);
+      return;
+    }
+
+    try {
+      const resp = await submitImport(titanUrl, token, store.id, product.id, reviews);
+      if (resp.status === 401) {
+        showToast('API token invalid — regenerate in Titan Settings > Users.', true);
+        return;
+      }
+      if (resp.status === 429) {
+        showToast('Titan rate limit hit — wait a bit and retry.', true);
+        return;
+      }
+      if (resp.status >= 400) {
+        showToast(`Import failed (HTTP ${resp.status}).`, true);
+        return;
+      }
+      const body = JSON.parse(resp.responseText);
+      showToast(`${body.inserted} reviews imported, ${body.duplicates} duplicates.`, false);
+    } catch (err) {
+      showToast(`Import failed: ${err.message}`, true);
+    }
+  }
+
   function promptForToken() {
     const current = GM_getValue('TITAN_API_TOKEN', '');
     const next = window.prompt('Paste your Titan API token (Settings > Users > Generate API token):', current);
@@ -73,8 +356,7 @@
         window.alert('No API token configured — go to Titan Settings > Users to generate one, then use the Tampermonkey menu (Configure Titan API token) to paste it in.');
         return;
       }
-      // Step 8 replaces this placeholder with the real scrape + modal + POST flow.
-      window.alert('Not implemented yet — scrape/import logic lands in the next userscript task.');
+      openImportModal(asin);
     });
 
     document.body.appendChild(btn);
