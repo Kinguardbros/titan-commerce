@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import 'dotenv/config';
+import { scrapeAmazonReviews } from './parser.js';
 
 const PORT = process.env.PORT || 3100;
 const EXPECTED_TOKEN = process.env.TITAN_SCRAPER_TOKEN;
@@ -36,8 +37,21 @@ app.get('/health', (req, res) => {
 });
 
 app.post('/scrape-amazon', requireBearer, async (req, res) => {
-  // Placeholder — T4 fills Puppeteer scraping logic
-  return res.status(501).json({ error: 'not implemented yet — Task 4 wires the scraper' });
+  const { amazon_url, max_reviews } = req.body || {};
+  if (!amazon_url) return res.status(400).json({ error: 'amazon_url required' });
+  const cap = Math.min(parseInt(max_reviews, 10) || 10, 10); // hard cap 10 per D-12
+  try {
+    const result = await scrapeAmazonReviews(amazon_url, cap);
+    res.status(200).json(result);
+  } catch (err) {
+    console.error('[titan-scraper] scrape error:', err);
+    const status = err.message.includes('blocked')
+      ? 503
+      : err.message.includes('Invalid Amazon')
+        ? 400
+        : 500;
+    res.status(status).json({ error: err.message });
+  }
 });
 
 // Central error handler — no `catch (e) {}` swallows
