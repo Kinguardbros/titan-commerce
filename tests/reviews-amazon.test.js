@@ -182,11 +182,25 @@ describe('lib/actions/reviews-amazon.js', () => {
       expect(supabaseState.inserted).toHaveLength(0);
     });
 
-    it('caps reviews array at 50 (hard cap, mirrors scrape max)', async () => {
-      const many = Array.from({ length: 51 }, (_, i) => ({ ...SAMPLE_REVIEW, body: `Review ${i}` }));
+    it('caps reviews array at 100 (hard cap, mirrors scrape max)', async () => {
+      const many = Array.from({ length: 101 }, (_, i) => ({ ...SAMPLE_REVIEW, body: `Review ${i}` }));
       const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: many }, MEMBER_WITH_EDIT);
       await import_amazon_reviews(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    it('prioritizes photo reviews (photo-first, then rating DESC) — F06', async () => {
+      const noPhoto5 = { ...SAMPLE_REVIEW, body: 'no-photo-5-star', rating: 5 };
+      const noPhoto3 = { ...SAMPLE_REVIEW, body: 'no-photo-3-star', rating: 3 };
+      const photo4   = { ...SAMPLE_REVIEW, body: 'photo-4-star',   rating: 4, photo_urls: ['https://m.media-amazon.com/images/I/photo1.jpg'] };
+      const photo2   = { ...SAMPLE_REVIEW, body: 'photo-2-star',   rating: 2, photo_urls: ['https://m.media-amazon.com/images/I/photo2.jpg'] };
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [noPhoto5, noPhoto3, photo4, photo2] }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      // Insertion order in supabase mock preserves the priority order:
+      // photo-4 (photo), photo-2 (photo), no-photo-5, no-photo-3
+      const bodies = supabaseState.inserted.map((r) => r.body);
+      expect(bodies).toEqual(['photo-4-star', 'photo-2-star', 'no-photo-5-star', 'no-photo-3-star']);
     });
 
     it('accepts source="temu" (feature-05 multi-domain) and persists it', async () => {

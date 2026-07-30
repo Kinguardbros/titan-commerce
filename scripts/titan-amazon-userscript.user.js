@@ -139,10 +139,21 @@
   // navigating the actual browser tab (document.location) would lose script state,
   // so instead we fetch each page's HTML via GM_xmlhttpRequest and parse it with
   // DOMParser — keeps everything in one script execution, no page reloads.
+  // Photo-first, rating-DESC sorter — mirrors backend's prioritizeReviews so the top
+  // maxReviews the userscript sends are already the highest-quality (photo reviews first,
+  // then best-rated non-photo). Server re-applies the same logic as belt-and-suspenders.
+  function prioritizeReviews(reviews) {
+    const hasPhoto = (r) => Array.isArray(r.photo_urls) && r.photo_urls.length > 0;
+    return [...reviews].sort((a, b) => {
+      const pa = hasPhoto(a) ? 1 : 0;
+      const pb = hasPhoto(b) ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      return (b.rating || 0) - (a.rating || 0);
+    });
+  }
+
   async function scrapeReviews(asin, maxReviews) {
     const collected = [];
-    // Dedup key: author + first-100-chars of body (matches server's md5(body) unique index
-    // pattern closely enough to avoid re-sending obvious duplicates between DOM and fetched pages).
     const seen = new Set();
     const dedupKey = (r) => `${r.author}|${(r.body || '').slice(0, 100)}`;
     const push = (r) => {
@@ -153,20 +164,18 @@
       return true;
     };
 
-    // Prefer live DOM on product page (dp/ASIN) — Amazon serves visible reviews there
-    // to the logged-in session, while /product-reviews/{asin} increasingly returns
-    // signed-out shells with zero cards. Then continue with paginated fetches for more.
-    for (const r of extractReviewsFromDom()) {
-      if (collected.length >= maxReviews) break;
-      push(r);
-    }
-    if (collected.length >= maxReviews) return collected.slice(0, maxReviews);
+    // Collect up to 3× maxReviews raw candidates so priority-sort has real headroom
+    // (otherwise we'd stop at the first 50 chronologically and never see photo reviews
+    // on later pages). Hard-cap the harvest at 300 to bound fetch time.
+    const harvestTarget = Math.min(maxReviews * 3, 300);
 
-    // Paginated fetch — up to 10 pages ≈ 100 raw reviews, then dedup + cap.
-    // If Amazon returns signed-out shells (0 cards on all pages), we simply return
-    // whatever DOM gave us.
+    // DOM first (current page — sees logged-in session's visible reviews)
+    extractReviewsFromDom().forEach(push);
+
+    // Paginated fetch — up to 10 pages. Stops when we have enough harvest OR Amazon
+    // returns empty / signed-out shell.
     let pageNumber = 1;
-    while (collected.length < maxReviews && pageNumber <= 10) {
+    while (collected.length < harvestTarget && pageNumber <= 10) {
       const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
       const resp = await gmFetch(url, { method: 'GET' });
       if (resp.status >= 400) break;
@@ -175,17 +184,15 @@
       const pageReviews = extractReviewsFromRoot(doc);
       if (pageReviews.length === 0) break;
 
-      for (const r of pageReviews) {
-        if (collected.length >= maxReviews) break;
-        push(r);
-      }
+      pageReviews.forEach(push);
 
       const hasNext = !!doc.querySelector(SELECTORS.nextPageLink);
       if (!hasNext) break;
       pageNumber += 1;
     }
 
-    return collected.slice(0, maxReviews);
+    // Priority-sort, then take top maxReviews.
+    return prioritizeReviews(collected).slice(0, maxReviews);
   }
 
   async function fetchProducts(titanUrl, token, storeId) {
@@ -269,7 +276,9 @@
   async function scrapeTemuReviews(maxReviews) {
     // Temu virtualizes review lists — cards get added as user scrolls. We take a snapshot
     // of whatever is currently rendered in DOM. To get more, user scrolls first then clicks.
-    return extractTemuReviews().slice(0, maxReviews);
+    // Photos aren't in DOM on dp/ page (see extractTemuReviews comment), so photo-first
+    // sort here is basically a no-op for Temu, but still sorts by rating DESC.
+    return prioritizeReviews(extractTemuReviews()).slice(0, maxReviews);
   }
 
   // Temu product ID lives in URL as -g-<digits>.html
@@ -368,8 +377,8 @@
     }
     const product = filtered[productIdx];
 
-    const maxInput = window.prompt('How many reviews to import? (max 50)', '50');
-    const maxReviews = Math.min(50, Math.max(1, parseInt(maxInput, 10) || 50));
+    const maxInput = window.prompt('How many reviews to import? (max 100)', '100');
+    const maxReviews = Math.min(100, Math.max(1, parseInt(maxInput, 10) || 100));
 
     showToast(`Scraping up to ${maxReviews} reviews from ${scraper.label}…`, false);
     let reviews;
