@@ -238,7 +238,19 @@
     author: 'div.XTEkYdlM',
     ratingAria: '[aria-label*="out of five stars" i]',
     dateAria: '[aria-label*="on " i]',
+    // Review photos: identified by alt="Reviews image" OR src containing /review-image/
+    // (avatars and country flags share the base class wxWpAMbp so filtering by class won't work).
+    photos: 'img[alt="Reviews image"], img[src*="/review-image/"]',
   };
+
+  // Temu photo URLs come as low-res thumbnails (?imageMogr2/auto-orient|imageView2/2/w/236/q/7).
+  // Strip the querystring to get the higher-res original URL from the same origin.
+  // Backend I-3 SSRF gate needs updating to allow this Temu CDN host (rewimg-eu.kwcdn.com).
+  function upgradeTemuPhotoUrl(url) {
+    if (!url) return url;
+    const q = url.indexOf('?');
+    return q > 0 ? url.slice(0, q) : url;
+  }
 
   function extractTemuReviews() {
     const cards = Array.from(document.querySelectorAll(TEMU_SELECTORS.reviewCard));
@@ -247,6 +259,7 @@
       const authorEl = card.querySelector(TEMU_SELECTORS.author);
       const ratingEl = card.querySelector(TEMU_SELECTORS.ratingAria);
       const dateEl = card.querySelector(TEMU_SELECTORS.dateAria);
+      const photoEls = Array.from(card.querySelectorAll(TEMU_SELECTORS.photos));
 
       // Rating from "5 out of five stars" aria-label
       const ratingMatch = ratingEl?.getAttribute('aria-label')?.match(/^(\d)\s+out of five/i);
@@ -260,13 +273,19 @@
       // Skip cards with no body text — they're probably UI shells that matched selector
       if (!body) return null;
 
+      // Take the first photo only (server accepts 1 photo_url per review).
+      const photo_urls = photoEls
+        .map((img) => upgradeTemuPhotoUrl(img.getAttribute('src')))
+        .filter(Boolean)
+        .slice(0, 1);
+
       return {
         author: anonymizeAuthor(authorEl?.textContent?.trim()),
         rating,
         title: '', // Temu reviews don't have separate titles
         body,
         verified: true, // Temu shows "All reviews are from verified purchases" globally
-        photo_urls: [], // photos not accessible from dp/ page (see comment above)
+        photo_urls,
         helpful_count: 0, // Temu doesn't expose per-review helpful counts on dp/ page
         review_date: dateAria,
       };
@@ -276,8 +295,8 @@
   async function scrapeTemuReviews(maxReviews) {
     // Temu virtualizes review lists — cards get added as user scrolls. We take a snapshot
     // of whatever is currently rendered in DOM. To get more, user scrolls first then clicks.
-    // Photos aren't in DOM on dp/ page (see extractTemuReviews comment), so photo-first
-    // sort here is basically a no-op for Temu, but still sorts by rating DESC.
+    // Photos are per-card (img[alt="Reviews image"]) — priority sort brings photo reviews
+    // to the front so the top maxReviews we send are the highest-quality ones.
     return prioritizeReviews(extractTemuReviews()).slice(0, maxReviews);
   }
 
