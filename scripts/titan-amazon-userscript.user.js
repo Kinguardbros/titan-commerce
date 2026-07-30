@@ -1,11 +1,13 @@
 // ==UserScript==
-// @name         Titan Commerce — Amazon Reviews Importer
+// @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      1.0.0
-// @description  Scrape Amazon product reviews on this page and import them into Titan Commerce as pending reviews.
+// @version      2.0.0
+// @description  Scrape product reviews (Amazon, Temu) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
 // @match        https://smile.amazon.com/*
+// @match        https://www.temu.com/*
+// @match        https://temu.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
@@ -210,12 +212,95 @@
     return Array.isArray(body) ? body : (body.stores || []);
   }
 
-  function submitImport(titanUrl, token, storeId, productId, reviews) {
+  function submitImport(titanUrl, token, storeId, productId, reviews, source) {
     return gmFetch(`${titanUrl}/api/system?action=import_amazon_reviews`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ store_id: storeId, product_id: productId, reviews }),
+      body: JSON.stringify({ store_id: storeId, product_id: productId, reviews, source }),
     });
+  }
+
+  // ---------- TEMU SCRAPER ----------
+  // Temu review card = div._9WTBQrvq (obfuscated by webpack, will break on their next
+  // redeploy — that's the accepted tradeoff for skipping the AI parser path).
+  // Photos aren't in dp/ page cards (Temu lazy-loads them behind a modal we can't hit
+  // without user interaction), so photo_urls is always empty for Temu imports.
+  const TEMU_SELECTORS = {
+    reviewCard: 'div._9WTBQrvq',
+    body: 'div._2EO0yd2j',
+    author: 'div.XTEkYdlM',
+    ratingAria: '[aria-label*="out of five stars" i]',
+    dateAria: '[aria-label*="on " i]',
+  };
+
+  function extractTemuReviews() {
+    const cards = Array.from(document.querySelectorAll(TEMU_SELECTORS.reviewCard));
+    return cards.map((card) => {
+      const bodyEl = card.querySelector(TEMU_SELECTORS.body);
+      const authorEl = card.querySelector(TEMU_SELECTORS.author);
+      const ratingEl = card.querySelector(TEMU_SELECTORS.ratingAria);
+      const dateEl = card.querySelector(TEMU_SELECTORS.dateAria);
+
+      // Rating from "5 out of five stars" aria-label
+      const ratingMatch = ratingEl?.getAttribute('aria-label')?.match(/^(\d)\s+out of five/i);
+      const rating = ratingMatch ? parseInt(ratingMatch[1], 10) : null;
+      if (rating === null) return null;
+
+      // Date from "in Czech Republic on 20 Apr 2024" aria-label — server parses "on <date>"
+      const dateAria = dateEl?.getAttribute('aria-label') || '';
+
+      const body = (bodyEl?.textContent?.trim() || '').slice(0, 2000);
+      // Skip cards with no body text — they're probably UI shells that matched selector
+      if (!body) return null;
+
+      return {
+        author: anonymizeAuthor(authorEl?.textContent?.trim()),
+        rating,
+        title: '', // Temu reviews don't have separate titles
+        body,
+        verified: true, // Temu shows "All reviews are from verified purchases" globally
+        photo_urls: [], // photos not accessible from dp/ page (see comment above)
+        helpful_count: 0, // Temu doesn't expose per-review helpful counts on dp/ page
+        review_date: dateAria,
+      };
+    }).filter(Boolean);
+  }
+
+  async function scrapeTemuReviews(maxReviews) {
+    // Temu virtualizes review lists — cards get added as user scrolls. We take a snapshot
+    // of whatever is currently rendered in DOM. To get more, user scrolls first then clicks.
+    return extractTemuReviews().slice(0, maxReviews);
+  }
+
+  // Temu product ID lives in URL as -g-<digits>.html
+  function extractTemuProductId() {
+    const m = window.location.pathname.match(/-g-(\d+)\.html/);
+    return m ? m[1] : null;
+  }
+
+  // ---------- SCRAPER REGISTRY ----------
+  // Each entry: source (server-side value), host regex, id extractor, scrape function
+  // Add new e-commerce sites here — no other userscript changes needed.
+  const SCRAPERS = [
+    {
+      source: 'amazon',
+      hostMatch: /(?:^|\.)amazon\.[a-z.]+$/i,
+      extractId: extractAsin,
+      scrape: (id, max) => scrapeReviews(id, max),
+      label: 'Amazon',
+    },
+    {
+      source: 'temu',
+      hostMatch: /(?:^|\.)temu\.com$/i,
+      extractId: extractTemuProductId,
+      scrape: (id, max) => scrapeTemuReviews(max),
+      label: 'Temu',
+    },
+  ];
+
+  function pickScraper() {
+    const host = window.location.hostname;
+    return SCRAPERS.find((s) => s.hostMatch.test(host)) || null;
   }
 
   function showToast(message, isError) {
@@ -231,7 +316,7 @@
     setTimeout(() => el.remove(), 6000);
   }
 
-  async function openImportModal(asin) {
+  async function openImportModal(scraper, productId) {
     const { token, titanUrl } = getConfig();
 
     let stores;
@@ -286,10 +371,10 @@
     const maxInput = window.prompt('How many reviews to import? (max 50)', '50');
     const maxReviews = Math.min(50, Math.max(1, parseInt(maxInput, 10) || 50));
 
-    showToast(`Scraping up to ${maxReviews} reviews…`, false);
+    showToast(`Scraping up to ${maxReviews} reviews from ${scraper.label}…`, false);
     let reviews;
     try {
-      reviews = await scrapeReviews(asin, maxReviews);
+      reviews = await scraper.scrape(productId, maxReviews);
     } catch (err) {
       showToast(`Scrape failed: ${err.message}`, true);
       return;
@@ -297,12 +382,12 @@
 
     if (!reviews.length) {
       showToast('0 reviews found — DOM may have changed, check console.', true);
-      console.warn('[titan-userscript] 0 reviews scraped for ASIN', asin);
+      console.warn('[titan-userscript] 0 reviews scraped', { source: scraper.source, productId });
       return;
     }
 
     try {
-      const resp = await submitImport(titanUrl, token, store.id, product.id, reviews);
+      const resp = await submitImport(titanUrl, token, store.id, product.id, reviews, scraper.source);
       if (resp.status === 401) {
         showToast('API token invalid — regenerate in Titan Settings > Users.', true);
         return;
@@ -365,11 +450,11 @@
     return m ? m[1].toUpperCase() : null;
   }
 
-  function injectButton(asin) {
+  function injectButton(scraper, productId) {
     if (document.getElementById('titan-import-btn')) return; // already injected
     const btn = document.createElement('button');
     btn.id = 'titan-import-btn';
-    btn.textContent = 'Import to Titan';
+    btn.textContent = `Import to Titan (${scraper.label})`;
     btn.style.cssText = [
       'position:fixed', 'bottom:24px', 'right:24px', 'z-index:99999',
       'background:#1a1a2e', 'color:#fff', 'border:1px solid #4a4a6a',
@@ -383,19 +468,21 @@
         window.alert('No API token configured — go to Titan Settings > Users to generate one, then use the Tampermonkey menu (Configure Titan API token) to paste it in.');
         return;
       }
-      openImportModal(asin);
+      openImportModal(scraper, productId);
     });
 
     document.body.appendChild(btn);
   }
 
   function init() {
-    const asin = extractAsin();
-    if (!asin) return; // not a product/review page
-    injectButton(asin);
+    const scraper = pickScraper();
+    if (!scraper) return; // domain not registered — do nothing
+    const productId = scraper.extractId();
+    if (!productId) return; // not a product page for this domain
+    injectButton(scraper, productId);
 
     const { token, titanUrl } = getConfig();
-    console.info('[Titan Importer] loaded, config:', { hasToken: !!token, titanUrl, asin });
+    console.info('[Titan Importer] loaded', { source: scraper.source, hasToken: !!token, titanUrl, productId });
   }
 
   init();

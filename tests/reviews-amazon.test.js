@@ -189,6 +189,26 @@ describe('lib/actions/reviews-amazon.js', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
+    it('accepts source="temu" (feature-05 multi-domain) and persists it', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'temu' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(supabaseState.inserted[0].source).toBe('temu');
+    });
+
+    it('defaults source to "amazon" when omitted (backward compat with F04 userscript)', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW] }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(supabaseState.inserted[0].source).toBe('amazon');
+    });
+
+    it('rejects unknown source values', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'evil' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+    });
+
     it('I-3 SSRF: rejects a non-Amazon photo host (e.g. cloud metadata IP) without fetching it', async () => {
       const ssrf = { ...SAMPLE_REVIEW, photo_urls: ['http://169.254.169.254/latest/meta-data/'] };
       const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [ssrf] }, MEMBER_WITH_EDIT);
