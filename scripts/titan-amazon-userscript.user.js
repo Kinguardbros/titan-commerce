@@ -66,13 +66,20 @@
   const SELECTORS = {
     reviewCard: 'div[data-hook="review"]',
     starRating: 'i[data-hook="review-star-rating"] span.a-icon-alt',
+    // Amazon renamed review sub-hooks to camelCase (~2026): reviewTitle, reviewText,
+    // reviewRichContentContainer. Keep hyphenated fallbacks for older markup and
+    // per-region variance (some Amazon locales still ship the legacy names).
     author: 'span.a-profile-name',
-    reviewTitle: 'a[data-hook="review-title"] span:not([class*="a-color-secondary"])',
-    reviewBody: 'span[data-hook="review-body"] span',
-    verifiedBadge: 'span[data-hook="avp-badge"]',
-    photos: 'div[data-hook="review-image-tile-section"] img',
-    helpfulText: 'span[data-hook="helpful-vote-statement"]',
-    reviewDate: 'span[data-hook="review-date"]',
+    // Title: new = <h5 data-hook="reviewTitle">, old = <a data-hook="review-title"> <span>
+    reviewTitle: '[data-hook="reviewTitle"], a[data-hook="review-title"] span:not([class*="a-color-secondary"])',
+    // Body: new = <div data-hook="reviewText"><div data-hook="reviewRichContentContainer">TEXT</div>
+    // Prefer the rich-content container (holds the actual review paragraph, not the "Brief content..." wrapper text)
+    reviewBody: '[data-hook="reviewRichContentContainer"], span[data-hook="review-body"] span, [data-hook="reviewText"]',
+    verifiedBadge: 'span[data-hook="avp-badge"], [data-hook="avp-badge"]',
+    // Photos: new markup uses different classes; support all known variants
+    photos: 'div[data-hook="review-image-tile-section"] img, [data-hook="review-image-tile-section"] img, img[data-hook="review-image-tile"], .review-image-tile-section img, img.review-image-tile, .cr-lightbox-image-thumbnail img',
+    helpfulText: 'span[data-hook="helpful-vote-statement"], [data-hook="helpful-vote-statement"]',
+    reviewDate: 'span[data-hook="review-date"], [data-hook="review-date"]',
     nextPageLink: 'ul.a-pagination li.a-last a',
   };
 
