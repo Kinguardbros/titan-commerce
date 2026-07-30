@@ -83,8 +83,11 @@
     nextPageLink: 'ul.a-pagination li.a-last a',
   };
 
-  function extractReviewsFromDom() {
-    const cards = Array.from(document.querySelectorAll(SELECTORS.reviewCard));
+  // Extract review objects from any DOM-tree-like root — used against both
+  // the live document (dp/ page reviews) and DOMParser-parsed HTML from
+  // paginated /product-reviews/{asin} fetches.
+  function extractReviewsFromRoot(root) {
+    const cards = Array.from(root.querySelectorAll(SELECTORS.reviewCard));
     return cards.map((card) => {
       const starEl = card.querySelector(SELECTORS.starRating);
       const authorEl = card.querySelector(SELECTORS.author);
@@ -111,6 +114,10 @@
     }).filter(Boolean);
   }
 
+  function extractReviewsFromDom() {
+    return extractReviewsFromRoot(document);
+  }
+
   function gmFetch(url, options) {
     return new Promise((resolve, reject) => {
       GM_xmlhttpRequest({
@@ -132,56 +139,43 @@
   // DOMParser — keeps everything in one script execution, no page reloads.
   async function scrapeReviews(asin, maxReviews) {
     const collected = [];
+    // Dedup key: author + first-100-chars of body (matches server's md5(body) unique index
+    // pattern closely enough to avoid re-sending obvious duplicates between DOM and fetched pages).
+    const seen = new Set();
+    const dedupKey = (r) => `${r.author}|${(r.body || '').slice(0, 100)}`;
+    const push = (r) => {
+      const k = dedupKey(r);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      collected.push(r);
+      return true;
+    };
 
     // Prefer live DOM on product page (dp/ASIN) — Amazon serves visible reviews there
     // to the logged-in session, while /product-reviews/{asin} increasingly returns
-    // signed-out shells with zero cards. Only fall back to paginated fetch when the
-    // current page has no visible review cards.
-    const domReviews = extractReviewsFromDom();
-    for (const r of domReviews) {
+    // signed-out shells with zero cards. Then continue with paginated fetches for more.
+    for (const r of extractReviewsFromDom()) {
       if (collected.length >= maxReviews) break;
-      collected.push(r);
+      push(r);
     }
     if (collected.length >= maxReviews) return collected.slice(0, maxReviews);
 
+    // Paginated fetch — up to 10 pages ≈ 100 raw reviews, then dedup + cap.
+    // If Amazon returns signed-out shells (0 cards on all pages), we simply return
+    // whatever DOM gave us.
     let pageNumber = 1;
-
     while (collected.length < maxReviews && pageNumber <= 10) {
       const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
       const resp = await gmFetch(url, { method: 'GET' });
       if (resp.status >= 400) break;
 
       const doc = new DOMParser().parseFromString(resp.responseText, 'text/html');
-      const cards = Array.from(doc.querySelectorAll(SELECTORS.reviewCard));
-      if (cards.length === 0) break;
-
-      // Reuse the same extraction logic against the parsed page instead of the live DOM.
-      const pageReviews = cards.map((card) => {
-        const starEl = card.querySelector(SELECTORS.starRating);
-        const authorEl = card.querySelector(SELECTORS.author);
-        const titleEl = card.querySelector(SELECTORS.reviewTitle);
-        const bodyEl = card.querySelector(SELECTORS.reviewBody);
-        const verifiedEl = card.querySelector(SELECTORS.verifiedBadge);
-        const helpfulEl = card.querySelector(SELECTORS.helpfulText);
-        const dateEl = card.querySelector(SELECTORS.reviewDate);
-        const photoEls = Array.from(card.querySelectorAll(SELECTORS.photos));
-        const rating = parseRating(starEl?.textContent?.trim());
-        if (rating === null) return null;
-        return {
-          author: anonymizeAuthor(authorEl?.textContent?.trim()),
-          rating,
-          title: (titleEl?.textContent?.trim() || '').slice(0, 200),
-          body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
-          verified: !!verifiedEl,
-          photo_urls: photoEls.map((img) => img.getAttribute('src')).filter(Boolean).slice(0, 1).map(upgradePhotoUrl),
-          helpful_count: parseHelpfulCount(helpfulEl?.textContent?.trim()),
-          review_date: dateEl?.textContent?.trim() || '',
-        };
-      }).filter(Boolean);
+      const pageReviews = extractReviewsFromRoot(doc);
+      if (pageReviews.length === 0) break;
 
       for (const r of pageReviews) {
         if (collected.length >= maxReviews) break;
-        collected.push(r);
+        push(r);
       }
 
       const hasNext = !!doc.querySelector(SELECTORS.nextPageLink);
@@ -289,8 +283,8 @@
     }
     const product = filtered[productIdx];
 
-    const maxInput = window.prompt('How many reviews to import? (max 10)', '10');
-    const maxReviews = Math.min(10, Math.max(1, parseInt(maxInput, 10) || 10));
+    const maxInput = window.prompt('How many reviews to import? (max 50)', '50');
+    const maxReviews = Math.min(50, Math.max(1, parseInt(maxInput, 10) || 50));
 
     showToast(`Scraping up to ${maxReviews} reviews…`, false);
     let reviews;

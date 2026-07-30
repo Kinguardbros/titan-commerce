@@ -182,8 +182,8 @@ describe('lib/actions/reviews-amazon.js', () => {
       expect(supabaseState.inserted).toHaveLength(0);
     });
 
-    it('caps reviews array at 10 (hard cap, mirrors scrape max)', async () => {
-      const many = Array.from({ length: 15 }, (_, i) => ({ ...SAMPLE_REVIEW, body: `Review ${i}` }));
+    it('caps reviews array at 50 (hard cap, mirrors scrape max)', async () => {
+      const many = Array.from({ length: 51 }, (_, i) => ({ ...SAMPLE_REVIEW, body: `Review ${i}` }));
       const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: many }, MEMBER_WITH_EDIT);
       await import_amazon_reviews(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
