@@ -125,9 +125,19 @@
   // DOMParser — keeps everything in one script execution, no page reloads.
   async function scrapeReviews(asin, maxReviews) {
     const collected = [];
+
+    // Prefer live DOM on product page (dp/ASIN) — Amazon serves visible reviews there
+    // to the logged-in session, while /product-reviews/{asin} increasingly returns
+    // signed-out shells with zero cards. Only fall back to paginated fetch when the
+    // current page has no visible review cards.
+    const domReviews = extractReviewsFromDom();
+    for (const r of domReviews) {
+      if (collected.length >= maxReviews) break;
+      collected.push(r);
+    }
+    if (collected.length >= maxReviews) return collected.slice(0, maxReviews);
+
     let pageNumber = 1;
-    const { titanUrl } = getConfig(); // not used for scraping, kept for symmetry — Amazon URL below
-    void titanUrl;
 
     while (collected.length < maxReviews && pageNumber <= 10) {
       const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
