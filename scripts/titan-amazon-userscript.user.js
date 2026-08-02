@@ -153,13 +153,21 @@
       // prefix isn't there.
       const rawTitle = (titleEl?.textContent || '').replace(/^\s*\d(?:\.\d)?\s+out of \d(?:\.\d)?\s+stars?\s*/i, '').replace(/\s+/g, ' ').trim();
 
-      // Photo URLs: images in card + video poster (if this review has a video).
-      // We store the video poster as if it were a photo — storefront just sees an
-      // image thumbnail. Server-side backend fetches from m.media-amazon.com which
-      // is already on the I-3 SSRF allow-list.
-      const imgPhotoUrls = photoEls.map((img) => img.getAttribute('src')).filter(Boolean).map(upgradePhotoUrl);
+      // Photo URLs (F08 multi-photo): all images in card + optional video poster.
+      // Amazon renders each photo twice (once as lightbox thumbnail with alt='Customer image 1'
+      // class 'cr-lightbox-image-thumbnail', once as inline tile with alt='Customer image'
+      // class 'review-image-tile') — we dedup by URL. Backend I-3 SSRF gate allows
+      // m.media-amazon.com so all these thumbnails will fetch.
+      const rawImgUrls = photoEls.map((img) => img.getAttribute('src')).filter(Boolean).map(upgradePhotoUrl);
       const videoPoster = videoPosters.get(card.id);
-      const photo_urls = [...(videoPoster ? [videoPoster] : []), ...imgPhotoUrls].slice(0, 1);
+      const combined = [...(videoPoster ? [upgradePhotoUrl(videoPoster) ] : []), ...rawImgUrls];
+      // Dedup by URL, preserving order (video poster first, then unique inline imgs).
+      const seen = new Set();
+      const photo_urls = combined.filter((url) => {
+        if (seen.has(url)) return false;
+        seen.add(url);
+        return true;
+      }).slice(0, 10);
 
       return {
         author: anonymizeAuthor(authorEl?.textContent?.trim()),
