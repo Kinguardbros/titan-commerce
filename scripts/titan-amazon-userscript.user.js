@@ -77,7 +77,9 @@
   // sibling VPS scraper, /root/titan-scraper/parser.js) — same DOM shape, different
   // execution context (real browser DOM here, not Puppeteer).
   const SELECTORS = {
-    reviewCard: 'div[data-hook="review"]',
+    // Tag-agnostic: dp/ page uses <div data-hook="review">, portal/customer-reviews/
+    // page uses <li data-hook="review" class="review">. Both hit this.
+    reviewCard: '[data-hook="review"]',
     starRating: 'i[data-hook="review-star-rating"] span.a-icon-alt',
     // Amazon renamed review sub-hooks to camelCase (~2026): reviewTitle, reviewText,
     // reviewRichContentContainer. Keep hyphenated fallbacks for older markup and
@@ -114,10 +116,17 @@
       const rating = parseRating(starEl?.textContent?.trim());
       if (rating === null) return null;
 
+      // Portal reviews page (/portal/customer-reviews/) puts the star rating text
+      // INSIDE the title element ('5.0 out of 5 stars\n\nMy first bikini'). Classic
+      // /dp/ page keeps them separate. Strip the star-rating prefix + collapse
+      // whitespace so we get just the title. No-op on classic pages where the
+      // prefix isn't there.
+      const rawTitle = (titleEl?.textContent || '').replace(/^\s*\d(?:\.\d)?\s+out of \d(?:\.\d)?\s+stars?\s*/i, '').replace(/\s+/g, ' ').trim();
+
       return {
         author: anonymizeAuthor(authorEl?.textContent?.trim()),
         rating,
-        title: (titleEl?.textContent?.trim() || '').slice(0, 200),
+        title: rawTitle.slice(0, 200),
         body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
         verified: !!verifiedEl,
         photo_urls: photoEls.map((img) => img.getAttribute('src')).filter(Boolean).slice(0, 1).map(upgradePhotoUrl),
