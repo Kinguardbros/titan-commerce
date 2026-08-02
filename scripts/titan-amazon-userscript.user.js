@@ -6,6 +6,17 @@
 // @author       Dan
 // @match        https://www.amazon.com/*
 // @match        https://smile.amazon.com/*
+// @match        https://www.amazon.co.uk/*
+// @match        https://www.amazon.de/*
+// @match        https://www.amazon.fr/*
+// @match        https://www.amazon.it/*
+// @match        https://www.amazon.es/*
+// @match        https://www.amazon.nl/*
+// @match        https://www.amazon.pl/*
+// @match        https://www.amazon.se/*
+// @match        https://www.amazon.ca/*
+// @match        https://www.amazon.com.au/*
+// @match        https://www.amazon.com.mx/*
 // @match        https://www.temu.com/*
 // @match        https://temu.com/*
 // @grant        GM_setValue
@@ -474,7 +485,13 @@
 
   // Amazon product pages: /dp/{ASIN} or /product-reviews/{ASIN}
   function extractAsin() {
-    const m = window.location.pathname.match(/\/(?:dp|product-reviews|gp\/product)\/([A-Z0-9]{10})/i);
+    // Supported URL forms:
+    //   /dp/{ASIN}                                  — product detail page
+    //   /gp/product/{ASIN}                          — legacy product URL
+    //   /product-reviews/{ASIN}                     — classic reviews page
+    //   /portal/customer-reviews/{ASIN}             — new "portal" reviews page (2026+)
+    //   /portal/customer-reviews/srp/-/{REVIEW_ID}  — single-review page (no ASIN — ignore)
+    const m = window.location.pathname.match(/\/(?:dp|product-reviews|gp\/product|portal\/customer-reviews)\/([A-Z0-9]{10})(?:[/?]|$)/i);
     return m ? m[1].toUpperCase() : null;
   }
 
