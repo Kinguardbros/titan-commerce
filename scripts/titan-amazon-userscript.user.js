@@ -77,20 +77,24 @@
   // sibling VPS scraper, /root/titan-scraper/parser.js) — same DOM shape, different
   // execution context (real browser DOM here, not Puppeteer).
   const SELECTORS = {
-    // Tag-agnostic: dp/ page uses <div data-hook="review">, portal/customer-reviews/
-    // page uses <li data-hook="review" class="review">. Both hit this.
-    reviewCard: '[data-hook="review"]',
+    // Card selector covers 3 known Amazon layouts:
+    // - Classic desktop /dp/ page: <div data-hook="review">
+    // - Portal /portal/customer-reviews/ page: <li data-hook="review" class="review">
+    // - UK mobile /portal/ page: <div id="R..." data-hook="mobley-review-content">
+    //   (no data-hook="review" — uses id starting with R + 12-14 alphanumeric review ID)
+    reviewCard: '[data-hook="review"], [data-hook="mobley-review-content"]',
     starRating: 'i[data-hook="review-star-rating"] span.a-icon-alt',
     // Amazon renamed review sub-hooks to camelCase (~2026): reviewTitle, reviewText,
     // reviewRichContentContainer. Keep hyphenated fallbacks for older markup and
     // per-region variance (some Amazon locales still ship the legacy names).
     author: 'span.a-profile-name',
     // Title: new = <h5 data-hook="reviewTitle">, old = <a data-hook="review-title"> <span>
-    reviewTitle: '[data-hook="reviewTitle"], a[data-hook="review-title"] span:not([class*="a-color-secondary"])',
+    reviewTitle: '[data-hook="reviewTitle"], a[data-hook="review-title"] span:not([class*="a-color-secondary"]), [data-hook="review-title"] span',
     // Body: new = <div data-hook="reviewText"><div data-hook="reviewRichContentContainer">TEXT</div>
     // Prefer the rich-content container (holds the actual review paragraph, not the "Brief content..." wrapper text)
-    reviewBody: '[data-hook="reviewRichContentContainer"], span[data-hook="review-body"] span, [data-hook="reviewText"]',
-    verifiedBadge: 'span[data-hook="avp-badge"], [data-hook="avp-badge"]',
+    reviewBody: '[data-hook="reviewRichContentContainer"], span[data-hook="review-body"] span, [data-hook="reviewText"], span[data-hook="review-body"]',
+    // Verified badge: US = "avp-badge", UK mobile = "msrp-avp-badge-linkless"
+    verifiedBadge: '[data-hook="avp-badge"], [data-hook="msrp-avp-badge-linkless"]',
     // Photos: new markup uses different classes; support all known variants
     photos: 'div[data-hook="review-image-tile-section"] img, [data-hook="review-image-tile-section"] img, img[data-hook="review-image-tile"], .review-image-tile-section img, img.review-image-tile, .cr-lightbox-image-thumbnail img',
     helpfulText: 'span[data-hook="helpful-vote-statement"], [data-hook="helpful-vote-statement"]',
@@ -98,11 +102,37 @@
     nextPageLink: 'ul.a-pagination li.a-last a',
   };
 
+  // Build a Map<reviewId, posterUrl> from Amazon's mobile video gallery. The gallery
+  // sits OUTSIDE review cards (single <span class="reviews-mobile-media-gallery"> for
+  // the whole page) but each video thumbnail carries a data-* attribute with a JSON
+  // payload containing reviewId + slateImageUrl (the video poster). We match the
+  // reviewId back to a review card's id="R..." attribute in extractReviewsFromRoot.
+  function extractVideoPostersByReviewId(root) {
+    const posters = new Map();
+    const triggers = Array.from(root.querySelectorAll('[data-action="reviews:open-mweb-immersive-video-modal"]'));
+    for (const t of triggers) {
+      const raw = t.getAttribute('data-reviews:open-mweb-immersive-video-modal');
+      if (!raw) continue;
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        console.warn('[titan-userscript] failed to parse video gallery payload:', err.message);
+        continue;
+      }
+      if (parsed?.reviewId && parsed?.slateImageUrl) {
+        posters.set(parsed.reviewId, parsed.slateImageUrl);
+      }
+    }
+    return posters;
+  }
+
   // Extract review objects from any DOM-tree-like root — used against both
   // the live document (dp/ page reviews) and DOMParser-parsed HTML from
   // paginated /product-reviews/{asin} fetches.
   function extractReviewsFromRoot(root) {
     const cards = Array.from(root.querySelectorAll(SELECTORS.reviewCard));
+    const videoPosters = extractVideoPostersByReviewId(root);
     return cards.map((card) => {
       const starEl = card.querySelector(SELECTORS.starRating);
       const authorEl = card.querySelector(SELECTORS.author);
@@ -123,13 +153,21 @@
       // prefix isn't there.
       const rawTitle = (titleEl?.textContent || '').replace(/^\s*\d(?:\.\d)?\s+out of \d(?:\.\d)?\s+stars?\s*/i, '').replace(/\s+/g, ' ').trim();
 
+      // Photo URLs: images in card + video poster (if this review has a video).
+      // We store the video poster as if it were a photo — storefront just sees an
+      // image thumbnail. Server-side backend fetches from m.media-amazon.com which
+      // is already on the I-3 SSRF allow-list.
+      const imgPhotoUrls = photoEls.map((img) => img.getAttribute('src')).filter(Boolean).map(upgradePhotoUrl);
+      const videoPoster = videoPosters.get(card.id);
+      const photo_urls = [...(videoPoster ? [videoPoster] : []), ...imgPhotoUrls].slice(0, 1);
+
       return {
         author: anonymizeAuthor(authorEl?.textContent?.trim()),
         rating,
         title: rawTitle.slice(0, 200),
         body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
         verified: !!verifiedEl,
-        photo_urls: photoEls.map((img) => img.getAttribute('src')).filter(Boolean).slice(0, 1).map(upgradePhotoUrl),
+        photo_urls,
         helpful_count: parseHelpfulCount(helpfulEl?.textContent?.trim()),
         review_date: dateEl?.textContent?.trim() || '',
       };
