@@ -31,9 +31,17 @@
 .rv-title { font-family: var(--display); font-size: 18px; font-weight: 500; color: var(--text); }
 .rv-product { font-family: var(--mono); font-size: 10px; color: var(--gold); margin-top: 3px; }
 .rv-header-right { display: flex; align-items: center; gap: 16px; }
-.rv-summary { display: flex; flex-direction: column; align-items: flex-end; }
-.rv-summary-avg { font-family: var(--display); font-size: 16px; color: var(--gold); }
-.rv-summary-count { font-family: var(--mono); font-size: 9px; color: var(--text4); letter-spacing: .5px; }
+.rv-summary {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--edge); background: var(--surface, transparent);
+  min-width: 68px;
+}
+.rv-summary-label { font-family: var(--mono); font-size: 9px; color: var(--text4); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 2px; }
+.rv-summary-avg { font-family: var(--display); font-size: 16px; color: var(--gold); line-height: 1; }
+.rv-summary-count { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
+.rv-summary--pub { border-color: var(--accent, #7a9cff); }
+.rv-summary--pub .rv-summary-label { color: var(--accent, #7a9cff); }
 .rv-add-btn {
   background: var(--gold); border: none; color: var(--void);
   font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .5px;

@@ -30,7 +30,6 @@ function Stars({ rating }) {
 export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const toast = useToast();
   const [reviews, setReviews] = useState([]);
-  const [summary, setSummary] = useState({ count: 0, average: 0 });
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null); // review object being edited
   const [adding, setAdding] = useState(false);     // new manual review form open
@@ -45,7 +44,6 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
     try {
       const data = await getProductReviews(product.id, storeId);
       setReviews(data?.reviews || []);
-      setSummary(data?.summary || { count: 0, average: 0 });
     } catch (err) {
       console.error('[ReviewsPanel] fetch failed:', err);
       toast.error(`Failed to load reviews: ${err.message}`);
@@ -147,10 +145,34 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
             <div className="rv-product">{product.title}</div>
           </div>
           <div className="rv-header-right">
-            <div className="rv-summary">
-              <span className="rv-summary-avg">★ {summary.average || '—'}</span>
-              <span className="rv-summary-count">{summary.count} review{summary.count === 1 ? '' : 's'}</span>
-            </div>
+            {(() => {
+              // Two summary boxes:
+              // - "All" = every review except rejected (pending + approved + published)
+              // - "Published" = only status='published' (what's actually live on Shopify)
+              // Both computed client-side from the loaded reviews list so we don't need
+              // a backend call.
+              const all = reviews.filter((r) => r.status !== 'rejected');
+              const published = reviews.filter((r) => r.status === 'published');
+              const avg = (arr) => arr.length
+                ? (Math.round((arr.reduce((s, r) => s + r.rating, 0) / arr.length) * 10) / 10)
+                : 0;
+              const allAvg = avg(all);
+              const pubAvg = avg(published);
+              return (
+                <>
+                  <div className="rv-summary" title="All non-rejected reviews in Titan">
+                    <span className="rv-summary-label">All</span>
+                    <span className="rv-summary-avg">★ {allAvg || '—'}</span>
+                    <span className="rv-summary-count">{all.length}</span>
+                  </div>
+                  <div className="rv-summary rv-summary--pub" title="Reviews live on Shopify (status=published)">
+                    <span className="rv-summary-label">Published</span>
+                    <span className="rv-summary-avg">★ {pubAvg || '—'}</span>
+                    <span className="rv-summary-count">{published.length}</span>
+                  </div>
+                </>
+              );
+            })()}
             <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
