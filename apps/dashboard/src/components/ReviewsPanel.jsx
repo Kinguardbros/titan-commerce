@@ -146,11 +146,11 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
           </div>
           <div className="rv-header-right">
             {(() => {
-              // Two summary boxes:
+              // Three summary boxes:
               // - "All" = every review except rejected (pending + approved + published)
               // - "Published" = only status='published' (what's actually live on Shopify)
-              // Both computed client-side from the loaded reviews list so we don't need
-              // a backend call.
+              // - "Ratings" = distribution bar chart of the "All" pool
+              // Everything computed client-side from the loaded reviews list.
               const all = reviews.filter((r) => r.status !== 'rejected');
               const published = reviews.filter((r) => r.status === 'published');
               const avg = (arr) => arr.length
@@ -158,6 +158,12 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                 : 0;
               const allAvg = avg(all);
               const pubAvg = avg(published);
+
+              // Rating distribution across the "All" pool (5→1 stars).
+              const dist = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+              all.forEach((r) => { if (dist[r.rating] !== undefined) dist[r.rating] += 1; });
+              const distMax = Math.max(1, ...Object.values(dist));
+
               return (
                 <>
                   <div className="rv-summary" title="All non-rejected reviews in Titan">
@@ -169,6 +175,20 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                     <span className="rv-summary-label">Published</span>
                     <span className="rv-summary-avg">★ {pubAvg || '—'}</span>
                     <span className="rv-summary-count">{published.length}</span>
+                  </div>
+                  <div className="rv-summary rv-summary--dist" title="Rating distribution across all non-rejected reviews">
+                    <span className="rv-summary-label">Ratings</span>
+                    <div className="rv-dist">
+                      {[5, 4, 3, 2, 1].map((star) => (
+                        <div key={star} className="rv-dist-row" title={`${dist[star]} × ${star}★`}>
+                          <span className="rv-dist-star">{star}★</span>
+                          <span className="rv-dist-bar">
+                            <span className="rv-dist-bar-fill" style={{ width: `${(dist[star] / distMax) * 100}%` }} />
+                          </span>
+                          <span className="rv-dist-count">{dist[star]}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               );

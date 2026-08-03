@@ -42,6 +42,15 @@
 .rv-summary-count { font-family: var(--mono); font-size: 10px; color: var(--text3); margin-top: 2px; }
 .rv-summary--pub { border-color: var(--accent, #7a9cff); }
 .rv-summary--pub .rv-summary-label { color: var(--accent, #7a9cff); }
+/* Rating distribution box — 5 mini bars, one per star tier */
+.rv-summary--dist { padding: 6px 12px 8px; min-width: 140px; align-items: stretch; }
+.rv-summary--dist .rv-summary-label { align-self: center; margin-bottom: 4px; }
+.rv-dist { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+.rv-dist-row { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--text3); }
+.rv-dist-star { color: var(--gold); min-width: 18px; }
+.rv-dist-bar { flex: 1; height: 6px; background: var(--edge); border-radius: 3px; overflow: hidden; }
+.rv-dist-bar-fill { display: block; height: 100%; background: var(--gold); transition: width .3s; }
+.rv-dist-count { min-width: 24px; text-align: right; color: var(--text2); }
 .rv-add-btn {
   background: var(--gold); border: none; color: var(--void);
   font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .5px;
