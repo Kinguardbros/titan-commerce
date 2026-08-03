@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.0.0
-// @description  Scrape product reviews (Amazon, Temu) and import into Titan Commerce as pending reviews.
+// @version      2.1.0
+// @description  Scrape product reviews (Amazon, Temu, Cupshe) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
 // @match        https://smile.amazon.com/*
@@ -19,11 +19,14 @@
 // @match        https://www.amazon.com.mx/*
 // @match        https://www.temu.com/*
 // @match        https://temu.com/*
+// @match        https://www.cupshe.com/*
+// @match        https://cupshe.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
 // @connect      titan-commerce.vercel.app
+// @connect      review.cupshe.com
 // @updateURL    https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @downloadURL  https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @run-at       document-idle
@@ -372,6 +375,123 @@
     return m ? m[1] : null;
   }
 
+  // ---------- CUPSHE SCRAPER ----------
+  // Cupshe exposes its reviews behind a public JSON API. No DOM scraping needed —
+  // we call the endpoint directly with the product's skcCode and iterate pages
+  // until all reviews are pulled. Fast (auto-paginate) + reliable (no CSS class churn).
+  //
+  // Endpoint (observed 2026-08-03):
+  //   POST https://review.cupshe.com/api/v1/CFM1001005
+  //   headers: content-type application/json, authorization: btn-code (fake, accepted)
+  //   body: { skcCode, pageNum, pageSize, siteId:1, siteName:'us', langCode:'en-GB',
+  //           sortType:5, ... — minimal fields the endpoint accepts }
+  //
+  // Response shape:
+  //   { data: { count, pageInfo: { total, pages, list: [{account, rating, content,
+  //             title, gmtCreate, medias:[], likeNum, ...}], hasNextPage } } }
+  const CUPSHE_ENDPOINT = 'https://review.cupshe.com/api/v1/CFM1001005';
+  const CUPSHE_PAGE_SIZE = 20;
+
+  // Cupshe product ID = skcCode, embedded in URL tail like -CAA12C4D059AA
+  // Format: 3 letters + digits/letters, uppercase, ~13 chars, at end of path.
+  function extractCupsheProductId() {
+    const m = window.location.pathname.match(/-([A-Z0-9]{10,20})(?:\/|$)/);
+    return m ? m[1] : null;
+  }
+
+  // Cupshe dates come as "DD/MM/YYYY". Convert to server-friendly "Reviewed on D Month YYYY"
+  // so parseAmazonDate() day-first regex catches it. Keeps a single date parser server-side.
+  function formatCupsheDate(ddmmyyyy) {
+    const m = String(ddmmyyyy || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return '';
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = parseInt(m[1], 10);
+    const monthIdx = parseInt(m[2], 10) - 1;
+    if (monthIdx < 0 || monthIdx > 11) return '';
+    return `on ${day} ${months[monthIdx]} ${m[3]}`;
+  }
+
+  // Extract photo URLs from a Cupshe review's medias array. Structure observed as empty
+  // in most reviews but may contain image objects — defensive extraction: try common
+  // shapes (string, {url}, {src}, {link}).
+  function extractCupshePhotos(medias) {
+    if (!Array.isArray(medias) || medias.length === 0) return [];
+    const urls = [];
+    for (const m of medias) {
+      if (!m) continue;
+      const url = typeof m === 'string' ? m : (m.url || m.src || m.link || m.mediaUrl);
+      if (typeof url === 'string' && url.startsWith('http')) urls.push(url);
+    }
+    return urls.slice(0, 10);
+  }
+
+  async function fetchCupshePage(skcCode, pageNum) {
+    const body = {
+      skcCode,
+      siteId: 1,
+      channelId: 1,
+      brandId: 1,
+      terminalId: 1,
+      subTerminal: 1,
+      shopId: 1,
+      loginMethod: 0,
+      currency: 'USD',
+      currencyCode: '$',
+      lang: 'en-GB',
+      langCode: 'en-GB',
+      siteName: 'us',
+      siteIdList: ['1'],
+      skcCodes: [skcCode],
+      pageNum,
+      pageSize: CUPSHE_PAGE_SIZE,
+      sortType: 5,
+      rating: '',
+      qas: [],
+      peopleType: '1',
+      visitorType: '1,4',
+    };
+    const resp = await gmFetch(CUPSHE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'authorization': 'btn-code' },
+      body: JSON.stringify(body),
+    });
+    if (resp.status !== 200) throw new Error(`Cupshe API HTTP ${resp.status}`);
+    const parsed = JSON.parse(resp.responseText);
+    if (!parsed?.success) throw new Error(`Cupshe API returned ${parsed?.retCode || 'error'}: ${parsed?.retInfo || 'unknown'}`);
+    return parsed.data;
+  }
+
+  async function scrapeCupsheReviews(skcCode, maxReviews) {
+    const collected = [];
+    let pageNum = 1;
+    while (collected.length < maxReviews && pageNum <= 50) {
+      const data = await fetchCupshePage(skcCode, pageNum);
+      const list = data?.pageInfo?.list;
+      if (!Array.isArray(list) || list.length === 0) break;
+
+      for (const r of list) {
+        if (collected.length >= maxReviews) break;
+        const rating = Number.isFinite(r.rating) ? r.rating : parseInt(r.rating, 10);
+        if (!rating || rating < 1 || rating > 5) continue;
+        const photos = extractCupshePhotos(r.medias);
+        collected.push({
+          author: anonymizeAuthor(r.account),
+          rating,
+          title: (r.title || '').slice(0, 200),
+          body: (r.content || '').slice(0, 2000),
+          verified: r.source === 'Email' || r.type === 2, // Cupshe email-invite reviews = post-purchase
+          photo_urls: photos,
+          helpful_count: Number.isFinite(r.likeNum) ? r.likeNum : 0,
+          review_date: formatCupsheDate(r.gmtCreate),
+        });
+      }
+
+      if (!data.pageInfo.hasNextPage) break;
+      pageNum += 1;
+    }
+    return prioritizeReviews(collected).slice(0, maxReviews);
+  }
+
   // ---------- SCRAPER REGISTRY ----------
   // Each entry: source (server-side value), host regex, id extractor, scrape function
   // Add new e-commerce sites here — no other userscript changes needed.
@@ -389,6 +509,13 @@
       extractId: extractTemuProductId,
       scrape: (id, max) => scrapeTemuReviews(max),
       label: 'Temu',
+    },
+    {
+      source: 'cupshe',
+      hostMatch: /(?:^|\.)cupshe\.com$/i,
+      extractId: extractCupsheProductId,
+      scrape: (id, max) => scrapeCupsheReviews(id, max),
+      label: 'Cupshe',
     },
   ];
 
