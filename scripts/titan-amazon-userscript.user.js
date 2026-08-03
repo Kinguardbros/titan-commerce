@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.1.0
+// @version      2.1.1
 // @description  Scrape product reviews (Amazon, Temu, Cupshe) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
@@ -547,6 +547,11 @@
       showToast(`Could not load stores: ${err.message}`, true);
       return;
     }
+    // Dan uses this userscript only for Isola right now — filter out Elegance House
+    // and Eleganz Haus to skip the extra picker step. If a future store should be
+    // eligible, add its slug here.
+    const SCRAPER_STORE_ALLOWLIST = new Set(['isola']);
+    stores = stores.filter((s) => SCRAPER_STORE_ALLOWLIST.has((s.slug || '').toLowerCase()));
     if (!stores.length) {
       showToast('No stores available for your account.', true);
       return;
