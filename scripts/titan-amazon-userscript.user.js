@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.1.1
+// @version      2.2.0
 // @description  Scrape product reviews (Amazon, Temu, Cupshe) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
@@ -221,30 +221,33 @@
     });
   }
 
-  async function scrapeReviews(asin, maxReviews) {
+  // Client-side dedup key: matches server's dropExistingDuplicates + check_review_duplicates
+  // action. Author + first-100-chars of body (mirrors the server's md5(body) unique index).
+  function reviewDedupKey(r) {
+    return `${r.author}|${(r.body || '').slice(0, 100)}`;
+  }
+
+  async function scrapeReviews(asin, harvestLimit) {
     const collected = [];
     const seen = new Set();
-    const dedupKey = (r) => `${r.author}|${(r.body || '').slice(0, 100)}`;
     const push = (r) => {
-      const k = dedupKey(r);
+      const k = reviewDedupKey(r);
       if (seen.has(k)) return false;
       seen.add(k);
       collected.push(r);
       return true;
     };
 
-    // Collect up to 3× maxReviews raw candidates so priority-sort has real headroom
-    // (otherwise we'd stop at the first 50 chronologically and never see photo reviews
-    // on later pages). Hard-cap the harvest at 300 to bound fetch time.
-    const harvestTarget = Math.min(maxReviews * 3, 300);
+    // F11: harvest up to harvestLimit UNIQUE raw candidates (not just maxReviews).
+    // Caller (openImportModal) does DB-dedup pre-check + priority-sort + trim.
 
     // DOM first (current page — sees logged-in session's visible reviews)
     extractReviewsFromDom().forEach(push);
 
-    // Paginated fetch — up to 10 pages. Stops when we have enough harvest OR Amazon
+    // Paginated fetch — up to 15 pages. Stops when we have enough harvest OR Amazon
     // returns empty / signed-out shell.
     let pageNumber = 1;
-    while (collected.length < harvestTarget && pageNumber <= 10) {
+    while (collected.length < harvestLimit && pageNumber <= 15) {
       const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
       const resp = await gmFetch(url, { method: 'GET' });
       if (resp.status >= 400) break;
@@ -260,8 +263,7 @@
       pageNumber += 1;
     }
 
-    // Priority-sort, then take top maxReviews.
-    return prioritizeReviews(collected).slice(0, maxReviews);
+    return collected;
   }
 
   async function fetchProducts(titanUrl, token, storeId) {
@@ -294,6 +296,26 @@
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ store_id: storeId, product_id: productId, reviews, source }),
     });
+  }
+
+  // F11: ask backend which of these dedup keys already exist for this product.
+  // Returns Set<string> of duplicate keys. On error returns empty Set (fail open —
+  // server-side dropExistingDuplicates will catch them at import time anyway).
+  async function checkDuplicates(titanUrl, token, storeId, productId, keys) {
+    if (!keys.length) return new Set();
+    try {
+      const resp = await gmFetch(`${titanUrl}/api/system?action=check_review_duplicates`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id: storeId, product_id: productId, keys }),
+      });
+      if (resp.status !== 200) return new Set();
+      const body = JSON.parse(resp.responseText);
+      return new Set(body.duplicates || []);
+    } catch (err) {
+      console.warn('[titan-userscript] dedup check failed, continuing without pre-filter:', err.message);
+      return new Set();
+    }
   }
 
   // ---------- TEMU SCRAPER ----------
@@ -361,12 +383,12 @@
     }).filter(Boolean);
   }
 
-  async function scrapeTemuReviews(maxReviews) {
+  async function scrapeTemuReviews(harvestLimit) {
     // Temu virtualizes review lists — cards get added as user scrolls. We take a snapshot
     // of whatever is currently rendered in DOM. To get more, user scrolls first then clicks.
-    // Photos are per-card (img[alt="Reviews image"]) — priority sort brings photo reviews
-    // to the front so the top maxReviews we send are the highest-quality ones.
-    return prioritizeReviews(extractTemuReviews()).slice(0, maxReviews);
+    // F11: no client-side slice — caller (openImportModal) does dedup + trim.
+    void harvestLimit; // Temu can't fetch more, only DOM-visible reviews.
+    return extractTemuReviews();
   }
 
   // Temu product ID lives in URL as -g-<digits>.html
@@ -461,16 +483,17 @@
     return parsed.data;
   }
 
-  async function scrapeCupsheReviews(skcCode, maxReviews) {
+  async function scrapeCupsheReviews(skcCode, harvestLimit) {
+    // F11: fetch all pages up to harvestLimit UNIQUE candidates. Caller does dedup + trim.
     const collected = [];
     let pageNum = 1;
-    while (collected.length < maxReviews && pageNum <= 50) {
+    while (collected.length < harvestLimit && pageNum <= 50) {
       const data = await fetchCupshePage(skcCode, pageNum);
       const list = data?.pageInfo?.list;
       if (!Array.isArray(list) || list.length === 0) break;
 
       for (const r of list) {
-        if (collected.length >= maxReviews) break;
+        if (collected.length >= harvestLimit) break;
         const rating = Number.isFinite(r.rating) ? r.rating : parseInt(r.rating, 10);
         if (!rating || rating < 1 || rating > 5) continue;
         const photos = extractCupshePhotos(r.medias);
@@ -489,7 +512,7 @@
       if (!data.pageInfo.hasNextPage) break;
       pageNum += 1;
     }
-    return prioritizeReviews(collected).slice(0, maxReviews);
+    return collected;
   }
 
   // ---------- SCRAPER REGISTRY ----------
@@ -594,21 +617,42 @@
     }
     const product = filtered[productIdx];
 
-    const maxInput = window.prompt('How many reviews to import? (max 100)', '100');
-    const maxReviews = Math.min(100, Math.max(1, parseInt(maxInput, 10) || 100));
+    const maxInput = window.prompt('How many reviews to import? (max 200)', '200');
+    const maxReviews = Math.min(200, Math.max(1, parseInt(maxInput, 10) || 200));
 
-    showToast(`Scraping up to ${maxReviews} reviews from ${scraper.label}…`, false);
-    let reviews;
+    // F11: oversample by 2× so DB-dedup pre-check has room to drop duplicates and still
+    // hit maxReviews unique. Hard-capped at 400 to bound scrape wall time.
+    const harvestLimit = Math.min(maxReviews * 2, 400);
+    showToast(`Scraping up to ${harvestLimit} candidates from ${scraper.label}…`, false);
+    let harvested;
     try {
-      reviews = await scraper.scrape(productId, maxReviews);
+      harvested = await scraper.scrape(productId, harvestLimit);
     } catch (err) {
       showToast(`Scrape failed: ${err.message}`, true);
       return;
     }
 
-    if (!reviews.length) {
+    if (!harvested.length) {
       showToast('0 reviews found — DOM may have changed, check console.', true);
       console.warn('[titan-userscript] 0 reviews scraped', { source: scraper.source, productId });
+      return;
+    }
+
+    // F11: DB-dedup pre-check — ask backend which author+body keys already exist for this
+    // product. Drop them from harvest so we can fill maxReviews with brand-new reviews
+    // instead of importing 200 candidates where 60 are duplicates and only 140 stick.
+    const keys = harvested.map(reviewDedupKey);
+    const dupKeys = await checkDuplicates(titanUrl, token, store.id, product.id, keys);
+    const fresh = harvested.filter((r) => !dupKeys.has(reviewDedupKey(r)));
+    const dbDupCount = harvested.length - fresh.length;
+    if (dbDupCount > 0) {
+      console.info(`[titan-userscript] pre-filter dropped ${dbDupCount} DB-duplicates from ${harvested.length} candidates`);
+    }
+
+    // Priority-sort (photo-first, rating-DESC) → trim to maxReviews.
+    const reviews = prioritizeReviews(fresh).slice(0, maxReviews);
+    if (!reviews.length) {
+      showToast(`0 new reviews — all ${harvested.length} candidates already imported.`, true);
       return;
     }
 
