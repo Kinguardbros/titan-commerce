@@ -190,9 +190,19 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                     <tr key={r.id} className={`rv-row${selected?.id === r.id ? ' rv-row--active' : ''}`}
                       onClick={() => { setAdding(false); setSelected(r); }}>
                       <td className="rv-cell-photo">
-                        {r.photo_url
-                          ? <img className="rv-thumb" src={r.photo_url} alt="" />
-                          : <span className="rv-thumb-empty">—</span>}
+                        {(() => {
+                          // F08 multi-photo: prefer photo_urls array, fall back to legacy photo_url.
+                          const photos = Array.isArray(r.photo_urls) && r.photo_urls.length > 0
+                            ? r.photo_urls
+                            : (r.photo_url ? [r.photo_url] : []);
+                          if (photos.length === 0) return <span className="rv-thumb-empty">—</span>;
+                          return (
+                            <div className="rv-thumb-wrap">
+                              <img className="rv-thumb" src={photos[0]} alt="" />
+                              {photos.length > 1 && <span className="rv-thumb-badge">+{photos.length - 1}</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <span className="rv-author">{r.author}</span>
