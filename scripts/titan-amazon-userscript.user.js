@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.2.0
-// @description  Scrape product reviews (Amazon, Temu, Cupshe) and import into Titan Commerce as pending reviews.
+// @version      2.3.0
+// @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me stores) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
 // @match        https://smile.amazon.com/*
@@ -21,12 +21,15 @@
 // @match        https://temu.com/*
 // @match        https://www.cupshe.com/*
 // @match        https://cupshe.com/*
+// @match        https://www.swanswaywear.com/*
+// @match        https://swanswaywear.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
 // @connect      titan-commerce.vercel.app
 // @connect      review.cupshe.com
+// @connect      judge.me
 // @updateURL    https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @downloadURL  https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @run-at       document-idle
@@ -518,6 +521,55 @@
   // ---------- SCRAPER REGISTRY ----------
   // Each entry: source (server-side value), host regex, id extractor, scrape function
   // Add new e-commerce sites here — no other userscript changes needed.
+  // ---------- JUDGE.ME SCRAPER (generic for Shopify stores using Judge.me) ----------
+  // Reviews come from Judge.me's public widget API (JSON, paginated 25/page) — no DOM
+  // parsing, so it survives theme changes. Works on any @match-listed Shopify store;
+  // to support another Judge.me store, add its domain to @match and hostMatch below.
+  function extractShopifyHandle() {
+    const m = window.location.pathname.match(/\/products\/([a-z0-9-]+)/i);
+    return m ? m[1] : null;
+  }
+
+  async function scrapeJudgemeReviews(handle, harvestLimit) {
+    const pj = await fetch(`/products/${handle}.js`, { credentials: 'same-origin' }).then((r) => r.json());
+    const productId = pj?.id;
+    const shopDomain = (typeof Shopify !== 'undefined' && Shopify.shop)
+      || (typeof unsafeWindow !== 'undefined' && unsafeWindow.Shopify?.shop);
+    if (!productId || !shopDomain) throw new Error('Missing Shopify product id or shop domain');
+
+    const base = `https://judge.me/reviews/reviews_for_widget?url=${shopDomain}&shop_domain=${shopDomain}`
+      + `&platform=shopify&product_id=${productId}&per_page=25`;
+    const out = [];
+    let page = 1, totalPages = 1;
+    while (page <= totalPages && out.length < harvestLimit) {
+      const resp = await new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+          method: 'GET',
+          url: `${base}&page=${page}`,
+          onload: (r) => resolve(r),
+          onerror: () => reject(new Error('judge.me request failed')),
+        });
+      });
+      const data = JSON.parse(resp.responseText);
+      totalPages = data.pagination?.total_pages || 1;
+      for (const r of (data.reviews || [])) {
+        out.push({
+          author: anonymizeAuthor(r.reviewer_name),
+          rating: r.rating,
+          title: (r.title || '').slice(0, 200),
+          body: (r.body_html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000),
+          verified: !!r.verified_buyer,
+          photo_urls: (r.pictures_urls || []).slice(0, 10),
+          helpful_count: r.thumb_up || 0,
+          review_date: (r.created_at || '').slice(0, 10),
+        });
+      }
+      page += 1;
+      await new Promise((res) => setTimeout(res, 800));
+    }
+    return out.slice(0, harvestLimit);
+  }
+
   const SCRAPERS = [
     {
       source: 'amazon',
@@ -539,6 +591,13 @@
       extractId: extractCupsheProductId,
       scrape: (id, max) => scrapeCupsheReviews(id, max),
       label: 'Cupshe',
+    },
+    {
+      source: 'judgeme',
+      hostMatch: /(?:^|\.)swanswaywear\.com$/i,
+      extractId: extractShopifyHandle,
+      scrape: (id, max) => scrapeJudgemeReviews(id, max),
+      label: 'Judge.me (Swansway)',
     },
   ];
 
