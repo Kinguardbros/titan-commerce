@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.3.0
+// @version      2.4.0
 // @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me stores) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
@@ -250,7 +250,7 @@
     // Paginated fetch — up to 15 pages. Stops when we have enough harvest OR Amazon
     // returns empty / signed-out shell.
     let pageNumber = 1;
-    while (collected.length < harvestLimit && pageNumber <= 15) {
+    while (collected.length < harvestLimit && pageNumber <= 50) {
       const url = `https://${window.location.hostname}/product-reviews/${asin}/?sortBy=recent&pageNumber=${pageNumber}`;
       const resp = await gmFetch(url, { method: 'GET' });
       if (resp.status >= 400) break;
@@ -293,12 +293,52 @@
     return Array.isArray(body) ? body : (body.stores || []);
   }
 
+  // Import is chunked: the backend caps a single request at 200 reviews and downloads
+  // review photos inline, so one 500-review POST would risk the Vercel function timeout.
+  // Sending IMPORT_CHUNK_SIZE at a time keeps every request well inside both limits and
+  // makes a mid-run failure partial rather than total.
+  const MAX_REVIEWS_PER_RUN = 500;
+  const IMPORT_CHUNK_SIZE = 100;
+
   function submitImport(titanUrl, token, storeId, productId, reviews, source) {
     return gmFetch(`${titanUrl}/api/system?action=import_amazon_reviews`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ store_id: storeId, product_id: productId, reviews, source }),
     });
+  }
+
+  // Returns {inserted, duplicates, skipped, failedChunks, httpError}. Never throws —
+  // a failed chunk is counted and the remaining chunks still run.
+  async function submitImportChunked(titanUrl, token, storeId, productId, reviews, source, onProgress) {
+    const totals = { inserted: 0, duplicates: 0, skipped: 0, failedChunks: 0, httpError: null };
+    for (let i = 0; i < reviews.length; i += IMPORT_CHUNK_SIZE) {
+      const chunk = reviews.slice(i, i + IMPORT_CHUNK_SIZE);
+      const nth = Math.floor(i / IMPORT_CHUNK_SIZE) + 1;
+      const of = Math.ceil(reviews.length / IMPORT_CHUNK_SIZE);
+      if (onProgress) onProgress(nth, of, totals.inserted);
+      try {
+        const resp = await submitImport(titanUrl, token, storeId, productId, chunk, source);
+        if (resp.status === 401 || resp.status === 429) {
+          totals.httpError = resp.status;
+          break; // auth / rate limit won't fix itself on the next chunk
+        }
+        if (resp.status >= 400) {
+          totals.failedChunks += 1;
+          totals.httpError = resp.status;
+          console.warn('[titan-userscript] chunk failed', { nth, status: resp.status, body: resp.responseText });
+          continue;
+        }
+        const body = JSON.parse(resp.responseText);
+        totals.inserted += body.inserted || 0;
+        totals.duplicates += body.duplicates || 0;
+        totals.skipped += body.skipped || 0;
+      } catch (err) {
+        totals.failedChunks += 1;
+        console.warn('[titan-userscript] chunk threw', { nth, error: err.message });
+      }
+    }
+    return totals;
   }
 
   // F11: ask backend which of these dedup keys already exist for this product.
@@ -676,12 +716,12 @@
     }
     const product = filtered[productIdx];
 
-    const maxInput = window.prompt('How many reviews to import? (max 200)', '200');
-    const maxReviews = Math.min(200, Math.max(1, parseInt(maxInput, 10) || 200));
+    const maxInput = window.prompt('How many reviews to import? (max 500)', '500');
+    const maxReviews = Math.min(MAX_REVIEWS_PER_RUN, Math.max(1, parseInt(maxInput, 10) || MAX_REVIEWS_PER_RUN));
 
     // F11: oversample by 2× so DB-dedup pre-check has room to drop duplicates and still
-    // hit maxReviews unique. Hard-capped at 400 to bound scrape wall time.
-    const harvestLimit = Math.min(maxReviews * 2, 400);
+    // hit maxReviews unique. Hard-capped to bound scrape wall time.
+    const harvestLimit = Math.min(maxReviews * 2, 1000);
     showToast(`Scraping up to ${harvestLimit} candidates from ${scraper.label}…`, false);
     let harvested;
     try {
@@ -716,21 +756,25 @@
     }
 
     try {
-      const resp = await submitImport(titanUrl, token, store.id, product.id, reviews, scraper.source);
-      if (resp.status === 401) {
+      const t = await submitImportChunked(
+        titanUrl, token, store.id, product.id, reviews, scraper.source,
+        function (nth, of, soFar) {
+          if (of > 1) showToast(`Importing batch ${nth}/${of}… (${soFar} in so far)`, false);
+        }
+      );
+      if (t.httpError === 401) {
         showToast('API token invalid — regenerate in Titan Settings > Users.', true);
         return;
       }
-      if (resp.status === 429) {
-        showToast('Titan rate limit hit — wait a bit and retry.', true);
+      if (t.httpError === 429) {
+        showToast(`Titan rate limit hit after ${t.inserted} reviews — wait a bit and re-run (duplicates are skipped).`, true);
         return;
       }
-      if (resp.status >= 400) {
-        showToast(`Import failed (HTTP ${resp.status}).`, true);
+      if (t.failedChunks) {
+        showToast(`${t.inserted} reviews imported, ${t.duplicates} duplicates — ${t.failedChunks} batch(es) FAILED (HTTP ${t.httpError}), check console.`, true);
         return;
       }
-      const body = JSON.parse(resp.responseText);
-      showToast(`${body.inserted} reviews imported, ${body.duplicates} duplicates.`, false);
+      showToast(`${t.inserted} reviews imported, ${t.duplicates} duplicates.`, false);
     } catch (err) {
       showToast(`Import failed: ${err.message}`, true);
     }
