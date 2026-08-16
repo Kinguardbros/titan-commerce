@@ -249,10 +249,10 @@ export function updateCogs(productId, cogs, variantCogs) {
   });
 }
 
-export function addManualAdspend(date, channel, amount) {
+export function addManualAdspend(date, channel, amount, storeId) {
   return fetchJSON('/api/system?action=manual_adspend', {
     method: 'POST',
-    body: JSON.stringify({ date, channel, amount }),
+    body: JSON.stringify({ date, channel, amount, store_id: storeId }),
   });
 }
 

@@ -1,4 +1,120 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// P0-3 (Docs/AUDIT-2026-08.md): manual_adspend and performance (Meta) queries
+// must be scoped by store_id, same as products.cogs already was.
+
+const supabaseCallsMock = {};
+
+function makeBuilderMock(table) {
+  const builder = {
+    select: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    eq: vi.fn((col, val) => {
+      supabaseCallsMock[table] = supabaseCallsMock[table] || [];
+      supabaseCallsMock[table].push({ col, val });
+      return builder;
+    }),
+    upsert: vi.fn((row) => {
+      supabaseCallsMock[table] = supabaseCallsMock[table] || [];
+      supabaseCallsMock[table].push({ upsert: row });
+      return builder;
+    }),
+    single: vi.fn(async () => {
+      const calls = supabaseCallsMock[table] || [];
+      const lastUpsert = calls[calls.length - 1];
+      return { data: { id: 1, ...(lastUpsert?.upsert || {}) }, error: null };
+    }),
+    then: (resolve) => resolve({ data: [], error: null }),
+  };
+  return builder;
+}
+
+const supabaseFromMock = vi.fn((table) => makeBuilderMock(table));
+vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: supabaseFromMock }) }));
+
+const getStoreMock = vi.fn(async () => ({ id: 'store-1' }));
+vi.mock('../lib/store-context.js', () => ({ getStore: getStoreMock }));
+
+vi.mock('../lib/shopify-admin.js', () => ({
+  createShopifyClient: vi.fn(),
+  getRevenueSummary: vi.fn(async () => ({})),
+  getRecentOrders: vi.fn(async () => []),
+}));
+
+function mockReqRes({ body = {}, query = {}, user } = {}) {
+  const req = { body, query, headers: {}, user };
+  const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
+  return { req, res };
+}
+
+const ADMIN = { role: 'admin', permissions: [], store_access: [] };
+const MEMBER_STORE1 = { role: 'member', permissions: ['products:read'], store_access: ['store-1'] };
+
+describe('profit_summary store scoping (P0-3)', () => {
+  let profit_summary;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    Object.keys(supabaseCallsMock).forEach((k) => delete supabaseCallsMock[k]);
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/actions/profit.js');
+    ({ profit_summary } = mod);
+  });
+
+  it('filters manual_adspend by store_id when store_id is provided', async () => {
+    const { req, res } = mockReqRes({ query: { store_id: 'store-1', days: '7' }, user: MEMBER_STORE1 });
+    await profit_summary(req, res);
+    expect(supabaseCallsMock['manual_adspend']).toContainEqual({ col: 'store_id', val: 'store-1' });
+  });
+
+  it('filters performance (Meta) by store_id when store_id is provided', async () => {
+    const { req, res } = mockReqRes({ query: { store_id: 'store-1', days: '7' }, user: MEMBER_STORE1 });
+    await profit_summary(req, res);
+    expect(supabaseCallsMock['performance']).toContainEqual({ col: 'store_id', val: 'store-1' });
+  });
+
+  it('does not filter manual_adspend/performance by store_id for an unscoped admin call', async () => {
+    const { req, res } = mockReqRes({ query: { days: '7' }, user: ADMIN });
+    await profit_summary(req, res);
+    expect(supabaseCallsMock['manual_adspend']).toBeUndefined();
+    expect(supabaseCallsMock['performance']).toBeUndefined();
+  });
+});
+
+describe('manual_adspend write scoping (P0-3)', () => {
+  let manual_adspend;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    Object.keys(supabaseCallsMock).forEach((k) => delete supabaseCallsMock[k]);
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    const mod = await import('../lib/actions/pricing.js');
+    ({ manual_adspend } = mod);
+  });
+
+  it('rejects without store_id (400)', async () => {
+    const { req, res } = mockReqRes({ body: { date: '2026-08-01', channel: 'tiktok', amount: 10 }, user: ADMIN });
+    await manual_adspend(req, res);
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it('rejects a non-admin with store access via hasStoreAccess-gated path', async () => {
+    const { req, res } = mockReqRes({ body: { date: '2026-08-01', channel: 'tiktok', amount: 10, store_id: 'store-2' }, user: MEMBER_STORE1 });
+    await manual_adspend(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('writes store_id into the upsert row for an admin with store_id provided', async () => {
+    const { req, res } = mockReqRes({ body: { date: '2026-08-01', channel: 'tiktok', amount: 10, store_id: 'store-1' }, user: ADMIN });
+    await manual_adspend(req, res);
+    const upsertCall = supabaseCallsMock['manual_adspend']?.find((c) => c.upsert);
+    expect(upsertCall?.upsert?.store_id).toBe('store-1');
+    expect(res.status).not.toHaveBeenCalledWith(400);
+    expect(res.status).not.toHaveBeenCalledWith(403);
+  });
+});
 
 // Test the P&L calculation logic directly — extracted from system.js profit_summary
 

@@ -59,7 +59,7 @@ export default function Profit({ storeId, store }) {
 
   const handleSaveAdspend = async () => {
     if (!adspendDate || !adspendAmount) return;
-    await addManualAdspend(adspendDate, adspendChannel, parseFloat(adspendAmount));
+    await addManualAdspend(adspendDate, adspendChannel, parseFloat(adspendAmount), storeId);
     setAdspendAmount('');
     toast.success('Adspend saved!');
     refresh();
