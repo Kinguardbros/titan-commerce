@@ -43,10 +43,6 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!await rateLimit('convert-to-video', 10, 3600000)) {
-    return res.status(429).json({ error: 'Rate limit exceeded' });
-  }
-
   const { creative_id } = req.body;
   if (!creative_id) {
     return res.status(400).json({ error: 'creative_id is required' });
@@ -67,6 +63,11 @@ async function handler(req, res) {
     }
     if (!hasStoreAccess(req.user, source.store_id)) {
       return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+    }
+
+    // Per-store + per-user rate limit (P0-8 from AUDIT-2026-08)
+    if (!await rateLimit(`convert-to-video:${source.store_id}:${req.user.user_id || req.user.username || 'master'}`, 10, 3600000)) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
     }
     if (source.format !== 'image') {
       return res.status(400).json({ error: 'Source creative must be an image' });

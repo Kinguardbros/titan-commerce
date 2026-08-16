@@ -14,10 +14,6 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!await rateLimit('regenerate', 20, 3600000)) {
-    return res.status(429).json({ error: 'Rate limit exceeded' });
-  }
-
   const { creative_id } = req.body;
   if (!creative_id) {
     return res.status(400).json({ error: 'creative_id is required' });
@@ -39,6 +35,11 @@ async function handler(req, res) {
     }
     if (!hasStoreAccess(req.user, creative.store_id)) {
       return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+    }
+
+    // Per-store + per-user rate limit (P0-8 from AUDIT-2026-08)
+    if (!await rateLimit(`regenerate:${creative.store_id}:${req.user.user_id || req.user.username || 'master'}`, 20, 3600000)) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
     }
 
     // --- VIDEO REGENERATION ---

@@ -49,14 +49,15 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (!await rateLimit('generate', 20, 3600000)) {
-    return res.status(429).json({ error: 'Rate limit exceeded' });
-  }
-
   let { product_id, store_id, style, ai_model, custom_prompt, show_model, text_overlay, overlay_text, audience, aspect_ratio, resolution, story_id, story_shot, reference_url, product_color, variant_image_url, v8_fill_intensity } = req.body;
   style = style || 'ad_creative'; ai_model = ai_model || 'fal_nano_banana'; custom_prompt = custom_prompt || ''; show_model = show_model !== false; text_overlay = text_overlay || 'none'; overlay_text = overlay_text || ''; aspect_ratio = aspect_ratio || '1:1';
   // Nano Banana output resolution — only the nano-banana models honor it
   resolution = ['1K', '2K', '4K'].includes(resolution) ? resolution : '2K';
+
+  // Per-store + per-user rate limit (P0-8 from AUDIT-2026-08)
+  if (!await rateLimit(`generate:${store_id}:${req.user.user_id || req.user.username || 'master'}`, 20, 3600000)) {
+    return res.status(429).json({ error: 'Rate limit exceeded' });
+  }
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
