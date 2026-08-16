@@ -46,6 +46,29 @@ UPDATE pipeline_log SET store_id = (SELECT id FROM stores WHERE slug = 'elegance
 UPDATE product_optimizations SET store_id = (SELECT id FROM stores WHERE slug = 'elegance-house') WHERE store_id IS NULL;
 UPDATE manual_adspend SET store_id = (SELECT id FROM stores WHERE slug = 'elegance-house') WHERE store_id IS NULL;
 
+-- 4b. Composite unique constraints for products (P0-4, Docs/AUDIT-2026-08.md)
+-- products.shopify_id / products.handle used to be globally UNIQUE at CREATE
+-- time (sql/products.sql) — before store_id existed. Now that store_id has
+-- just been added and backfilled above, scope uniqueness per store, so two
+-- stores can share a generic handle (e.g. 'black-dress') without a Postgres
+-- unique violation on sync. On a DB that still has the old global UNIQUE
+-- constraints (pre-fix), run sql/fix-products-composite-unique.sql instead —
+-- it drops those first. Guarded with DO blocks (no "ADD CONSTRAINT IF NOT
+-- EXISTS" in Postgres) so re-running this file is a no-op here too.
+DO $$
+BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_store_handle_unique UNIQUE (store_id, handle);
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'products_store_handle_unique already exists, skipping';
+END$$;
+
+DO $$
+BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_store_shopify_id_unique UNIQUE (store_id, shopify_id);
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'products_store_shopify_id_unique already exists, skipping';
+END$$;
+
 -- 5. Indexes
 CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_id);
 CREATE INDEX IF NOT EXISTS idx_creatives_store ON creatives(store_id);
