@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.4.0
+// @version      2.4.1
 // @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me stores) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
@@ -39,6 +39,21 @@
   'use strict';
 
   const DEFAULT_TITAN_URL = 'https://titan-commerce.vercel.app';
+
+  // Truncating with .slice() counts UTF-16 code units, so a cut that lands inside an emoji
+  // leaves a lone surrogate. Postgres rejects the resulting JSON (22P02) and the whole
+  // import batch fails, so scrub the halves before anything is sent. Backend repeats this.
+  function stripLoneSurrogates(text) {
+    return String(text ?? '').replace(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+      ''
+    );
+  }
+
+  // Truncate to `max` UTF-16 units, then drop any surrogate half the cut created.
+  function clip(text, max) {
+    return stripLoneSurrogates(String(text ?? '').slice(0, max));
+  }
 
   function getConfig() {
     return {
@@ -178,8 +193,8 @@
       return {
         author: anonymizeAuthor(authorEl?.textContent?.trim()),
         rating,
-        title: rawTitle.slice(0, 200),
-        body: (bodyEl?.textContent?.trim() || '').slice(0, 2000),
+        title: clip(rawTitle, 200),
+        body: clip(bodyEl?.textContent?.trim() || '', 2000),
         verified: !!verifiedEl,
         photo_urls,
         helpful_count: parseHelpfulCount(helpfulEl?.textContent?.trim()),
@@ -227,7 +242,7 @@
   // Client-side dedup key: matches server's dropExistingDuplicates + check_review_duplicates
   // action. Author + first-100-chars of body (mirrors the server's md5(body) unique index).
   function reviewDedupKey(r) {
-    return `${r.author}|${(r.body || '').slice(0, 100)}`;
+    return `${r.author}|${clip(r.body || '', 100)}`;
   }
 
   async function scrapeReviews(asin, harvestLimit) {
@@ -403,7 +418,7 @@
       // Date from "in Czech Republic on 20 Apr 2024" aria-label — server parses "on <date>"
       const dateAria = dateEl?.getAttribute('aria-label') || '';
 
-      const body = (bodyEl?.textContent?.trim() || '').slice(0, 2000);
+      const body = clip(bodyEl?.textContent?.trim() || '', 2000);
       // Skip cards with no body text — they're probably UI shells that matched selector
       if (!body) return null;
 
@@ -543,8 +558,8 @@
         collected.push({
           author: anonymizeAuthor(r.account),
           rating,
-          title: (r.title || '').slice(0, 200),
-          body: (r.content || '').slice(0, 2000),
+          title: clip(r.title || '', 200),
+          body: clip(r.content || '', 2000),
           verified: r.source === 'Email' || r.type === 2, // Cupshe email-invite reviews = post-purchase
           photo_urls: photos,
           helpful_count: Number.isFinite(r.likeNum) ? r.likeNum : 0,
@@ -596,8 +611,8 @@
         out.push({
           author: anonymizeAuthor(r.reviewer_name),
           rating: r.rating,
-          title: (r.title || '').slice(0, 200),
-          body: (r.body_html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 2000),
+          title: clip(r.title || '', 200),
+          body: clip((r.body_html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), 2000),
           verified: !!r.verified_buyer,
           photo_urls: (r.pictures_urls || []).slice(0, 10),
           helpful_count: r.thumb_up || 0,
