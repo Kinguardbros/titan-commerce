@@ -23,7 +23,11 @@ function visibleTabs(user) {
   if (user.role === 'admin') return [...ALL_TABS, 'Settings'];
   const perms = user.permissions || [];
   const tabs = [];
-  if (perms.includes('products:read')) tabs.push('Cockpit', 'Shopify', 'Products', 'Profit');
+  if (perms.includes('products:read')) tabs.push('Products');
+  // Cockpit/Shopify/Profit surface revenue, margin and ad-spend data — gated on
+  // finance:read (P0-5, Docs/AUDIT-2026-08.md), separate from products:read so a
+  // VA/contractor scoped for product image work doesn't automatically see P&L.
+  if (perms.includes('finance:read')) tabs.push('Cockpit', 'Shopify', 'Profit');
   if (perms.includes('creatives:generate')) tabs.push('Studio', 'Avatars');
   return ALL_TABS.filter((t) => tabs.includes(t));
 }

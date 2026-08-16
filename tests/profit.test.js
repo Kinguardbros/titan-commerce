@@ -48,7 +48,10 @@ function mockReqRes({ body = {}, query = {}, user } = {}) {
 }
 
 const ADMIN = { role: 'admin', permissions: [], store_access: [] };
-const MEMBER_STORE1 = { role: 'member', permissions: ['products:read'], store_access: ['store-1'] };
+// finance:read (not products:read) is what gates profit_summary since P0-5 —
+// these P0-3 store-scoping tests need it to reach the query logic at all.
+const MEMBER_STORE1 = { role: 'member', permissions: ['finance:read'], store_access: ['store-1'] };
+const MEMBER_STORE1_PRODUCTS_ONLY = { role: 'member', permissions: ['products:read'], store_access: ['store-1'] };
 
 describe('profit_summary store scoping (P0-3)', () => {
   let profit_summary;
@@ -79,6 +82,27 @@ describe('profit_summary store scoping (P0-3)', () => {
     await profit_summary(req, res);
     expect(supabaseCallsMock['manual_adspend']).toBeUndefined();
     expect(supabaseCallsMock['performance']).toBeUndefined();
+  });
+
+  // P0-5 (Docs/AUDIT-2026-08.md): finance:read is a dedicated permission tier,
+  // separate from products:read — profit_summary must reject a caller who only
+  // has products:read (the permission the Products tab needs).
+  it('rejects a member with products:read but not finance:read (403)', async () => {
+    const { req, res } = mockReqRes({ query: { store_id: 'store-1', days: '7' }, user: MEMBER_STORE1_PRODUCTS_ONLY });
+    await profit_summary(req, res);
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  it('allows a member with finance:read and store access', async () => {
+    const { req, res } = mockReqRes({ query: { store_id: 'store-1', days: '7' }, user: MEMBER_STORE1 });
+    await profit_summary(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(403);
+  });
+
+  it('allows admin regardless of permissions array', async () => {
+    const { req, res } = mockReqRes({ query: { store_id: 'store-1', days: '7' }, user: ADMIN });
+    await profit_summary(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(403);
   });
 });
 

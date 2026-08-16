@@ -7,6 +7,7 @@ const PERMISSION_LIST = [
   'products:publications',
   'creatives:generate',
   'admin:users',
+  'finance:read',
 ];
 
 const LABELS = {
@@ -16,6 +17,7 @@ const LABELS = {
   'products:publications': 'Bulk publish/unpublish, CSV export',
   'creatives:generate': 'Generate AI creatives (Studio, Avatars)',
   'admin:users': 'Manage users (admin only, implicit for role=admin)',
+  'finance:read': 'View financial data (Profit, Shopify analytics, Cockpit revenue/margin)',
 };
 
 export default function PermissionCheckboxes({ value, onChange, disabled }) {
