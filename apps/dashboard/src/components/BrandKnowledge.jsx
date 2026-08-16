@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import DOMPurify from 'dompurify';
 import { getSkills, generateSkills, regenerateSkill, saveSkill } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import './BrandKnowledge.css';
@@ -241,7 +242,7 @@ function SkillCard({ skill, expanded, regenerating, onToggle, onRegenerate, onEx
             <textarea className="bk-edit-textarea" value={editContent} onChange={(e) => setEditContent(e.target.value)}
               rows={Math.max(10, editContent.split('\n').length + 2)} />
           ) : (
-            <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: markdownToHtml(skill.content) }} />
+            <div className="bk-markdown" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(markdownToHtml(skill.content)) }} />
           )}
         </div>
       )}
