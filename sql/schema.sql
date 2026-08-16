@@ -86,9 +86,17 @@ CREATE TABLE winner_refs (
 );
 
 -- Pipeline log (for terminal in dashboard)
+-- Agent list kept in sync with sql/fix-pipeline-log-agent-check.sql — see
+-- that migration for why it's wider than the original 4 legacy values.
 CREATE TABLE pipeline_log (
     id            SERIAL PRIMARY KEY,
-    agent         TEXT NOT NULL CHECK (agent IN ('SCRAPER', 'FORGE', 'PUBLISHER', 'LOOPER')),
+    agent         TEXT NOT NULL CHECK (agent IN (
+                      'SCRAPER', 'FORGE', 'PUBLISHER', 'LOOPER',
+                      'OPTIMIZER', 'IMPORTER', 'PRICING', 'CLEANUP', 'AUTH',
+                      'SKILL_GEN', 'STYLE_GEN', 'AVATAR', 'EDITOR', 'SIZE_CHART',
+                      'DOC_PROCESSOR', 'REVIEWS', 'AGENT',
+                      'AMAZON_SCRAPER', 'AUTH_ADMIN', 'MASTER'
+                  )),
     message       TEXT NOT NULL,
     level         TEXT DEFAULT 'info' CHECK (level IN ('info', 'warn', 'error')),
     metadata      JSONB,
