@@ -43,15 +43,16 @@ export default function ProductWorkspace({ product, onBack, onNavigateToStudio, 
   const [lightbox, setLightbox] = useState(null); // { images: string[], index: number }
 
   const fetchCreatives = useCallback(async () => {
+    if (!storeId) return;
     try {
-      const data = await getProductCreatives(product.id);
+      const data = await getProductCreatives(product.id, storeId);
       if (data) setCreatives(data);
     } catch (err) {
       console.error('Failed to fetch creatives:', err);
     } finally {
       setLoading(false);
     }
-  }, [product.id]);
+  }, [product.id, storeId]);
 
   useEffect(() => {
     fetchCreatives();

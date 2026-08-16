@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '../../lib/auth.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -14,12 +15,22 @@ async function handler(req, res) {
   try {
     const { id, store_id: storeId } = req.query;
 
+    // store_id is required for every path below (single-product fetch and list). Fail
+    // closed before any permission/store-access check so we never leak whether a check
+    // was skipped due to a missing param.
+    if (!storeId) {
+      return res.status(400).json({ error: id ? 'store_id is required for single-product fetch' : 'store_id is required' });
+    }
+    if (!hasPermission(req.user, 'products:read')) {
+      return res.status(403).json({ error: 'forbidden', hint: 'requires products:read permission' });
+    }
+    if (!hasStoreAccess(req.user, storeId)) {
+      return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+    }
+
     if (id) {
       // Single-product fetch: require store_id so a product from another store can't be
       // retrieved by guessing the id. Validate that the product belongs to the requested store.
-      if (!storeId) {
-        return res.status(400).json({ error: 'store_id is required for single-product fetch' });
-      }
       const { data, error } = await supabase
         .from('products')
         .select('*')
@@ -30,11 +41,8 @@ async function handler(req, res) {
       return res.status(200).json(data);
     }
 
-    // List/pagination path: store_id is REQUIRED. Without it, a query would return products
-    // across ALL stores (cross-store leak). Fail closed.
-    if (!storeId) {
-      return res.status(400).json({ error: 'store_id is required' });
-    }
+    // List/pagination path: store_id required + verified above — a query without it would
+    // return products across ALL stores (cross-store leak).
 
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 200);

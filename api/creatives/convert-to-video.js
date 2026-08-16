@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -60,6 +61,12 @@ async function handler(req, res) {
 
     if (sErr || !source) {
       return res.status(404).json({ error: 'Source creative not found' });
+    }
+    if (!hasPermission(req.user, 'creatives:generate')) {
+      return res.status(403).json({ error: 'forbidden', hint: 'requires creatives:generate permission' });
+    }
+    if (!hasStoreAccess(req.user, source.store_id)) {
+      return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
     }
     if (source.format !== 'image') {
       return res.status(400).json({ error: 'Source creative must be an image' });

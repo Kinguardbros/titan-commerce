@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '../../lib/auth.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -14,6 +15,18 @@ async function handler(req, res) {
   try {
     const { status, product_id, store_id: storeId } = req.query;
 
+    // store_id is REQUIRED — without it this query would return creatives across ALL
+    // stores (cross-store leak). Fail closed before any permission/store-access check.
+    if (!storeId) {
+      return res.status(400).json({ error: 'store_id is required' });
+    }
+    if (!hasPermission(req.user, 'products:read')) {
+      return res.status(403).json({ error: 'forbidden', hint: 'requires products:read permission' });
+    }
+    if (!hasStoreAccess(req.user, storeId)) {
+      return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+    }
+
     let query = supabase
       .from('creatives')
       .select(`
@@ -21,11 +34,9 @@ async function handler(req, res) {
         brief:briefs(id, product_name, product_url, price),
         product:products(id, title, image_url, handle)
       `)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .eq('store_id', storeId);
 
-    if (storeId) {
-      query = query.eq('store_id', storeId);
-    }
     if (status) {
       query = query.eq('status', status);
     }

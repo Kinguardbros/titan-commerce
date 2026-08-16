@@ -1,6 +1,7 @@
 import { getRevenueSummary, getRevenueDelta, getDailyRevenue, getTrafficSources, getTopProductsWithCreatives, getRecentOrders, isConnected, createShopifyClient } from '../../lib/shopify-admin.js';
 import { getStore } from '../../lib/store-context.js';
 import { withAuth } from '../../lib/auth.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -8,6 +9,19 @@ async function handler(req, res) {
   }
 
   const { store_id: storeId } = req.query;
+
+  if (!hasPermission(req.user, 'finance:read')) {
+    return res.status(403).json({ error: 'forbidden', hint: 'requires finance:read permission' });
+  }
+  // Business-sensitive revenue/customer data — non-admins must scope to a store they have
+  // access to; an unscoped call would otherwise fall back to the default env-configured
+  // store (mirrors lib/actions/profit.js's profit_summary gate).
+  if (req.user?.role !== 'admin' && !storeId) {
+    return res.status(403).json({ error: 'forbidden', hint: 'store_id required for non-admin users' });
+  }
+  if (storeId && !hasStoreAccess(req.user, storeId)) {
+    return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+  }
 
   let client = null;
   if (storeId) {

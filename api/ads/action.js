@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '../../lib/auth.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -19,6 +20,13 @@ async function handler(req, res) {
       const { data: creative, error: fetchErr } = await supabase
         .from('creatives').select('*').eq('id', creative_id).single();
       if (fetchErr) throw fetchErr;
+
+      if (!hasPermission(req.user, 'creatives:generate')) {
+        return res.status(403).json({ error: 'forbidden', hint: 'requires creatives:generate permission' });
+      }
+      if (!hasStoreAccess(req.user, creative.store_id)) {
+        return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+      }
 
       const { data, error } = await supabase
         .from('creatives')
@@ -49,6 +57,13 @@ async function handler(req, res) {
       const { data: creative, error: fetchErr } = await supabase
         .from('creatives').select('*').eq('id', creative_id).single();
       if (fetchErr) throw fetchErr;
+
+      if (!hasPermission(req.user, 'creatives:generate')) {
+        return res.status(403).json({ error: 'forbidden', hint: 'requires creatives:generate permission' });
+      }
+      if (!hasStoreAccess(req.user, creative.store_id)) {
+        return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+      }
 
       // Log rejection details + reason for learning (generate API reads these)
       await supabase.from('pipeline_log').insert({
@@ -81,6 +96,19 @@ async function handler(req, res) {
 
     if (action === 'pause') {
       if (!ad_id) return res.status(400).json({ error: 'ad_id required' });
+
+      // ads has no direct store_id column — resolve it via the linked creative.
+      const { data: adRow, error: adFetchErr } = await supabase
+        .from('ads').select('*, creative:creatives(store_id)').eq('id', ad_id).single();
+      if (adFetchErr || !adRow) return res.status(404).json({ error: 'Ad not found' });
+
+      if (!hasPermission(req.user, 'creatives:generate')) {
+        return res.status(403).json({ error: 'forbidden', hint: 'requires creatives:generate permission' });
+      }
+      if (!hasStoreAccess(req.user, adRow.creative?.store_id)) {
+        return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
+      }
+
       const { data, error } = await supabase
         .from('ads').update({ status: 'paused' }).eq('id', ad_id).select().single();
       if (error) throw error;

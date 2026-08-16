@@ -10,6 +10,7 @@ import { V9_PROMPT_BODY } from '../../lib/v9-prompt.js';
 import { V10_PROMPT_BODY } from '../../lib/v10-prompt.js';
 import { withAuth } from '../../lib/auth.js';
 import { rateLimit } from '../../lib/rate-limit.js';
+import { hasPermission, hasStoreAccess } from '../../lib/permissions.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -59,6 +60,13 @@ async function handler(req, res) {
 
   if (!product_id) {
     return res.status(400).json({ error: 'product_id is required' });
+  }
+
+  if (!hasPermission(req.user, 'creatives:generate')) {
+    return res.status(403).json({ error: 'forbidden', hint: 'requires creatives:generate permission' });
+  }
+  if (!hasStoreAccess(req.user, store_id)) {
+    return res.status(403).json({ error: 'forbidden', hint: 'no access to this store' });
   }
 
   // Auto-inject persona reference if audience selected and no explicit reference
