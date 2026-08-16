@@ -127,7 +127,7 @@ Key patterns:
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
-- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals)
+- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `AUTH_ADMIN`, `MASTER`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `AMAZON_SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals). All 20 values enforced by `pipeline_log_agent_check` (fixed 2026-08-17 via `sql/fix-pipeline-log-agent-check.sql` — P0-7 from AUDIT-2026-08).
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr, import_reviews_csv 20/hr, generate_reviews 20/hr, public `review_submit:{ip}` 5/hr + `review_submit_global` 200/hr, `helpful_vote:{ip}` 30/hr + `helpful_vote_global` 500/hr + `helpful_one:{ip}:{review_id}` 1/24h (per-review dedup)
 - Vercel 12-route limit: consolidated endpoints in `api/system.js` thin router (~156 lines) → 72 actions across 23 files in `lib/actions/`, dispatched by `?action=X` (GET) or `{ action }` body (POST). Errors are sanitized (strip API keys, DB strings) before returning to the client.
