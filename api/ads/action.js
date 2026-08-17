@@ -46,6 +46,7 @@ async function handler(req, res) {
           comment: comment || '',
           action: 'approved',
         }),
+        user_id: req.user?.user_id || null, initiator: 'user',
       });
       return res.status(200).json(data);
     }
@@ -79,6 +80,7 @@ async function handler(req, res) {
           reason: reason || '',
           action: 'rejected',
         }),
+        user_id: req.user?.user_id || null, initiator: 'user',
       });
 
       // Delete file from Supabase Storage
@@ -112,7 +114,7 @@ async function handler(req, res) {
       const { data, error } = await supabase
         .from('ads').update({ status: 'paused' }).eq('id', ad_id).select().single();
       if (error) throw error;
-      await supabase.from('pipeline_log').insert({ agent: 'PUBLISHER', message: `Ad ${ad_id} paused`, level: 'warn' });
+      await supabase.from('pipeline_log').insert({ agent: 'PUBLISHER', message: `Ad ${ad_id} paused`, level: 'warn', user_id: req.user?.user_id || null, initiator: 'user' });
       return res.status(200).json(data);
     }
 

@@ -55,6 +55,7 @@ async function handler(req, res) {
       await supabase.from('pipeline_log').insert({
         agent: 'FORGE', level: 'info',
         message: `Regenerating video creative`,
+        user_id: req.user?.user_id || null, initiator: 'user',
       });
 
       const result = await generateVideo({ prompt, imageUrl: sourceImageUrl });
@@ -85,6 +86,7 @@ async function handler(req, res) {
       await supabase.from('pipeline_log').insert({
         agent: 'FORGE', level: 'info',
         message: `Regenerated video — new video ready`,
+        user_id: req.user?.user_id || null, initiator: 'user',
       });
 
       return res.status(200).json(updated);
@@ -127,6 +129,7 @@ async function handler(req, res) {
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info',
       message: `Regenerating image creative`,
+      user_id: req.user?.user_id || null, initiator: 'user',
     });
 
     const result = await generateImage({ prompt, imageUrls: imageUrls.slice(0, 1) });
@@ -160,6 +163,7 @@ async function handler(req, res) {
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info',
       message: `Regenerated image — new image ready`,
+      user_id: req.user?.user_id || null, initiator: 'user',
     });
 
     return res.status(200).json(updated);

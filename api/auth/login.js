@@ -56,6 +56,7 @@ export default async function handler(req, res) {
       agent: 'MASTER', level: 'warn',
       message: 'Master (APP_PASSWORD) login used',
       metadata: { ip },
+      user_id: null, initiator: 'user',
     });
     return res.status(200).json({ token });
   }
@@ -77,13 +78,13 @@ export default async function handler(req, res) {
   }
   if (!user.active) {
     await verifyPassword(password, await dummyHashPromise); // pay the same scrypt cost as a real check
-    await logFailedLogin(username, ip, 'inactive user');
+    await logFailedLogin(username, ip, 'inactive user', user.id);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
   const valid = await verifyPassword(password, user.password_hash);
   if (!valid) {
-    await logFailedLogin(username, ip, 'wrong password');
+    await logFailedLogin(username, ip, 'wrong password', user.id);
     return res.status(401).json({ error: 'Invalid credentials' });
   }
 
@@ -98,6 +99,7 @@ export default async function handler(req, res) {
     agent: 'AUTH', level: 'info',
     message: `User "${user.username}" logged in`,
     metadata: { ip, user_id: user.id },
+    user_id: user.id, initiator: 'user',
   });
 
   const token = signToken({
@@ -113,11 +115,12 @@ export default async function handler(req, res) {
   return res.status(200).json({ token, must_change_password: !!user.must_change_password });
 }
 
-async function logFailedLogin(username, ip, reason) {
+async function logFailedLogin(username, ip, reason, userId = null) {
   console.error('[login] Failed login attempt:', { username, ip, reason });
   await supabase.from('pipeline_log').insert({
     agent: 'AUTH', level: 'warn',
     message: `Failed login for "${username}": ${reason}`,
     metadata: { ip },
+    user_id: userId, initiator: 'user',
   });
 }

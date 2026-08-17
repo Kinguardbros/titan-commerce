@@ -71,6 +71,11 @@ export default function TerminalLog({ storeId }) {
             <span className={`tl-msg${l.level === 'error' ? ' tl-msg--error' : l.level === 'warn' ? ' tl-msg--warn' : ''}`}>
               {l.message}
             </span>
+            {l.initiator && (
+              <span className="tl-initiator" title={l.user_email ? `Initiated by ${l.user_email}` : `Initiator: ${l.initiator}`}>
+                {' '}· {l.initiator === 'user' ? (l.user_email || 'user') : l.initiator}
+              </span>
+            )}
           </div>
         ))}
       </div>

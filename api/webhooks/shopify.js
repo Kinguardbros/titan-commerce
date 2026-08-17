@@ -94,6 +94,7 @@ export default async function handler(req, res) {
       store_id: store.id, agent: 'SCRAPER', level: isCreate ? 'success' : 'info',
       message: friendlyMessage,
       metadata: { topic, webhook_id: wId, ...result },
+      user_id: null, initiator: 'webhook',
     });
     return res.status(200).json({ ok: true });
   } catch (err) {

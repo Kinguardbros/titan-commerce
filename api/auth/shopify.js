@@ -50,6 +50,7 @@ export default async function handler(req, res) {
       message: `OAuth nonce generated for ${store.shopify_url}`,
       level: 'info',
       metadata: { nonce, store_id: storeId, expires: Date.now() + 10 * 60 * 1000 },
+      user_id: null, initiator: 'user',
     });
 
     const authUrl = `https://${store.shopify_url}/admin/oauth/authorize` +
@@ -119,6 +120,7 @@ export default async function handler(req, res) {
         message: `Shopify Admin connected for ${shop}`,
         level: 'success',
         metadata: { shop, scopes: SCOPES },
+        user_id: null, initiator: 'user',
       });
 
       return res.redirect('/?tab=Shopify&connected=true');

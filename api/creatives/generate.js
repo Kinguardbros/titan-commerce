@@ -922,6 +922,7 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
       agent: 'FORGE', level: 'info', store_id: effectiveStoreId,
       message: isPending ? `Queued ${style} generation for ${product.title}` : `Generated ${style} creative for ${product.title}`,
       metadata: { product_id, creative_id: creative.id, style },
+      user_id: req.user?.user_id || null, initiator: 'user',
     });
 
     return res.status(200).json({

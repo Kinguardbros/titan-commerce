@@ -130,6 +130,7 @@ async function handler(req, res) {
     await supabase.from('pipeline_log').insert({
       agent: 'FORGE', level: 'info', store_id: source.store_id || null,
       message: `Generated video from image for ${product?.title || 'product'}`,
+      user_id: req.user?.user_id || null, initiator: 'user',
     });
 
     return res.status(200).json({ creative_id: creative.id, format: 'video', source_creative_id: creative_id });

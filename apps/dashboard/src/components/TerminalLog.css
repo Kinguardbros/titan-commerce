@@ -35,3 +35,4 @@
 .tl-msg { color: var(--text3); }
 .tl-msg--error { color: var(--coral); }
 .tl-msg--warn { color: var(--gold); }
+.tl-initiator { color: var(--text4); font-style: italic; }

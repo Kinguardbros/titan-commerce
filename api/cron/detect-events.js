@@ -155,7 +155,7 @@ export default async function handler(req, res) {
     // partial run (some stores failed) is visible in the Cockpit TerminalLog, not
     // just in Sentry/console.
     const failureSuffix = failedStores.length > 0 ? `, ${failedStores.length} store(s) failed` : '';
-    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: failedStores.length > 0 ? 'warn' : 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned, ${pollResult.completed || 0} generations finalized${failureSuffix}` });
+    await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: failedStores.length > 0 ? 'warn' : 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned, ${pollResult.completed || 0} generations finalized${failureSuffix}`, user_id: null, initiator: 'cron' });
     // Top-level shape (events/proposals/cleaned/polled) is unchanged for backward
     // compat with anything watching this endpoint. `stores` + `failures` are new,
     // additive fields summarizing the per-store parallel run (P1-13, AUDIT-2026-08).
