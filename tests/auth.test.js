@@ -78,6 +78,19 @@ describe('verifyAuth', () => {
     const req = { headers: { authorization: 'Bearer not-a-valid-token' }, query: {} };
     expect(await verifyAuth(req)).toBeNull();
   });
+
+  it('rejects a signature of a different length than expected, without throwing (P2, AUDIT-2026-08 — constant-time compare)', async () => {
+    // The session signature comparison switched from `!==` to a length-checked
+    // crypto.timingSafeEqual (safeEqual helper). A naive direct timingSafeEqual
+    // call (no length guard) throws on unequal-length buffers — this guards
+    // against that regression by feeding a signature far shorter than a real
+    // hex HMAC-SHA256 digest (64 chars).
+    const token = createToken({ master: true, expires: Date.now() + 60000 });
+    const [payloadB64] = token.split('.');
+    const shortSigToken = `${payloadB64}.abcd`;
+    const req = { headers: { authorization: `Bearer ${shortSigToken}` }, query: {} };
+    await expect(verifyAuth(req)).resolves.toBeNull();
+  });
 });
 
 describe('withAuth public allow-list', () => {
