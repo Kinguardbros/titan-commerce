@@ -58,7 +58,7 @@ vi.mock('../lib/shopify-admin.js', () => ({
 }));
 
 const captureExceptionMock = vi.fn();
-vi.mock('../lib/sentry.js', () => ({ captureException: (...args) => captureExceptionMock(...args) }));
+vi.mock('../lib/notify.js', () => ({ captureException: (...args) => captureExceptionMock(...args) }));
 
 const ADMIN_USER = { role: 'admin', user_id: 'u1', permissions: [], store_access: [] };
 function mockReqRes(body) {

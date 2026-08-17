@@ -2,11 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { createShopifyClient } from '../../lib/shopify-admin.js';
 import { detectEventsForStore } from '../../lib/event-detector.js';
 import { poll_generations } from '../../lib/actions/creatives.js';
-import { initSentry, captureException } from '../../lib/sentry.js';
+import { initSentry, captureException } from '../../lib/notify.js';
 
-// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
-// Cron failures were previously console.error-only (per P1-20 finding) — invisible
-// unless someone tails Vercel logs the day it runs.
+// Backend error monitoring (P1-21, superseded by Telegram DIY monitoring) — no-op
+// unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set. Cron failures were previously
+// console.error-only (per P1-20 finding) — invisible unless someone tails Vercel logs
+// the day it runs. initSentry() is a no-op kept for call-site compat — see lib/notify.js.
 initSentry();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -16,7 +17,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 // them at once) is fine. This constant exists for when the store count grows past
 // ~10 — Shopify Admin API and Claude API rate limits are per-credential-set, so a
 // large simultaneous fan-out could start tripping 429s. Lower it (e.g. to 3-5) if
-// that shows up in pipeline_log / Sentry for the cron run.
+// that shows up in pipeline_log / Telegram for the cron run.
 const MAX_PARALLEL_STORES = 10;
 
 // Runs `fn` over `items` in batches of at most `batchSize` concurrent calls,
@@ -153,7 +154,7 @@ export default async function handler(req, res) {
     // was never split per-store even before parallelization, and this task doesn't
     // add per-store DB writes to avoid widening scope). Failure count appended so a
     // partial run (some stores failed) is visible in the Cockpit TerminalLog, not
-    // just in Sentry/console.
+    // just in Telegram/console.
     const failureSuffix = failedStores.length > 0 ? `, ${failedStores.length} store(s) failed` : '';
     await supabase.from('pipeline_log').insert({ agent: 'AGENT', level: failedStores.length > 0 ? 'warn' : 'info', message: `Cron scan: ${totalEvents} events, ${totalProposals} proposals, ${cleanedUp} stale cleaned, ${pollResult.completed || 0} generations finalized${failureSuffix}`, user_id: null, initiator: 'cron' });
     // Top-level shape (events/proposals/cleaned/polled) is unchanged for backward

@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// P1-21 (AUDIT-2026-08): health action (uptime-monitor ping target) + Sentry wrapper
-// fail-open behavior. Both must work with SENTRY_DSN unset — that's the default state
-// for every existing deploy until Dan opts in.
+// P1-21 follow-up: health action (uptime-monitor ping target, unchanged) + the
+// Telegram-based lib/notify.js that replaced lib/sentry.js. Both must work with
+// TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID unset — that's the default state for every
+// existing deploy until Dan opts in (fail-open by design).
 
 describe('health action', () => {
   it('returns ok:true with a numeric ts and a ver string, no DB/auth involved', async () => {
@@ -20,39 +21,109 @@ describe('health action', () => {
   });
 });
 
-describe('lib/sentry.js fail-open behavior', () => {
+describe('lib/notify.js — Telegram error notifications, fail-open behavior', () => {
+  let fetchMock;
+
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllEnvs();
+    fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => '' });
+    vi.stubGlobal('fetch', fetchMock);
   });
 
-  it('initSentry() is a no-op and never throws when SENTRY_DSN is unset', async () => {
-    const { initSentry } = await import('../lib/sentry.js');
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('initSentry() is a no-op and never throws (no init step needed for Telegram)', async () => {
+    const { initSentry } = await import('../lib/notify.js');
     expect(() => initSentry()).not.toThrow();
   });
 
-  it('captureException() is a no-op and never throws when SENTRY_DSN is unset', async () => {
-    const { captureException } = await import('../lib/sentry.js');
-    expect(() => captureException(new Error('test'), { tags: { action: 'test' } })).not.toThrow();
+  it('captureException() never throws and does not call fetch when TELEGRAM_BOT_TOKEN/CHAT_ID are unset', async () => {
+    const { captureException } = await import('../lib/notify.js');
+    await expect(captureException(new Error('test'), { tags: { action: 'test' } })).resolves.not.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('initSentry() calls Sentry.init when SENTRY_DSN is set', async () => {
-    const initMock = vi.fn();
-    vi.doMock('@sentry/node', () => ({ init: initMock, captureException: vi.fn() }));
-    vi.stubEnv('SENTRY_DSN', 'https://fake@example.ingest.sentry.io/1');
-    const { initSentry } = await import('../lib/sentry.js');
-    initSentry();
-    expect(initMock).toHaveBeenCalledOnce();
-    expect(initMock.mock.calls[0][0]).toMatchObject({ dsn: 'https://fake@example.ingest.sentry.io/1', tracesSampleRate: 0 });
+  it('captureException() never throws when only one of the two env vars is set', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '');
+    const { captureException } = await import('../lib/notify.js');
+    await expect(captureException(new Error('test'))).resolves.not.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('captureException() forwards to Sentry.captureException when SENTRY_DSN is set', async () => {
-    const captureMock = vi.fn();
-    vi.doMock('@sentry/node', () => ({ init: vi.fn(), captureException: captureMock }));
-    vi.stubEnv('SENTRY_DSN', 'https://fake@example.ingest.sentry.io/1');
-    const { captureException } = await import('../lib/sentry.js');
+  it('captureException() POSTs to the Telegram sendMessage endpoint with error message + action tag when both env vars are set', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token-123');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '-100987654');
+    const { captureException } = await import('../lib/notify.js');
+
     const err = new Error('boom');
-    captureException(err, { tags: { action: 'test_action' } });
-    expect(captureMock).toHaveBeenCalledWith(err, { tags: { action: 'test_action' } });
+    await captureException(err, { tags: { action: 'test_action' } });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://api.telegram.org/botfake-token-123/sendMessage');
+    expect(opts.method).toBe('POST');
+    expect(opts.headers['Content-Type']).toBe('application/json');
+
+    const body = JSON.parse(opts.body);
+    expect(body.chat_id).toBe('-100987654');
+    expect(body.parse_mode).toBe('Markdown');
+    expect(body.text).toContain('boom');
+    expect(body.text).toContain('test_action');
+  });
+
+  it('captureException() includes the stack trace (truncated) when present', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '123');
+    const { captureException } = await import('../lib/notify.js');
+
+    const err = new Error('with stack');
+    await captureException(err, { tags: { action: 'stack_test' } });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.text).toContain('with stack');
+    // First line of a real Error stack is "Error: <message>"
+    expect(body.text).toMatch(/```/);
+  });
+
+  it('captureException() truncates text to Telegram\'s 4096 char limit with headroom', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '123');
+    const { captureException } = await import('../lib/notify.js');
+
+    const err = new Error('x'.repeat(10_000));
+    await captureException(err, { tags: { action: 'long' } });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.text.length).toBeLessThanOrEqual(4000);
+  });
+
+  it('captureException() logs and does not throw when the Telegram API responds non-ok', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '123');
+    fetchMock.mockResolvedValue({ ok: false, status: 401, text: async () => 'Unauthorized' });
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { captureException } = await import('../lib/notify.js');
+    await expect(captureException(new Error('boom'), { tags: { action: 'x' } })).resolves.not.toThrow();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('captureException() logs and does not throw when fetch itself rejects (network error)', async () => {
+    vi.stubEnv('TELEGRAM_BOT_TOKEN', 'fake-token');
+    vi.stubEnv('TELEGRAM_CHAT_ID', '123');
+    fetchMock.mockRejectedValue(new Error('network down'));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const { captureException } = await import('../lib/notify.js');
+    await expect(captureException(new Error('boom'), { tags: { action: 'x' } })).resolves.not.toThrow();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 });

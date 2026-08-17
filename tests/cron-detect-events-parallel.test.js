@@ -58,7 +58,7 @@ vi.mock('@supabase/supabase-js', () => ({
   }),
 }));
 
-vi.mock('../lib/sentry.js', () => ({
+vi.mock('../lib/notify.js', () => ({
   initSentry: vi.fn(),
   captureException: vi.fn(),
 }));

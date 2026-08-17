@@ -1,0 +1,60 @@
+# Uptime monitor — DIY replacement for the Better Stack recommendation in
+# Docs/RUNBOOK-monitoring.md (P1-21 follow-up). Zero-cost: GitHub Actions cron pings
+# the health endpoint; on non-200 (or timeout/network failure), alerts via the same
+# Telegram bot lib/notify.js uses for backend error capture.
+#
+# Caveat: GitHub Actions' `schedule` cron is best-effort, not real-time — GitHub's
+# own docs and observed behavior put actual delay at 5-15 min past the nominal
+# `*/5 * * * *` slot during high load. This is a "is it up within ~15 min" check,
+# not a real-time uptime SLA monitor. Good enough for current scale — see
+# Docs/RUNBOOK-monitoring.md > Tradeoffs.
+#
+# No cooldown/dedup: a sustained outage sends one Telegram alert per failed run
+# (every ~5-15 min) until the endpoint recovers. Documented tradeoff, not a bug —
+# see Docs/RUNBOOK-monitoring.md. Follow-up TODO: only alert after 2 consecutive
+# failures (needs workflow state, e.g. a cache-file counter or the GitHub API to
+# read the previous run's conclusion) to avoid alerting on a single transient
+# cold-start blip.
+
+name: Uptime monitor
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'  # every 5 minutes (subject to GitHub scheduler delay, see above)
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        id: ping
+        run: |
+          set +e
+          RESPONSE=$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 15 \
+            "https://titan-commerce.vercel.app/api/system?action=health")
+          echo "status=$RESPONSE" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          head -c 500 /tmp/body >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          if [ "$RESPONSE" != "200" ]; then exit 1; fi
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID repo secrets not set — skipping alert (fail-open, same contract as lib/notify.js)."
+            exit 0
+          fi
+          MSG="🔴 *Titan uptime FAIL*
+          Status: ${{ steps.ping.outputs.status }}
+          URL: https://titan-commerce.vercel.app/api/system?action=health
+          Time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TG_CHAT" --arg text "$MSG" \
+              '{chat_id: $chat_id, text: $text, parse_mode: "Markdown"}')"

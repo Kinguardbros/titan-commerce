@@ -1,5 +1,5 @@
 import { withAuth } from '../lib/auth.js';
-import { initSentry, captureException } from '../lib/sentry.js';
+import { initSentry, captureException } from '../lib/notify.js';
 import { getPerStoreOrigins } from '../lib/storefront-cors.js';
 
 // GET actions
@@ -31,9 +31,11 @@ import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publication
 import { scrape_amazon_preview, import_amazon_reviews, check_review_duplicates } from '../lib/actions/reviews-amazon.js';
 import { me, users_list, create_user, update_user, delete_user, reset_password, generate_api_token, change_own_password } from '../lib/actions/users.js';
 
-// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
-// api/system.js is the main dispatcher (60+ actions flow through it), so it's the
-// highest-value place to catch unhandled action errors.
+// Backend error monitoring (P1-21, superseded by Telegram DIY monitoring) — no-op
+// unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set. api/system.js is the main
+// dispatcher (60+ actions flow through it), so it's the highest-value place to catch
+// unhandled action errors. initSentry() is a no-op kept for call-site compat — see
+// lib/notify.js.
 initSentry();
 
 const GET_ACTIONS = {

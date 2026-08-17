@@ -3,14 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import {
   handleProductCreate, handleProductUpdate, handleProductDelete,
 } from '../../lib/shopify-webhook-handlers.js';
-import { initSentry, captureException } from '../../lib/sentry.js';
+import { initSentry, captureException } from '../../lib/notify.js';
 
 // Raw body required for HMAC verification — disable automatic JSON parsing
 export const config = { api: { bodyParser: false } };
 
-// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
-// A missed Shopify product webhook is especially bad to miss silently (product goes
-// stale in TC with no visible signal).
+// Backend error monitoring (P1-21, superseded by Telegram DIY monitoring) — no-op
+// unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set. A missed Shopify product
+// webhook is especially bad to miss silently (product goes stale in TC with no
+// visible signal). initSentry() is a no-op kept for call-site compat — see lib/notify.js.
 initSentry();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
