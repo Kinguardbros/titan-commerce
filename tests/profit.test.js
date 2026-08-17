@@ -14,9 +14,9 @@ function makeBuilderMock(table) {
       supabaseCallsMock[table].push({ col, val });
       return builder;
     }),
-    upsert: vi.fn((row) => {
+    upsert: vi.fn((row, options) => {
       supabaseCallsMock[table] = supabaseCallsMock[table] || [];
-      supabaseCallsMock[table].push({ upsert: row });
+      supabaseCallsMock[table].push({ upsert: row, upsertOptions: options });
       return builder;
     }),
     single: vi.fn(async () => {
@@ -137,6 +137,17 @@ describe('manual_adspend write scoping (P0-3)', () => {
     expect(upsertCall?.upsert?.store_id).toBe('store-1');
     expect(res.status).not.toHaveBeenCalledWith(400);
     expect(res.status).not.toHaveBeenCalledWith(403);
+  });
+
+  // P0-3 follow-up (Docs/AUDIT-2026-08.md, sql/fix-manual-adspend-unique.sql):
+  // the UNIQUE constraint moved from (date, channel) to (store_id, date, channel) —
+  // the upsert's onConflict target must match, or a duplicate-key upsert against the
+  // new constraint would silently fall through to a plain INSERT and 23505.
+  it('uses composite onConflict target store_id,date,channel — not the old global date,channel', async () => {
+    const { req, res } = mockReqRes({ body: { date: '2026-08-01', channel: 'tiktok', amount: 10, store_id: 'store-1' }, user: ADMIN });
+    await manual_adspend(req, res);
+    const upsertCall = supabaseCallsMock['manual_adspend']?.find((c) => c.upsert);
+    expect(upsertCall?.upsertOptions).toEqual({ onConflict: 'store_id,date,channel' });
   });
 });
 

@@ -141,26 +141,28 @@ describe('lib/shopify-webhook-handlers.js', () => {
   });
 
   // -------------------------------------------------------------------------
-  // "Missing store" behavior. NOTE: unlike the task brief's assumption, none
-  // of the three handlers has an internal `if (!store) return` guard — the
-  // guard lives entirely in the CALLER (api/webhooks/shopify.js: `if
-  // (!store?.client_secret) return res.status(401)...` runs BEFORE any
-  // handler is invoked). These tests document actual behavior: calling a
-  // handler directly with a missing store throws rather than degrading
-  // gracefully. Flagged as a finding in the P1-23 report — not fixed here
-  // per "coverage only, don't silently fix" instructions.
+  // "Missing store" guard (P1-23 follow-up, AUDIT-2026-08 sweep). The sole
+  // caller (api/webhooks/shopify.js) already rejects requests with no
+  // matching store row before invoking any handler, but each handler now
+  // also asserts explicitly at its own entry point — defense-in-depth so a
+  // future caller that skips the pre-check gets a clear, attributable Error
+  // instead of an opaque TypeError from deep inside upsertProductFromShopify
+  // or the Supabase query builder.
   // -------------------------------------------------------------------------
-  describe('missing store (no internal guard — relies entirely on the caller pre-check)', () => {
-    it('handleProductCreate throws (does not silently no-op) when store is null', async () => {
-      await expect(handleProductCreate(null, { id: 1, title: 'X' })).rejects.toThrow();
+  describe('missing store (explicit guard at handler entry)', () => {
+    it('handleProductCreate throws "missing store" when store is null', async () => {
+      await expect(handleProductCreate(null, { id: 1, title: 'X' }))
+        .rejects.toThrow(/missing store/i);
     });
 
-    it('handleProductUpdate throws when store is null', async () => {
-      await expect(handleProductUpdate(null, { id: 1, title: 'X' })).rejects.toThrow();
+    it('handleProductUpdate throws "missing store" when store is undefined', async () => {
+      await expect(handleProductUpdate(undefined, { id: 1, title: 'X' }))
+        .rejects.toThrow(/missing store/i);
     });
 
-    it('handleProductDelete throws when store is null', async () => {
-      await expect(handleProductDelete(null, { id: 1 })).rejects.toThrow();
+    it('handleProductDelete throws "missing store" when store is null', async () => {
+      await expect(handleProductDelete(null, { id: 1 }))
+        .rejects.toThrow(/missing store/i);
     });
   });
 });
