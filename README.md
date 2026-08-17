@@ -46,6 +46,28 @@ cd apps/dashboard && npm run build
 npm test             # Vitest
 ```
 
+## CI
+
+`.github/workflows/ci.yml` runs two parallel jobs on every push + PR to `main`:
+
+- **backend-tests** — `npm ci --legacy-peer-deps` + `npm test` (root vitest suite, 383+ tests)
+- **frontend-build** — `cd apps/dashboard && npm ci && npm run build`
+
+Both are cached on their respective `package-lock.json` hashes.
+
+**This does not gate Vercel deploys.** `vercel.json`'s `buildCommand` only runs the frontend
+build — it never ran the backend test suite, so `git push` to `main` deploys to production
+regardless of whether the tests pass (P1-22, `Docs/AUDIT-2026-08.md`). This workflow gives
+visibility (a red/green check on the commit) without blocking anything.
+
+**Follow-up, not done here:** to actually block a bad deploy, enable "Wait for CI to pass" in
+the Vercel project's Git settings (Project Settings > Git). That's per-project Vercel dashboard
+config, not something a repo file can turn on — do this once CI has proven stable for a while.
+
+**Optional local gate:** `bash scripts/setup-git-hooks.sh` installs a `pre-push` git hook that
+runs `npm test` before every push from that clone (bypass once with `git push --no-verify`).
+Opt-in per clone, not installed automatically.
+
 ## Project Structure
 
 ```

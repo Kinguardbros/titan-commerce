@@ -1,0 +1,93 @@
+# CI test gate — P1-22 from Docs/AUDIT-2026-08.md
+#
+# Why this exists: vercel.json's buildCommand only runs the frontend Vite
+# build (`cd apps/dashboard && npm run build`). It never touches the root
+# vitest suite. `git push` to main deploys to production regardless of
+# whether the backend tests pass — fine with one disciplined developer
+# manually running `npm test` before pushing, unsafe once a 2nd person can
+# push and skip that step.
+#
+# What this does: runs the backend test suite + the frontend build on every
+# push/PR to main and reports pass/fail as a commit status check (the red/
+# green X on GitHub).
+#
+# What this deliberately does NOT do: gate Vercel deploys. Vercel deploys on
+# `git push` independently of this workflow's result. To make a red CI run
+# actually block production, enable "Wait for CI to pass" in the Vercel
+# project's Git settings (Project Settings > Git > Ignored Build Step /
+# deployment protection) — that's per-project config only Dan can flip in
+# the Vercel dashboard, not something this workflow file can do on its own.
+# Turn it on once CI has proven stable for a while; until then this workflow
+# gives visibility without blocking anything.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch)
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend tests (vitest)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache root node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node20-root-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node20-root-
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Run tests
+        run: npm test
+
+  frontend-build:
+    name: Frontend build (vite)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache dashboard node_modules
+        uses: actions/cache@v4
+        with:
+          path: apps/dashboard/node_modules
+          key: ${{ runner.os }}-node20-dashboard-${{ hashFiles('apps/dashboard/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node20-dashboard-
+
+      - name: Install dependencies
+        working-directory: apps/dashboard
+        run: npm ci
+
+      - name: Build
+        working-directory: apps/dashboard
+        run: npm run build
