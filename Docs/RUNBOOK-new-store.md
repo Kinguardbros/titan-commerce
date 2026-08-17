@@ -7,7 +7,8 @@ Source: `Docs/AUDIT-2026-08.md` P1-12 — "No new-store onboarding playbook / ru
 
 Related work not yet shipped that affects this flow, called out inline where relevant:
 - **P1-11** (Isola-specific hardcodes) — still open. See the gotcha in section 2 and section 11.
-- **P1-10** (`STOREFRONT_URL` is a single global env var, not per-store) — still open. See section 4.
+- **P1-10** (`STOREFRONT_URL` is a single global env var, not per-store) — **fixed 2026-08-17.**
+  CORS for public review actions is now per-store (`stores.storefront_origins`). See section 4.
 - **P1-13** (daily cron scans all stores sequentially in one 60s function) — still open. See section 10.
 
 ---
@@ -159,40 +160,39 @@ returns `!!(store.has_admin || store.admin_token)`. Without `admin_token`:
 
 ---
 
-## 4. CORS — add the storefront domain to `STOREFRONT_URL`
+## 4. CORS — set `stores.storefront_origins` for the new store
 
-`STOREFRONT_URL` is a **single global comma-separated env var** shared by all stores' public review
-actions (`submit_review_public`, `vote_review_helpful`, `review_helpful_counts` — `api/system.js:130`).
-This is the P1-10 gap (per-store column would be cleaner, not built yet) — for now it's manual, and it's
-additive: you're appending to the existing list, not replacing it.
+**Fixed 2026-08-17 (P1-10, AUDIT-2026-08).** CORS for the public review actions
+(`submit_review_public`, `vote_review_helpful`, `review_helpful_counts` — `api/system.js`) is now
+**per-store**, read from `stores.storefront_origins` (`TEXT[]`, migration
+`sql/add-store-storefront-origins.sql`). `applyCors` (`api/system.js`) resolves which store a request
+targets (via `shopify_product_id` for `submit_review_public`/`review_helpful_counts`, `review_id` for
+`vote_review_helpful`) and looks up that store's own origins in `lib/storefront-cors.js`'s
+`getPerStoreOrigins()`. Adding a new store's domain is now a plain `UPDATE`, not an env var edit +
+redeploy — and it can't accidentally drop another store's origins, since each store owns its own row.
 
-```bash
-# 1. See the current value first — don't guess what's already there.
-vercel env pull .env.vercel.tmp --environment production
-grep STOREFRONT_URL .env.vercel.tmp
-# e.g. STOREFRONT_URL="https://isolaswim.com,https://swimwear-brand.myshopify.com"
-rm .env.vercel.tmp
-
-# 2. Remove the old value (Vercel CLI has no "append" — full replace only).
-vercel env rm STOREFRONT_URL production --yes
-
-# 3. Re-add with the new domain(s) appended — keep every existing origin.
-printf 'https://isolaswim.com,https://swimwear-brand.myshopify.com,https://swansway.com,https://swans-way-store.myshopify.com' | vercel env add STOREFRONT_URL production
-
-# 4. Redeploy for the env change to take effect (Vercel doesn't hot-reload env vars on already-deployed functions).
-vercel --prod
+```sql
+UPDATE stores SET storefront_origins = ARRAY['https://swansway.com', 'https://swans-way-store.myshopify.com']
+WHERE slug = 'swansway';
 ```
 
-**This is REQUIRED before the public review widget goes live on the new store's storefront.** If
-skipped, `submit_review_public` gets silently CORS-blocked in the visitor's browser — the request never
-even reaches the rate limiter or the DB, so `pipeline_log` shows nothing and it looks like the widget is
-just "not working" with zero server-side signal. Include both the custom domain and the
-`.myshopify.com` fallback — whichever one the storefront's JS actually calls from should be covered, and
-having both costs nothing.
+Include both the custom domain and the `.myshopify.com` fallback — whichever one the storefront's JS
+actually calls from should be covered, and having both costs nothing.
 
-If the fallback hardcoded in `api/system.js` (`'https://isolaswim.com,https://swimwear-brand.myshopify.com'`,
-used only when `STOREFRONT_URL` is completely unset) ever needs updating for a stores test/dev
-environment, that's a code change, not an env change — don't rely on it in production.
+**This is REQUIRED before the public review widget goes live on the new store's storefront.** If
+`storefront_origins` is left at its default `'{}'`, `getPerStoreOrigins()` falls back to the **legacy
+global `STOREFRONT_URL` env var** (or its hardcoded default, `'https://isolaswim.com,https://swimwear-
+brand.myshopify.com'`, if that env var is unset too) — logged via `console.warn` — which will NOT include
+the new store's domain, so `submit_review_public` gets silently CORS-blocked in the visitor's browser.
+The request never even reaches the rate limiter or the DB, so `pipeline_log` shows nothing and it looks
+like the widget is just "not working" with zero server-side signal — same failure mode as before, just a
+missing DB row instead of a missing env var entry now.
+
+**`STOREFRONT_URL` is deprecated, one-cycle fallback only** — see CLAUDE.md Env Vars. Don't add a new
+store's domain to it; that env var only exists today as a safety net for requests where the target store
+can't be resolved (e.g. a CORS preflight `OPTIONS` request, which never carries a body) or for a store row
+that hasn't been backfilled yet. It will be removed once logs confirm nothing is hitting the fallback for
+a full deploy cycle.
 
 ---
 
@@ -385,7 +385,7 @@ trigger a refresh) to see it resolve to `pending` for review.
 | 1 | Gather Shopify domain, admin token, storefront token, client_secret, slug, name, currency |
 | 2 | `INSERT INTO stores (...)` — section 2 SQL, fill `brand_config.brand_voice` |
 | 3 | `UPDATE stores SET admin_token = ...` (skip for read-only stores) |
-| 4 | `vercel env rm/add STOREFRONT_URL production` + `vercel --prod` — REQUIRED before public reviews go live |
+| 4 | `UPDATE stores SET storefront_origins = ARRAY[...] WHERE slug = ...` — REQUIRED before public reviews go live |
 | 5 | Shopify tab → Register webhooks, verify `ours_count === 3` |
 | 6 | Products tab → Sync Shopify, check `pipeline_log` for errors |
 | 7 | Settings → Users → grant `store_access` (+ `finance:read` if needed) — full replace, not append |

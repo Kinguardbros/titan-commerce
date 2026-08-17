@@ -1,5 +1,6 @@
 import { withAuth } from '../lib/auth.js';
 import { initSentry, captureException } from '../lib/sentry.js';
+import { getPerStoreOrigins } from '../lib/storefront-cors.js';
 
 // GET actions
 import { stores_list } from '../lib/actions/stores.js';
@@ -130,21 +131,25 @@ const POST_ACTIONS = {
 };
 
 // Actions callable cross-origin need CORS headers — each maps to the specific
-// origins it trusts (NOT a single shared allow-list). Storefront actions get the
-// storefront's own domain(s); import_amazon_reviews gets Amazon's domain(s) only.
-// Note: for the userscript's actual request, GM_xmlhttpRequest bypasses browser-side
-// CORS enforcement entirely — the real authorization gate is the bearer api_token
-// check in verifyAuth. This CORS entry exists for correctness/defense-in-depth (e.g.
-// if a future integration calls this action via plain fetch() from a browser tab).
-const STOREFRONT_ORIGINS = (process.env.STOREFRONT_URL || 'https://isolaswim.com,https://swimwear-brand.myshopify.com')
-  .split(',').map((o) => o.trim()).filter(Boolean);
+// origins it trusts (NOT a single shared allow-list).
+// - submit_review_public / vote_review_helpful / review_helpful_counts are 'per_store':
+//   applyCors resolves the target store per-request from stores.storefront_origins
+//   (P1-10, AUDIT-2026-08 — replaces the old single global STOREFRONT_URL env var,
+//   which required an env edit + redeploy for every new store's domain and risked
+//   dropping existing stores' origins on a copy/paste mistake). See lib/storefront-cors.js.
+// - import_amazon_reviews stays on the shared Amazon-domain env list — still a
+//   shared, less-critical list (Amazon's own domains, not per-store).
+//   Note: for the userscript's actual request, GM_xmlhttpRequest bypasses browser-side
+//   CORS enforcement entirely — the real authorization gate is the bearer api_token
+//   check in verifyAuth. This CORS entry exists for correctness/defense-in-depth (e.g.
+//   if a future integration calls this action via plain fetch() from a browser tab).
 const AMAZON_USERSCRIPT_ORIGINS = (process.env.AMAZON_USERSCRIPT_ORIGINS || 'https://www.amazon.com,https://smile.amazon.com')
   .split(',').map((o) => o.trim()).filter(Boolean);
 
 const CORS_ACTIONS = {
-  submit_review_public: STOREFRONT_ORIGINS,
-  vote_review_helpful: STOREFRONT_ORIGINS,
-  review_helpful_counts: STOREFRONT_ORIGINS,
+  submit_review_public: 'per_store',
+  vote_review_helpful: 'per_store',
+  review_helpful_counts: 'per_store',
   import_amazon_reviews: AMAZON_USERSCRIPT_ORIGINS,
   // health (P1-21) is a public no-data-leak liveness check — wildcard CORS is safe here
   // and covers any future browser-based caller (uptime monitors typically hit it
@@ -152,8 +157,9 @@ const CORS_ACTIONS = {
   health: ['*'],
 };
 
-function applyCors(req, res, action) {
-  const allowedOrigins = CORS_ACTIONS[action] || [];
+async function applyCors(req, res, action) {
+  const configured = CORS_ACTIONS[action] || [];
+  const allowedOrigins = configured === 'per_store' ? await getPerStoreOrigins(req, action) : configured;
   const origin = req.headers.origin;
   const allow = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
   res.setHeader('Access-Control-Allow-Origin', allow);
@@ -167,10 +173,10 @@ async function handler(req, res) {
 
   // CORS preflight for public storefront actions (must answer before auth/dispatch).
   if (req.method === 'OPTIONS') {
-    if (CORS_ACTIONS[action]) { applyCors(req, res, action); return res.status(200).end(); }
+    if (CORS_ACTIONS[action]) { await applyCors(req, res, action); return res.status(200).end(); }
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (CORS_ACTIONS[action]) applyCors(req, res, action);
+  if (CORS_ACTIONS[action]) await applyCors(req, res, action);
 
   if (!action) return res.status(400).json({ error: 'action required' });
 
