@@ -320,6 +320,11 @@ Key patterns:
 ### RLS & migrations
 - All tables have RLS enabled (`sql/enable-rls-all.sql`). Service-role bypasses RLS — backend uses service role.
 - Migrations are individual `sql/*.sql` files (run in order in Supabase SQL Editor). `sql/schema.sql` is the original base; the `add-*.sql` files layer on top.
+- **Migration tracking (P1-19, AUDIT-2026-08):** `sql/000-schema-migrations.sql` creates a `schema_migrations` table (`filename` PK, `applied_at`, `applied_by`), applied first (numbered `000-`) so it exists before anything else lands. Every new migration file should end with:
+  ```sql
+  INSERT INTO schema_migrations (filename) VALUES ('{THIS_FILENAME}.sql') ON CONFLICT DO NOTHING;
+  ```
+  This tracks applied migrations and lets a new environment audit `SELECT filename FROM schema_migrations ORDER BY applied_at;` to detect drift (missing rows = skipped migrations, out-of-order `applied_at` = replayed out of documented order). The pre-existing `sql/*.sql` files were NOT retrofitted with this line — too much churn for files already applied everywhere — they're captured once via `scripts/register-existing-migrations.mjs` instead. See `sql/README.md`.
 - `sql/add-publications-manager.sql` — adds `stores.online_store_publication_id` + `products.publication_online_store`.
 - Realtime enabled on relevant tables (`sql/enable-realtime.sql`, `sql/enable-delete-realtime.sql`).
 
@@ -579,5 +584,5 @@ cd apps/dashboard && npm run build   # production build (output: apps/dashboard/
 npx supabase db push                 # or run sql/*.sql manually in Supabase SQL Editor
 
 # Tests
-npm test                             # Vitest — auth (incl. tv/session-revocation, self-service password change), rate-limit, profit, routing, CSV parser, image validation, import-guard, contracts (358 tests)
+npm test                             # Vitest — auth (incl. tv/session-revocation, self-service password change), rate-limit, profit, routing, CSV parser, image validation, import-guard, contracts, migration tracking (373 tests)
 ```
