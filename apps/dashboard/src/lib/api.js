@@ -653,6 +653,31 @@ export function generateApiToken(userId) {
   });
 }
 
+// Self-service password change (P1-14, AUDIT-2026-08) — any logged-in user,
+// not admin-only. Server bumps token_version on success, which invalidates
+// the token used to make this very call — caller is expected to discard it
+// and re-login (see ChangePasswordForm.jsx), which is why this does NOT use
+// fetchJSON: a wrong-current-password attempt legitimately 401s, and
+// fetchJSON's shared 401 handler nukes auth_token + force-reloads on ANY
+// 401 (session-expiry assumption) — that would silently boot the user back
+// to the login screen instead of showing an inline "wrong password" error.
+export async function changeOwnPassword(currentPassword, newPassword) {
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/system`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ action: 'change_own_password', current_password: currentPassword, new_password: newPassword }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.hint || body.details || body.error || `Request failed (${res.status})`);
+  }
+  return body;
+}
+
 // CSV export — cannot use fetchJSON because response is text/csv, not JSON.
 // Downloads via anchor with object URL.
 export async function exportProductsCsv(storeId, filters = {}) {

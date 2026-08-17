@@ -66,7 +66,7 @@ export default async function handler(req, res) {
 
   const { data: user, error } = await supabase
     .from('users')
-    .select('id, username, password_hash, role, permissions, store_access, active')
+    .select('id, username, password_hash, role, permissions, store_access, active, token_version, must_change_password')
     .eq('username', username)
     .single();
 
@@ -105,11 +105,12 @@ export default async function handler(req, res) {
     role: user.role,
     permissions: user.permissions || [],
     store_access: user.store_access || [],
+    tv: user.token_version,
     created: Date.now(),
     expires: Date.now() + ttl,
   });
 
-  return res.status(200).json({ token });
+  return res.status(200).json({ token, must_change_password: !!user.must_change_password });
 }
 
 async function logFailedLogin(username, ip, reason) {

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ChangePasswordForm from '../components/settings/ChangePasswordForm';
 import './Login.css';
 
 export default function Login({ onSuccess }) {
@@ -7,6 +8,12 @@ export default function Login({ onSuccess }) {
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // Set once a login response carries must_change_password:true (admin-issued
+  // temp password, P1-14 AUDIT-2026-08) — blocks reaching the dashboard until
+  // the user picks a new password. The just-logged-in token is already in
+  // localStorage at that point, so ChangePasswordForm can call
+  // change_own_password directly; success clears it and reloads back here.
+  const [forcePasswordChange, setForcePasswordChange] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,8 +33,13 @@ export default function Login({ onSuccess }) {
         return;
       }
 
-      const { token } = await res.json();
+      const { token, must_change_password } = await res.json();
       localStorage.setItem('auth_token', token);
+      if (must_change_password) {
+        setForcePasswordChange(true);
+        setLoading(false);
+        return;
+      }
       onSuccess();
     } catch (err) {
       console.error('[Login] Connection error:', err?.message || err);
@@ -35,6 +47,21 @@ export default function Login({ onSuccess }) {
       setLoading(false);
     }
   };
+
+  if (forcePasswordChange) {
+    return (
+      <div className="login-page">
+        <div className="login-card">
+          <div className="login-logo">
+            <div className="login-logo-mark">T</div>
+            <div className="login-logo-brand">Titan Commerce</div>
+            <div className="login-logo-sub">Command Center</div>
+          </div>
+          <ChangePasswordForm forced initialCurrentPassword={password} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="login-page">

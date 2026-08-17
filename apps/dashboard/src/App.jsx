@@ -20,6 +20,9 @@ const ALL_TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit
 
 function visibleTabs(user) {
   if (!user) return [];
+  // Settings now also hosts self-service "change my password" (P1-14,
+  // AUDIT-2026-08) — visible to every authenticated user, not just admins.
+  // Settings.jsx itself gates the admin-only Users table inside the tab.
   if (user.role === 'admin') return [...ALL_TABS, 'Settings'];
   const perms = user.permissions || [];
   const tabs = [];
@@ -29,7 +32,7 @@ function visibleTabs(user) {
   // VA/contractor scoped for product image work doesn't automatically see P&L.
   if (perms.includes('finance:read')) tabs.push('Cockpit', 'Shopify', 'Profit');
   if (perms.includes('creatives:generate')) tabs.push('Studio', 'Avatars');
-  return ALL_TABS.filter((t) => tabs.includes(t));
+  return [...ALL_TABS.filter((t) => tabs.includes(t)), 'Settings'];
 }
 
 function isTokenValid() {
@@ -227,7 +230,7 @@ function AppContent() {
             {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
             {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
             {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}
-            {activeTab === 'Settings' && user?.role === 'admin' && <Settings />}
+            {activeTab === 'Settings' && <Settings />}
           </Suspense>
         </main>
       </div>

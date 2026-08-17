@@ -26,7 +26,7 @@ import { submit_review_public, vote_review_helpful, review_helpful_counts } from
 import { export_products_csv } from '../lib/actions/exports.js';
 import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publications.js';
 import { scrape_amazon_preview, import_amazon_reviews, check_review_duplicates } from '../lib/actions/reviews-amazon.js';
-import { me, users_list, create_user, update_user, delete_user, reset_password, generate_api_token } from '../lib/actions/users.js';
+import { me, users_list, create_user, update_user, delete_user, reset_password, generate_api_token, change_own_password } from '../lib/actions/users.js';
 
 const GET_ACTIONS = {
   stores_list,
@@ -118,6 +118,7 @@ const POST_ACTIONS = {
   delete_user,
   reset_password,
   generate_api_token,
+  change_own_password,
 };
 
 // Actions callable cross-origin need CORS headers — each maps to the specific

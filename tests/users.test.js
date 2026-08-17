@@ -265,6 +265,10 @@ describe('lib/actions/users.js', () => {
     });
 
     it('happy path: generates a 12-char temp password, hashes it, saves, returns it in the response', async () => {
+      // reset_password now does a preliminary select() for token_version
+      // (P1-15, AUDIT-2026-08 — bumped so the reset invalidates existing
+      // sessions) before the update — needs a truthy row to pass that lookup.
+      usersState._single = { token_version: 3 };
       usersState._updateResult = { id: 'u2', username: 'jana' };
       const { req, res } = mockReqRes({ user_id: 'u2' }, ADMIN_USER);
       await reset_password(req, res);
@@ -273,6 +277,13 @@ describe('lib/actions/users.js', () => {
       expect(body.temp_password).toHaveLength(12);
       expect(hashPasswordMock).toHaveBeenCalledWith(body.temp_password);
       expect(usersState.logged[0]).toMatchObject({ agent: 'AUTH_ADMIN' });
+    });
+
+    it('404s when the target user cannot be found for the token_version lookup', async () => {
+      usersState._single = null;
+      const { req, res } = mockReqRes({ user_id: 'ghost' }, ADMIN_USER);
+      await reset_password(req, res);
+      expect(res.status).toHaveBeenCalledWith(404);
     });
   });
 });
