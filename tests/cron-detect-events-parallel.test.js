@@ -191,3 +191,69 @@ describe('cron/detect-events — parallel store processing (P1-13)', () => {
     expect(pollGenerationsMock).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// P1-13 follow-up: MAX_PARALLEL_STORES (=10) never triggers a second batch at
+// the current 2-6 active-store count, so the batching branch of runInBatches()
+// has zero coverage above. runInBatches() is a module-private helper (not
+// exported) — driven here through the real handler with 12 synthetic stores,
+// per the file's own header note on how this suite drives the parallel path.
+// ---------------------------------------------------------------------------
+describe('cron/detect-events — MAX_PARALLEL_STORES batching branch (P1-13 follow-up, synthetic 12-store test)', () => {
+  it('batches 12 stores into groups of 10: batch 1 fully settles before batch 2 starts, all 12 stores are processed exactly once, and one rejection does not abort the others', async () => {
+    const stores = Array.from({ length: 12 }, (_, i) => makeStore({ id: `s${i + 1}`, name: `Store ${i + 1}` }));
+    tableData.stores = { list: () => ({ data: stores, error: null }) };
+    getTopProductsMock.mockResolvedValue([{ product_id: 'p1', units: 1, creative_count: 0, revenue: 10 }]);
+
+    const FAILING_STORE_ID = 's7'; // inside batch 1 (stores 1-10) — proves a mid-batch rejection
+                                    // doesn't abort the rest of batch 1 or block batch 2 from starting.
+    const timeline = [];
+    detectEventsForStoreMock.mockImplementation(async (storeId) => {
+      timeline.push({ storeId, event: 'start', t: Date.now() });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      timeline.push({ storeId, event: 'end', t: Date.now() });
+      if (storeId === FAILING_STORE_ID) throw new Error(`[${storeId}] simulated failure`);
+      return { eventsCreated: 1, proposalsCreated: 1 };
+    });
+
+    const { default: handler } = await import('../api/cron/detect-events.js');
+    const { req, res } = mockReqRes();
+
+    const wallStart = Date.now();
+    await handler(req, res);
+    const wallDuration = Date.now() - wallStart;
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const body = res.json.mock.calls[0][0];
+
+    // No drops: processStore (proxied here by detectEventsForStoreMock, called once per store
+    // that reaches it) ran for all 12 stores, regardless of the one rejection.
+    expect(detectEventsForStoreMock).toHaveBeenCalledTimes(12);
+
+    // allSettled semantics: the 1 rejection is reported, not swallowed and not fatal — the
+    // other 11 stores still completed and are reflected in the aggregated totals.
+    expect(body.failures).toHaveLength(1);
+    expect(body.failures[0]).toContain(FAILING_STORE_ID);
+    expect(body.stores).toHaveLength(11);
+    expect(body.events).toBe(11);
+    expect(body.proposals).toBe(11);
+
+    // Batching happened: batch 1 (the first 10 stores, MAX_PARALLEL_STORES) must fully settle
+    // (all 10 'end' events) before batch 2 (stores 11-12) starts (their 'start' events) — this
+    // is a structural guarantee of the `for` loop awaiting each batch's Promise.allSettled
+    // before moving on, not a timing race.
+    const batch1Ids = stores.slice(0, 10).map((s) => s.id);
+    const batch2Ids = stores.slice(10).map((s) => s.id);
+    const batch1EndTimes = timeline.filter((e) => batch1Ids.includes(e.storeId) && e.event === 'end').map((e) => e.t);
+    const batch2StartTimes = timeline.filter((e) => batch2Ids.includes(e.storeId) && e.event === 'start').map((e) => e.t);
+    expect(batch1EndTimes).toHaveLength(10);
+    expect(batch2StartTimes).toHaveLength(2);
+    expect(Math.min(...batch2StartTimes)).toBeGreaterThanOrEqual(Math.max(...batch1EndTimes));
+
+    // Timing: 12 stores at ~10ms each, capped at 10 concurrent, is 2 sequential rounds (~20ms)
+    // — not ~120ms, which is what the pre-P1-13 fully-sequential `for` loop would have taken.
+    // Generous upper bound to absorb CI/test-runner scheduling jitter while still failing hard
+    // on a regression back to unbounded-sequential behavior.
+    expect(wallDuration).toBeLessThan(90);
+  });
+});

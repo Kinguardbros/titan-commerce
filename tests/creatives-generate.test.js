@@ -264,6 +264,143 @@ describe('api/creatives/generate.js — Product Catalog prompt routing (spot che
   });
 });
 
+// ---------------------------------------------------------------------------
+// Backfill (follow-up to P1-23): the spot-check above only covered v1/v4/v7.
+// This block covers the remaining 7 Product Catalog variants — v2, v3, v5, v6,
+// v8, v9, v10 — each asserting (a) the variant-specific prompt injection (a
+// distinctive inline phrase for v2/v3, which are monolithic prompts built
+// directly in generate.js like v1; the mocked *_PROMPT_BODY marker for v5/v6/
+// v9/v10, which — like v4/v7 — just wrap an imported body constant; and the
+// mocked-template substitution result for v8, which additionally templates
+// LIGHTING/DO-NOT blocks by detected color class) and (b) the persona-avatar
+// sandwich reference-image shape [avatar, productPhoto, avatar], which every
+// catalog version shares (generate.js ~line 724).
+//
+// Reference image is provided via `audience` + a mocked `persona_avatars` row
+// (same as the "persona avatar sandwich" describe block below), NOT a bare
+// `reference_url` — passing `reference_url` directly on a catalog style hits
+// the defended degenerate-sandwich path (generate.js ~line 730, see the
+// "sandwich degeneration is defended" test below) and collapses to a single
+// image, which would falsely fail the 3-element sandwich assertion here.
+// `audience` is also how the real frontend does it (CreativeStudio.jsx never
+// sends a bare `reference_url` for catalog styles).
+// ---------------------------------------------------------------------------
+describe('api/creatives/generate.js — Product Catalog prompt routing (backfill: v2/v3/v5/v6/v8/v9/v10)', () => {
+  function mockPersonaAvatar() {
+    tableData.persona_avatars = { single: () => ({ data: { reference_url: 'https://img.test/avatar.png' }, error: null }) };
+  }
+
+  it('product_catalog_v2 sends the golden-hour beach prompt (inline, no external body file — same style as v1) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v2', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('barefoot on a quiet beach at golden hour');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v3 sends the clean-studio prompt (inline — step 1 of the double pipeline, beach BG swapped in later by poll_generations) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v3', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('SEAMLESS white-to-light-grey studio backdrop');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v5 sends the (mocked) V5_PROMPT_BODY verbatim (distinct from v4/v6) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v5', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('V5_BODY_MARKER');
+    expect(call.prompt).not.toContain('V4_BODY_MARKER');
+    expect(call.prompt).not.toContain('V6_BODY_MARKER');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v6 sends the (mocked) V6_PROMPT_BODY verbatim (distinct from v5) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v6', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('V6_BODY_MARKER');
+    expect(call.prompt).not.toContain('V5_BODY_MARKER');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v8 sends the color-class-templated body (mocked V8_PROMPT_BODY_TEMPLATE with __V8_LIGHTING_BLOCK__/__V8_DO_NOT__ substituted) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v8', ai_model: 'fal_nano_banana_pro', audience: 'Maria', v8_fill_intensity: 'medium' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    // Template shell + both placeholders substituted from the mocked helpers (lib/v8-prompt.js
+    // mock at the top of this file: detectV8ColorClass → 'print', buildV8LightingBlock → 'lighting',
+    // buildV8DoNotBlock → '- do-not').
+    expect(call.prompt).toContain('V8_BODY_MARKER');
+    expect(call.prompt).toContain('V8_BODY_MARKER lighting - do-not');
+    expect(call.prompt).not.toContain('__V8_LIGHTING_BLOCK__');
+    expect(call.prompt).not.toContain('__V8_DO_NOT__');
+    expect(call.prompt).not.toContain('V7_BODY_MARKER');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v9 sends the (mocked) V9_PROMPT_BODY verbatim (distinct from v8) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v9', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('V9_BODY_MARKER');
+    expect(call.prompt).not.toContain('V8_BODY_MARKER');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+
+  it('product_catalog_v10 sends the (mocked) V10_PROMPT_BODY verbatim (distinct from v9) + persona-avatar sandwich', async () => {
+    mockPersonaAvatar();
+    const handler = await loadHandler();
+    const { req, res } = mockReqRes({
+      body: { product_id: 'p1', store_id: 's1', style: 'product_catalog_v10', ai_model: 'fal_nano_banana_pro', audience: 'Maria' },
+      user: ADMIN,
+    });
+    await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const call = submitFalJobMock.mock.calls[0][0];
+    expect(call.prompt).toContain('V10_BODY_MARKER');
+    expect(call.prompt).not.toContain('V9_BODY_MARKER');
+    expect(call.imageUrl).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/avatar.png']);
+  });
+});
+
 describe('api/creatives/generate.js — persona avatar sandwich reference-image pattern', () => {
   it('product_catalog with an audience/persona avatar → refImages is the [avatar, productPhoto, avatar] 3-element sandwich', async () => {
     tableData.persona_avatars = { single: () => ({ data: { reference_url: 'https://img.test/avatar.png' }, error: null }) };
