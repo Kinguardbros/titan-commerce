@@ -94,14 +94,18 @@ async function handler(req, res) {
     const { data: product, error: pErr } = await supabase.from('products').select('*').eq('id', product_id).single();
     if (pErr || !product) return res.status(404).json({ error: 'Product not found' });
 
-    // If store_id provided, load store for store-specific shopify_url + name (Isola = all tummy-control)
+    // If store_id provided, load store for store-specific shopify_url + high-waist navel-hide flag.
+    // Flag comes from stores.brand_config.features.high_waist_navel_hide (P1-11 from
+    // AUDIT-2026-08 — previously a name-substring check for "isola", which silently no-op'd
+    // for any other store instead of being data-driven per store).
     let storeShopifyUrl = null;
-    let isIsola = false;
+    let highWaistNavelHideFlag = false;
     if (store_id) {
-      const { data: store } = await supabase.from('stores').select('shopify_url, name').eq('id', store_id).single();
+      const { data: store } = await supabase.from('stores').select('shopify_url, name, brand_config').eq('id', store_id).single();
       if (store) {
         storeShopifyUrl = store.shopify_url;
-        isIsola = (store.name || '').toLowerCase().includes('isola');
+        const brandConfig = typeof store.brand_config === 'string' ? JSON.parse(store.brand_config || '{}') : (store.brand_config || {});
+        highWaistNavelHideFlag = brandConfig.features?.high_waist_navel_hide === true;
       }
     }
 
@@ -165,9 +169,10 @@ async function handler(req, res) {
     void garmentLength;
 
     // HIGH-WAIST navel-hide block applies ONLY to swimwear (one-pieces, high-waist bikinis, tummy-control).
-    // Previously: any Isola product → always inject. NEW: must also be swimwear product (avoid injecting
-    // "high-waist tummy-control" instructions on dresses, cover-ups, etc).
-    const catalogHighWaist = (((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8 || isProductCatalogV9 || isProductCatalogV10) && isIsola) || isHighWaistTummy) && !isNonSwimGarment;
+    // Gated on store.brand_config.features.high_waist_navel_hide (data-driven, per store) — must
+    // also be a swimwear product (avoid injecting "high-waist tummy-control" instructions on
+    // dresses, cover-ups, etc).
+    const catalogHighWaist = (((isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8 || isProductCatalogV9 || isProductCatalogV10) && highWaistNavelHideFlag) || isHighWaistTummy) && !isNonSwimGarment;
 
     let images = JSON.parse(product.images || '[]');
     // For audience flows AND standalone styles (product_catalog, realistic_beach):

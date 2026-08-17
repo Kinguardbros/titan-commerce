@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.4.1
+// @version      2.5.0
 // @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me stores) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
@@ -684,11 +684,11 @@
       showToast(`Could not load stores: ${err.message}`, true);
       return;
     }
-    // Dan uses this userscript only for Isola right now — filter out Elegance House
-    // and Eleganz Haus to skip the extra picker step. If a future store should be
-    // eligible, add its slug here.
-    const SCRAPER_STORE_ALLOWLIST = new Set(['isola']);
-    stores = stores.filter((s) => SCRAPER_STORE_ALLOWLIST.has((s.slug || '').toLowerCase()));
+    // No client-side store allowlist (P1-11 from AUDIT-2026-08 — removed
+    // SCRAPER_STORE_ALLOWLIST). fetchStores() already calls stores_list, which the backend
+    // filters to the bearer token's user.store_access unless admin/master (lib/actions/stores.js)
+    // — double-filtering here just hardcoded a single store and blocked new stores from
+    // reaching the picker without editing + republishing the userscript.
     if (!stores.length) {
       showToast('No stores available for your account.', true);
       return;
