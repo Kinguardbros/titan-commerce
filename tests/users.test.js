@@ -48,7 +48,59 @@ const supabaseFromMock = vi.fn((table) => {
   return makeChain();
 });
 
-vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: supabaseFromMock }) }));
+// safe_update_user / safe_delete_user (P1-17, AUDIT-2026-08) — atomic Postgres
+// RPCs that replaced the old read-then-write pattern. The mock simulates the
+// SQL function's decision logic in JS so tests can drive it via usersState
+// without a real DB: usersState.rows is the full user table, usersState._single
+// (role/active only) identifies the RPC target for the last-admin check.
+const supabaseRpcMock = vi.fn((fnName, args) => {
+  const rpcResult = (data, error) => {
+    const result = { data: data ?? null, error: error ?? null };
+    // Mirrors supabase-js: .rpc(...).single() is chainable; only update_user uses it.
+    result.single = async () => result;
+    return result;
+  };
+
+  if (fnName === 'safe_update_user') {
+    if (usersState._rpcError) return rpcResult(null, usersState._rpcError);
+    const target = usersState._single;
+    if (!target) return rpcResult(null, { message: 'user_not_found' });
+
+    const updates = args.p_updates || {};
+    const newRole = updates.role !== undefined ? updates.role : target.role;
+    const newActive = updates.active !== undefined ? updates.active : target.active;
+    if (target.role === 'admin' && target.active === true && (newRole !== 'admin' || newActive === false)) {
+      const otherActiveAdmins = usersState.rows.filter(
+        (u) => u.role === 'admin' && u.active && u.id !== args.p_user_id
+      );
+      if (otherActiveAdmins.length === 0) {
+        return rpcResult(null, { message: 'last_active_admin' });
+      }
+    }
+    return rpcResult(usersState._updateResult, usersState._updateError || null);
+  }
+
+  if (fnName === 'safe_delete_user') {
+    if (usersState._rpcError) return rpcResult(null, usersState._rpcError);
+    const target = usersState.rows.find((u) => u.id === args.p_user_id);
+    if (!target) return rpcResult(null, { message: 'user_not_found' });
+    if (target.role === 'admin' && target.active) {
+      const otherActiveAdmins = usersState.rows.filter(
+        (u) => u.role === 'admin' && u.active && u.id !== args.p_user_id
+      );
+      if (otherActiveAdmins.length === 0) {
+        return rpcResult(null, { message: 'last_active_admin' });
+      }
+    }
+    return rpcResult(true, usersState._deleteError || null);
+  }
+
+  return rpcResult(null, { message: `unmocked rpc: ${fnName}` });
+});
+
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({ from: supabaseFromMock, rpc: supabaseRpcMock }),
+}));
 
 const hashPasswordMock = vi.fn().mockResolvedValue('salt:hash');
 vi.mock('../lib/password.js', () => ({ hashPassword: hashPasswordMock }));
@@ -76,6 +128,8 @@ describe('lib/actions/users.js', () => {
     usersState._updateResult = null;
     usersState._updateError = null;
     usersState._deleteError = null;
+    usersState._rpcError = null;
+    supabaseRpcMock.mockClear();
     hashPasswordMock.mockClear().mockResolvedValue('salt:hash');
     vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
@@ -189,23 +243,57 @@ describe('lib/actions/users.js', () => {
       expect(body.user.active).toBe(false);
     });
 
-    it('400s when deactivating the last active admin (active:false)', async () => {
+    it('409s when deactivating the last active admin (active:false) — atomic RPC guard', async () => {
+      // P1-17, AUDIT-2026-08: the count-check now happens inside safe_update_user
+      // (Postgres RPC, FOR UPDATE locks), not a separate JS-side SELECT. The
+      // RPC raises 'last_active_admin', which update_user maps to 409.
       usersState._single = { role: 'admin', active: true };
       usersState.rows = [{ id: 'admin-1', role: 'admin', active: true }];
       const { req, res } = mockReqRes({ user_id: 'admin-1', active: false }, ADMIN_USER);
       await update_user(req, res);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json.mock.calls[0][0].error).toMatch(/last active admin/i);
     });
 
-    it("400s when demoting the last active admin (role:'member')", async () => {
+    it("409s when demoting the last active admin (role:'member') — atomic RPC guard", async () => {
       usersState._single = { role: 'admin', active: true };
       usersState.rows = [{ id: 'admin-1', role: 'admin', active: true }];
       const { req, res } = mockReqRes({ user_id: 'admin-1', role: 'member' }, ADMIN_USER);
       await update_user(req, res);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json.mock.calls[0][0].error).toMatch(/last active admin/i);
     });
+
+    it("succeeds demoting an admin when a second active admin exists", async () => {
+      usersState._single = { role: 'admin', active: true };
+      usersState.rows = [
+        { id: 'admin-1', role: 'admin', active: true },
+        { id: 'admin-2', role: 'admin', active: true },
+      ];
+      usersState._updateResult = {
+        id: 'admin-1', username: 'jana', password_hash: 'salt:hash', role: 'member',
+        permissions: [], store_access: [], active: true,
+      };
+      const { req, res } = mockReqRes({ user_id: 'admin-1', role: 'member' }, ADMIN_USER);
+      await update_user(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.json.mock.calls[0][0].user.role).toBe('member');
+    });
+
+    it('404s when the RPC reports the target user does not exist', async () => {
+      usersState._single = null;
+      const { req, res } = mockReqRes({ user_id: 'ghost', active: false }, ADMIN_USER);
+      await update_user(req, res);
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    // The atomic guarantee itself (two concurrent demote calls against 2
+    // different admins, only one succeeding) is enforced by Postgres FOR
+    // UPDATE row locks inside safe_update_user/safe_delete_user — it cannot
+    // be raced in-process against a mocked client. This is verified at the
+    // DB layer (sql/add-safe-admin-update-fn.sql); these JS tests only cover
+    // that update_user/delete_user map the RPC's 'last_active_admin' /
+    // 'user_not_found' exceptions to the right HTTP status codes.
   });
 
   describe('delete_user', () => {
@@ -221,12 +309,21 @@ describe('lib/actions/users.js', () => {
       expect(res.status).toHaveBeenCalledWith(400);
     });
 
-    it('400s when deleting the last active admin', async () => {
+    it('409s when deleting the last active admin — atomic RPC guard', async () => {
+      // P1-17, AUDIT-2026-08: safe_delete_user (Postgres RPC) raises
+      // 'last_active_admin', mapped here to 409.
       usersState.rows = [{ id: 'admin-1', role: 'admin', active: true }];
       const { req, res } = mockReqRes({ user_id: 'admin-1' }, ADMIN_USER);
       await delete_user(req, res);
-      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.status).toHaveBeenCalledWith(409);
       expect(res.json.mock.calls[0][0].error).toMatch(/last admin/i);
+    });
+
+    it('404s when the RPC reports the target user does not exist', async () => {
+      usersState.rows = [];
+      const { req, res } = mockReqRes({ user_id: 'ghost' }, ADMIN_USER);
+      await delete_user(req, res);
+      expect(res.status).toHaveBeenCalledWith(404);
     });
 
     it('happy path: deletes a member user', async () => {
