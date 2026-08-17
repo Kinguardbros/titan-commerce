@@ -21,6 +21,10 @@ vi.mock('@supabase/supabase-js', () => ({
         update: vi.fn().mockReturnThis(),
       };
     },
+    // P1-20: poll_generations now claims via the claim_generating_creatives RPC
+    // instead of a plain SELECT — empty claim set is enough for these permission
+    // gate spot-checks (they only assert on res.status, not on claimed rows).
+    rpc: vi.fn(async () => ({ data: [], error: null })),
   }),
 }));
 vi.mock('../lib/store-context.js', () => ({ getStore: vi.fn().mockResolvedValue({ id: 's1', admin_token: 't', shopify_url: 'x.myshopify.com' }), getAllStores: vi.fn().mockResolvedValue([]) }));
