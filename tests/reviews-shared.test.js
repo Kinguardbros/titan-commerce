@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 // reviews-shared.js creates a Supabase client at import time → needs env present.
-let validateImageBuffer, decodeAndValidateImage;
+let validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant;
 beforeAll(async () => {
   vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
-  ({ validateImageBuffer, decodeAndValidateImage } = await import('../lib/actions/reviews-shared.js'));
+  ({ validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant } = await import('../lib/actions/reviews-shared.js'));
 });
+
+// Minimal fake `db` — insertReviewsTolerant only calls `db.from('product_reviews').insert(row)`,
+// so a hand-rolled stub (no real/mocked Supabase client needed) is enough to drive it.
+function fakeDb(insertImpl) {
+  return { from: () => ({ insert: insertImpl }) };
+}
 
 // Minimal valid magic-byte headers for each format (bodies are junk — only the
 // header bytes are checked by validateImageBuffer).
@@ -57,6 +63,53 @@ describe('validateImageBuffer', () => {
     const junk = Buffer.from([0x00, 0x01, 0x02, 0x03]);
     const result = validateImageBuffer(junk, 1024 * 1024);
     expect(result.error).toBe('file is not a JPEG/PNG/WebP image');
+  });
+});
+
+describe('insertReviewsTolerant — per-row 23505 tolerance (TOCTOU defense)', () => {
+  it('inserts every row when none collide', async () => {
+    const inserted = [];
+    const db = fakeDb(async (row) => { inserted.push(row); return { error: null }; });
+    const rows = [{ author: 'A', body: 'a' }, { author: 'B', body: 'b' }, { author: 'C', body: 'c' }];
+
+    const result = await insertReviewsTolerant(db, rows);
+
+    expect(result).toEqual({ inserted: 3, skipped_duplicates: 0 });
+    expect(inserted).toHaveLength(3);
+  });
+
+  it('catches a 23505 (unique_violation) on one row, skips it, and keeps inserting the rest — does not throw', async () => {
+    let call = 0;
+    const attempted = [];
+    const db = fakeDb(async (row) => {
+      call += 1;
+      attempted.push(row);
+      // Simulate a concurrent request winning the insert race for the 2nd row only —
+      // this is the TOCTOU window between dropExistingDuplicates()'s pre-check and here.
+      if (call === 2) return { error: { code: '23505', message: 'duplicate key value violates unique constraint "uq_product_reviews_dedup"' } };
+      return { error: null };
+    });
+    const rows = [{ author: 'A', body: 'a' }, { author: 'B', body: 'b' }, { author: 'C', body: 'c' }];
+
+    await expect(insertReviewsTolerant(db, rows)).resolves.toEqual({ inserted: 2, skipped_duplicates: 1 });
+    expect(attempted).toHaveLength(3); // every row was attempted — the batch wasn't aborted
+  });
+
+  it('does NOT swallow a non-23505 error — still throws (real DB errors must surface)', async () => {
+    const db = fakeDb(async () => ({ error: { code: '23502', message: 'null value in column violates not-null constraint' } }));
+    const rows = [{ author: 'A', body: 'a' }];
+
+    await expect(insertReviewsTolerant(db, rows)).rejects.toMatchObject({ code: '23502' });
+  });
+
+  it('returns zeros for an empty batch without calling insert', async () => {
+    const insertFn = vi.fn();
+    const db = fakeDb(insertFn);
+
+    const result = await insertReviewsTolerant(db, []);
+
+    expect(result).toEqual({ inserted: 0, skipped_duplicates: 0 });
+    expect(insertFn).not.toHaveBeenCalled();
   });
 });
 
