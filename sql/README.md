@@ -18,10 +18,9 @@ reordering a file goes up with headcount (P1-19, `Docs/AUDIT-2026-08.md`).
    a fresh database from scratch. Skip these on the existing prod DB — they
    already ran years ago.
 3. **`add-*.sql`, `fix-*.sql`, `enable-*.sql`, `relax-*.sql`, `restrict-*.sql`,
-   `migrate-*.sql`, `backfill-*.sql`** — apply in **date order (file mtime /
-   git history)**, not alphabetically. Several of these are cumulative and
-   depend on an earlier one having already run (e.g. `add-review-*-source.sql`
-   files each widen the same CHECK constraint — see P1-18 below). `git log
+   `migrate-*.sql`, `backfill-*.sql`, `consolidate-*.sql`** — apply in **date
+   order (file mtime / git history)**, not alphabetically. Several of these
+   are cumulative and depend on an earlier one having already run. `git log
    --follow --diff-filter=A -- sql/<file>` shows when a given file was
    introduced if mtime isn't reliable (e.g. after a fresh checkout).
 
@@ -63,9 +62,14 @@ SQL Editor.
 
 ## Related
 
-- `Docs/AUDIT-2026-08.md` P1-18 — source `CHECK` constraints (the
-  `add-review-*-source.sql` family) regress if replayed out of the order they
-  were written in; this is a second reason apply-order and tracking matter,
-  not just double-apply protection.
+- `Docs/AUDIT-2026-08.md` P1-18 (fixed 2026-08-17) — the old `add-review-*-
+  source.sql` family each hardcoded its own cumulative snapshot of the
+  `chk_product_reviews_source` CHECK, so replaying an older one after a newer
+  one landed would silently shrink the allow-list (or fail validation
+  against existing rows). `sql/consolidate-review-source-check.sql` is now
+  the single source of truth for that constraint — the 4 source-only files
+  (`add-review-amazon-source.sql` / `-temu-` / `-cupshe-` / `-judgeme-`) are
+  marked deprecated in their own headers; extend the consolidate-* file for
+  any future review source instead of adding a new one.
 - `CLAUDE.md` "RLS & migrations" — the short version of this file, kept in
   sync with what's here.
