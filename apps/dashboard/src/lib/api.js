@@ -239,8 +239,8 @@ export function getProfitSummary(days = 7, storeId = null) {
   return fetchJSON(url);
 }
 
-export function updateCogs(productId, cogs, variantCogs) {
-  const payload = { product_id: productId };
+export function updateCogs(productId, cogs, variantCogs, storeId) {
+  const payload = { product_id: productId, store_id: storeId };
   if (cogs !== undefined) payload.cogs = cogs;
   if (variantCogs !== undefined) payload.variant_cogs = variantCogs;
   return fetchJSON('/api/system?action=update_cogs', {

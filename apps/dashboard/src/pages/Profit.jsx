@@ -37,7 +37,7 @@ export default function Profit({ storeId, store }) {
 
   const handleSaveCogs = async () => {
     if (!editingCogs || !cogsValue) return;
-    await updateCogs(editingCogs, parseFloat(cogsValue));
+    await updateCogs(editingCogs, parseFloat(cogsValue), undefined, storeId);
     setEditingCogs(null);
     setCogsValue('');
     toast.success('COGS updated!');
@@ -49,7 +49,7 @@ export default function Profit({ storeId, store }) {
     for (const [k, v] of Object.entries(variantCogsEdit)) {
       if (v !== '' && !isNaN(parseFloat(v))) cleaned[k] = parseFloat(v);
     }
-    await updateCogs(productId, undefined, cleaned);
+    await updateCogs(productId, undefined, cleaned, storeId);
     setExpandedVariantCogs(null);
     setVariantCogsEdit({});
     toast.success('Variant COGS saved!');
