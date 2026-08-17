@@ -346,7 +346,8 @@ Key patterns:
 ## Env Vars
 
 ```
-APP_PASSWORD=***                # Dashboard login password
+APP_PASSWORD=***                # Dashboard master login password (kill-switch fallback, bypasses per-user login). See "APP_PASSWORD rotation" below.
+APP_SECRET=***                  # Session token HMAC signing key (api/auth/login.js, lib/auth.js). Fails closed — auth throws if unset. (P2 gap, AUDIT-2026-08: used since P1-14/15 but wasn't listed here until now.)
 APP_URL=***                     # Public app URL (e.g. https://titan-commerce.vercel.app) — webhook callback target
 SITE_URL=***
 STOREFRONT_URL=***              # DEPRECATED (P1-10, AUDIT-2026-08, fixed 2026-08-17) — CORS origins for public review actions now live per-store in stores.storefront_origins. This var is kept for ONE deploy cycle as a fail-open fallback only (store unresolved, e.g. a CORS preflight with no body — or a store row not yet backfilled), console.warn'd on every hit. See lib/storefront-cors.js. Follow-up TODO: delete this var + the fallback once logs show nothing hits it for a full cycle.
@@ -378,6 +379,20 @@ CRON_SECRET=                    # Optional. Bearer token api/cron/detect-events.
 FEATURE_AMAZON_USERSCRIPT=      # 'true' marks this feature as live in prod (no frontend gate exists — the Amazon tab is always visible, same as F03's precedent). import_amazon_reviews itself still gates on FEATURE_AMAZON_REVIEWS_SCRAPER (unchanged) — both must be 'true' for the userscript flow to work end to end.
 AMAZON_USERSCRIPT_ORIGINS=      # optional comma-separated override for import_amazon_reviews CORS origins, default 'https://www.amazon.com,https://smile.amazon.com'
 ```
+
+### APP_PASSWORD rotation
+(P2 gap, AUDIT-2026-08 — no rotation policy existed before this.)
+
+- **Purpose**: master kill-switch, bypasses per-user login (see Auth Flow > Master fallback below); last-resort access if the `users` table / RBAC path is unavailable.
+- **Current holder**: Dan (Owner). Any additional holder must be documented here + explicitly named.
+- **Rotation trigger**: quarterly, OR immediately on any team member departure, OR suspected leak.
+- **How to rotate**:
+  1. Generate a new 32+ char random string (e.g. `openssl rand -base64 32`)
+  2. Update `APP_PASSWORD` in Vercel project settings (Environment Variables)
+  3. Redeploy
+  4. Log the rotation date below
+- **Last rotated**: _(not yet done — fill in on first documented rotation)_
+- **Alerting**: a successful login via `APP_PASSWORD` should ideally trigger a Sentry event, so master-fallback usage is visible instead of silent. Not wired yet — follow-up, post-P1-21.
 
 ---
 
@@ -489,10 +504,13 @@ Cron (daily 08:00 UTC) → `detect-events.js` → per store in parallel (`Promis
 - Other pages use `getAllProducts()`
 
 ### Vercel Hobby Limits
-- Max 12 serverless functions → route budget: `system.js`, `auth/login.js`, `auth/shopify.js`, `creatives/generate.js`, `creatives/regenerate.js`, `creatives/convert-to-video.js`, `creatives/list.js`, `ads/action.js`, `shopify/overview.js`, `products/list.js`, `webhooks/shopify.js`, `cron/detect-events.js` (12 total; `meta_overview` is an action in `analytics.js`, not a route) — `api/system.js` absorbs everything else as `?action=X`
-- 1 cron/day → `cron/detect-events.js` at `0 8 * * *`
-- 60s timeout → fire-and-forget for long ops (image gen submits then polls via `poll_generations`)
+(Current active plan — see also "Known Tech Debt" for the upgrade trigger.)
+- Max 12 serverless functions → route budget: `system.js`, `auth/login.js`, `auth/shopify.js`, `creatives/generate.js`, `creatives/regenerate.js`, `creatives/convert-to-video.js`, `creatives/list.js`, `ads/action.js`, `shopify/overview.js`, `products/list.js`, `webhooks/shopify.js`, `cron/detect-events.js` (12 total; `meta_overview` is an action in `analytics.js`, not a route) — `api/system.js` absorbs everything else as `?action=X`. **Currently 12/12 used — no headroom for a new dedicated route.**
+- 1 cron/day → `cron/detect-events.js` at `0 8 * * *`. **Currently 1/1 used** — Hobby allows only 1 cron job.
+- 60s timeout → fire-and-forget for long ops (image gen submits then polls via `poll_generations`). This ceiling is a documented audit false positive: it hasn't blocked any current flow.
 - Shopify webhooks have a ~5s response SLA — keep handlers light
+- No dedicated Log Drain on Hobby — self-hosted Sentry (P1-21, AUDIT-2026-08) compensates for structured error visibility; there's still no first-class request/access log export.
+- **Implication for future features**: any new `/api/*.js` route needs either (a) upgrading to Vercel Pro ($20/mo), (b) nesting the new behavior inside `api/system.js` as a new `?action=X`, or (c) piggy-backing on the one existing cron slot (as the "Auto-cleanup: delete pending creatives older than 7 days" step inside `cron/detect-events.js` already does) — don't add a 13th route without picking one of these first.
 
 ### Shopify Webhooks
 - Endpoint `api/webhooks/shopify.js` receives `products/create|update|delete` for all stores; routes via `X-Shopify-Shop-Domain` → lookup `stores.client_secret`
@@ -573,6 +591,9 @@ Dashboard → Password gate (Login.jsx)
 | 🟢 LOW | `getAllProducts` caps at 200 | Filters/search incomplete for stores >200 products (none currently) |
 | 🟢 LOW | Amazon reviews scraper has no persistent `products.amazon_url` mapping | Admin re-pastes the URL each scrape (D-05, deferred) |
 | 🟢 LOW | `STOREFRONT_URL` env var + its fallback in `lib/storefront-cors.js` (P1-10, AUDIT-2026-08) | One-cycle deprecation fallback for per-store `stores.storefront_origins`. Remove the env var + fallback branch once logs confirm no store has hit `console.warn('[CORS] using legacy STOREFRONT_URL fallback...')` for a full deploy cycle. |
+| 🟢 LOW | MFA (TOTP) not implemented | Current: scrypt password + session HMAC only (see Auth Flow). Add if team grows past ~3 people or handling PII beyond product data. |
+| 🟢 LOW | Invite-link flow not implemented | Current: admin-relayed temp passwords + self-service reset (P1-14/15, see Auth Flow). Add proper email-delivered signed magic-link if onboarding friction becomes real. |
+| 🟢 LOW | Email verification not implemented | No email flow exists at all — `users.email` is display-only, never verified. Ties to invite-link work above. |
 
 ---
 
