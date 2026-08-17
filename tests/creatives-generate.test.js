@@ -290,22 +290,30 @@ describe('api/creatives/generate.js — persona avatar sandwich reference-image 
     expect(sentImages).toEqual(['https://img.test/avatar.png', 'https://img.test/prod1.png', 'https://img.test/prod2.png', 'https://img.test/avatar.png']);
   });
 
-  // FINDING (not fixed here — coverage only): the frontend never actually triggers this path
-  // (CreativeStudio.jsx sends `audience`, not a bare `reference_url`, for every catalog style —
-  // see apps/dashboard/src/components/CreativeStudio.jsx:703-708). But if reference_url is ever
-  // passed directly (bypassing the audience/persona_avatars lookup) for a catalog style, the
-  // unconditional "prepend reference_url to images" step (generate.js ~line 204) means
-  // images.slice(0,1) below it picks up the AVATAR (now images[0]) instead of a real product
-  // photo — the sandwich degenerates to [avatar, avatar, avatar] with the garment reference lost.
-  it('LATENT BUG (currently unreachable from the frontend): direct reference_url (no audience) on a catalog style loses the product photo from the sandwich', async () => {
+  // FIXED (was a latent bug, now defended — P1-23 follow-up sweep): the frontend never actually
+  // triggers this path (CreativeStudio.jsx sends `audience`, not a bare `reference_url`, for every
+  // catalog style — see apps/dashboard/src/components/CreativeStudio.jsx:703-708). But if
+  // reference_url is ever passed directly (bypassing the audience/persona_avatars lookup) for a
+  // catalog style, the unconditional "prepend reference_url to images" step (generate.js ~line 204)
+  // means images.slice(0,1) below it would pick up the AVATAR (now images[0]) instead of a real
+  // product photo — the sandwich would degenerate to [avatar, avatar, avatar] with the garment
+  // reference silently lost. generate.js now detects this (all "middle" slots === the avatar url)
+  // and skips the sandwich instead of throwing (reference_url w/o audience is also the intentional
+  // path for non-persona reference use, e.g. color variant — a hard throw would break that), falling
+  // back to the single reference image, console.warn'ing so it's visible in logs.
+  it('direct reference_url (no audience) on a catalog style: sandwich degeneration is defended — falls back to a single reference image + warns, not [avatar, avatar, avatar]', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const handler = await loadHandler();
     const { req, res } = mockReqRes({
       body: { product_id: 'p1', store_id: 's1', style: 'product_catalog', ai_model: 'fal_nano_banana', reference_url: 'https://img.test/avatar.png' },
       user: ADMIN,
     });
     await handler(req, res);
+    expect(res.status).not.toHaveBeenCalledWith(500);
     const sentImages = submitFalJobMock.mock.calls[0][0].imageUrl;
-    expect(sentImages).toEqual(['https://img.test/avatar.png', 'https://img.test/avatar.png', 'https://img.test/avatar.png']);
+    expect(sentImages).toEqual(['https://img.test/avatar.png']);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('sandwich degenerated'));
+    warnSpy.mockRestore();
   });
 });
 

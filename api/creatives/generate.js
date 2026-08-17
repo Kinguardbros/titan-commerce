@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { buildStyledPrompt, generateFluxKontext, generateImage } from '../../lib/higgsfield.js';
+import { buildStyledPrompt, generateFluxKontext } from '../../lib/higgsfield.js';
 import { submitFalJob } from '../../lib/fal.js';
 import { V4_PROMPT_BODY } from '../../lib/v4-prompt.js';
 import { V5_PROMPT_BODY } from '../../lib/v5-prompt.js';
@@ -721,9 +721,22 @@ NEGATIVE: No plastic skin, no porcelain smoothing, no fitness model body, no sli
         // Product Catalog (v1, v2, v3): with a persona avatar → sandwich [avatar, 1 product image, avatar]
         //                               without an avatar     → 1 product image only (packshot/flat-lay,
         //                                                       not a model shot), model comes from the prompt
-        const refImages = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8 || isProductCatalogV9 || isProductCatalogV10)
+        let refImages = (isProductCatalog || isProductCatalogV2 || isProductCatalogV3 || isProductCatalogV4 || isProductCatalogV5 || isProductCatalogV6 || isProductCatalogV7 || isProductCatalogV8 || isProductCatalogV9 || isProductCatalogV10)
           ? (avatarRef ? [avatarRef, ...images.slice(0, 1), avatarRef] : images.slice(0, 1))
           : (avatarRef ? [avatarRef, ...productImages, avatarRef] : images.slice(0, 4));
+        // Defensive check: reference_url passed directly (bypassing audience) prepends it into
+        // `images` (see the `if (reference_url && !audience)` block above), so the "product photo"
+        // slot ends up being the SAME url as the avatar — the sandwich degenerates to
+        // [avatar, avatar, avatar] and the garment reference is silently lost. Unreachable from the
+        // current frontend (CreativeStudio.jsx always sends `audience`, never `reference_url`, for
+        // catalog styles), but `reference_url` without `audience` is also the intentional path for
+        // non-persona reference use (color variant, etc. — see the comment above the `images =
+        // [reference_url, ...images]` prepend) — a hard throw would break that. Skip the sandwich
+        // instead: fall back to the single reference image, same as the no-avatar case (P1-23).
+        if (avatarRef && refImages.length >= 3 && refImages.slice(1, -1).every((url) => url === avatarRef)) {
+          console.warn('[creatives/generate] sandwich degenerated — check reference_url vs audience');
+          refImages = refImages.slice(1, -1);
+        }
         console.log(`[generate] Submitting fal.ai Nano Banana (has reference), ref images: ${refImages.length}, has persona: ${!!reference_url}, productCatalog: ${isProductCatalog}`);
         const colorMatch = (custom_prompt || '').match(/Product color:\s*([^.]+)\./i);
         const colorOverride = colorMatch

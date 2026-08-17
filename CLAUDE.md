@@ -68,7 +68,7 @@ Skills in `.claude/skills/` are product-knowledge mentors — they advise, you d
 - **Framework:** React 19 + Vite (frontend dashboard, in `apps/dashboard/`)
 - **Deployment:** Vercel Serverless Functions (API layer, Hobby plan — 12 route max, 1 cron)
 - **Database:** Supabase (Postgres + Auth + Storage + Realtime)
-- **AI — Images/Video (primary):** fal.ai — Nano Banana 2 / Nano Banana Pro for images (`/edit` variants, fire-and-forget polling), plus FLUX.2 edit, FLUX Kontext, Ideogram v3. **`resolution: "2K"` is forced for Nano Banana** (its default is 1K — too soft for product photos).
+- **AI — Images/Video (primary):** fal.ai — Nano Banana 2 / Nano Banana Pro for images (`/edit` variants, fire-and-forget polling), plus FLUX.2 edit, FLUX Kontext, Ideogram v3. **`resolution: "2K"` is the fallback for Nano Banana** when `resolution` is unset or invalid (fal.ai's own default is 1K — too soft for product photos); an explicit `"1K"` or other valid value passes through unchanged.
 - **AI — Images/Video (fallback / legacy):** Higgsfield — Soul / Soul Reference (`/v1/text2image/soul`) for text-to-image, Flux Kontext Max, DOP Turbo (`dop-turbo`) for video. Used when fal.ai isn't a fit (e.g. no reference image → HF Flux Kontext Max).
 - **AI — Text:** Anthropic Claude API (`claude-sonnet-4-20250514`) for product optimization, product-skill auto-generation, Claude Vision (size chart parsing, style analysis)
 - **E-commerce:** Shopify Admin API (REST v2024-01 + some GraphQL Admin v2024-01) — MUST use `{handle}.myshopify.com` URLs (not custom domains)
@@ -219,7 +219,7 @@ Key patterns:
 | **Backend libs** (`lib/`) | |
 | `claude.js` | Claude API wrapper — dynamic per-store brand system prompt from `store_skills` (fallback: generic + store name), `optimizeProduct()` |
 | `higgsfield.js` | Higgsfield image/video generation + `buildStyledPrompt()` (built-in styles + `cs_` custom styles from `store_skills`) + per-store brand context + feedback learning. ⚠️ large file, fragile prompt logic. |
-| `fal.js` | fal.ai image generation — `generateFal()`, `submitFalJob()` (fire-and-forget), `checkFalJob()` (poll). `buildFalBody()` per-model bodies; **forces `resolution: "2K"` for Nano Banana**. |
+| `fal.js` | fal.ai image generation — `generateFal()`, `submitFalJob()` (fire-and-forget), `checkFalJob()` (poll). `buildFalBody()` per-model bodies; **`resolution: "2K"` is the fallback for Nano Banana** when `resolution` is unset/invalid — explicit `"1K"` passes through unchanged. |
 | `shopify-admin.js` | Shopify Admin REST API: `createShopifyClient(url, token)` factory, read (orders, products, traffic, customers) + write (updateProduct, updateVariant, updateProductOptions, bulkUpdateVariantPrices) + `graphql()` for Publications mutations |
 | `shopify-publications.js` | `getOnlineStorePublicationId(client)` — one-shot GraphQL lookup of the Online Store publication GID |
 | `meta-api.js` | Meta Marketing API: read-only (insights, campaigns, active ads) |
@@ -437,7 +437,7 @@ Every action in `lib/actions/*` starts with `hasPermission(req.user, 'X')` → 4
   - `fal_flux2_edit` / `fal_flux2_pro_edit` / `fal_ideogram_bg` / `fal_ideogram_edit` / `fal_flux_kontext` → fal.ai (fire-and-forget)
   - `flux_kontext` → Higgsfield Flux Kontext Max, fallback fal.ai FLUX.2 edit
   - `soul` / `soul_ref` → Higgsfield Soul / Soul Reference
-- **`resolution: "2K"` is forced for Nano Banana** in `lib/fal.js` (default is 1K — too soft for product photos)
+- **`resolution: "2K"` is the fallback for Nano Banana** in `lib/fal.js` when `resolution` is unset or invalid (default is 1K — too soft for product photos); an explicit `"1K"` (or other valid value) passes through unchanged
 - Fire-and-forget: creative row created as `generating`, `requestId`/`pollBase`/`model` stored in `metadata`; `poll_generations` action checks pending jobs and finalizes them (with one retry on failure for fal.ai jobs)
 - **Atomic claim (P1-20, AUDIT-2026-08 fixed 2026-08-17):** `poll_generations` claims rows via the `claim_generating_creatives(p_limit, p_store_id)` Postgres RPC (`sql/add-claim-generating-creatives-fn.sql`, `SECURITY DEFINER`) instead of a plain SELECT. The RPC does `UPDATE creatives SET status='polling' ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING *`, so two concurrent pollers (ProductWorkspace.jsx/Studio.jsx interval-poll every 3s in separate browser tabs, the daily admin cron) get disjoint claimed row sets instead of both fetching + double-processing the same `generating` row (previously: duplicate fal.ai auto-retry credits burned + racing writes to the same creative). Every exit path in `poll_generations` either finalizes the claimed row to a terminal/next-stage status or calls the local `releaseClaim(id)` helper to set it back to `generating` (fal.ai job still in progress, or processing threw mid-work). `cleanup_stale` additionally resets any `polling` row stuck > 10 min (`polling_started_at`) back to `generating` — a poller that claimed a row and then crashed/was killed before reaching its own release path.
 
