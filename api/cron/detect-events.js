@@ -2,6 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { createShopifyClient } from '../../lib/shopify-admin.js';
 import { detectEventsForStore } from '../../lib/event-detector.js';
 import { poll_generations } from '../../lib/actions/creatives.js';
+import { initSentry, captureException } from '../../lib/sentry.js';
+
+// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
+// Cron failures were previously console.error-only (per P1-20 finding) — invisible
+// unless someone tails Vercel logs the day it runs.
+initSentry();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -87,6 +93,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ events: totalEvents, proposals: totalProposals, cleaned: cleanedUp, polled: pollResult });
   } catch (err) {
     console.error('[cron/detect-events] Error:', err);
+    captureException(err, { tags: { action: 'cron_detect_events' } });
     return res.status(500).json({ error: 'Cron failed', details: err.message });
   }
 }

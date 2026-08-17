@@ -3,9 +3,15 @@ import { createClient } from '@supabase/supabase-js';
 import {
   handleProductCreate, handleProductUpdate, handleProductDelete,
 } from '../../lib/shopify-webhook-handlers.js';
+import { initSentry, captureException } from '../../lib/sentry.js';
 
 // Raw body required for HMAC verification — disable automatic JSON parsing
 export const config = { api: { bodyParser: false } };
+
+// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
+// A missed Shopify product webhook is especially bad to miss silently (product goes
+// stale in TC with no visible signal).
+initSentry();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -92,6 +98,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('[webhook] Handler error:', { topic, shop, error: err.message });
+    captureException(err, { tags: { action: 'webhook_shopify', topic, shop } });
     return res.status(500).json({ error: 'handler_failed' });
   }
 }

@@ -1,7 +1,9 @@
 import { withAuth } from '../lib/auth.js';
+import { initSentry, captureException } from '../lib/sentry.js';
 
 // GET actions
 import { stores_list } from '../lib/actions/stores.js';
+import { health } from '../lib/actions/health.js';
 import { pipeline_log } from '../lib/actions/pipeline.js';
 import { kpi, meta_overview, insights } from '../lib/actions/analytics.js';
 import { profit_summary } from '../lib/actions/profit.js';
@@ -28,8 +30,14 @@ import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publication
 import { scrape_amazon_preview, import_amazon_reviews, check_review_duplicates } from '../lib/actions/reviews-amazon.js';
 import { me, users_list, create_user, update_user, delete_user, reset_password, generate_api_token, change_own_password } from '../lib/actions/users.js';
 
+// Backend error monitoring (P1-21, AUDIT-2026-08) — no-op unless SENTRY_DSN is set.
+// api/system.js is the main dispatcher (60+ actions flow through it), so it's the
+// highest-value place to catch unhandled action errors.
+initSentry();
+
 const GET_ACTIONS = {
   stores_list,
+  health,
   pipeline_log,
   kpi,
   profit_summary,
@@ -138,6 +146,10 @@ const CORS_ACTIONS = {
   vote_review_helpful: STOREFRONT_ORIGINS,
   review_helpful_counts: STOREFRONT_ORIGINS,
   import_amazon_reviews: AMAZON_USERSCRIPT_ORIGINS,
+  // health (P1-21) is a public no-data-leak liveness check — wildcard CORS is safe here
+  // and covers any future browser-based caller (uptime monitors typically hit it
+  // server-side, bypassing CORS entirely, same as the userscript note above).
+  health: ['*'],
 };
 
 function applyCors(req, res, action) {
@@ -176,6 +188,7 @@ async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error(`[system/${action}] Error:`, err);
+    captureException(err, { tags: { action } });
     // Sanitize: never expose raw error messages (could leak API keys, DB strings)
     const safeDetails = (err.message || '')
       .replace(/sk-[a-zA-Z0-9_-]+/g, 'sk-***')

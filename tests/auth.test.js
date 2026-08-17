@@ -91,7 +91,7 @@ describe('withAuth public allow-list', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it.each(['vote_review_helpful', 'review_helpful_counts'])('lets %s through WITHOUT a token', async (action) => {
+  it.each(['vote_review_helpful', 'review_helpful_counts', 'health'])('lets %s through WITHOUT a token', async (action) => {
     const handler = vi.fn((req, res) => res.status(200).json({ ok: true }));
     const wrapped = withAuth(handler);
     const req = { headers: {}, query: { action }, body: {} };
