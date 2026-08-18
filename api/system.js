@@ -140,7 +140,12 @@ const POST_ACTIONS = {
 //   applyCors resolves the target store per-request from stores.storefront_origins
 //   (P1-10, AUDIT-2026-08 — replaces the old single global STOREFRONT_URL env var,
 //   which required an env edit + redeploy for every new store's domain and risked
-//   dropping existing stores' origins on a copy/paste mistake). See lib/storefront-cors.js.
+//   dropping existing stores' origins on a copy/paste mistake). On a CORS preflight
+//   (no body — the common case for these two POST actions) getPerStoreOrigins()
+//   resolves the store from the request's Origin header instead, matched against
+//   every store's storefront_origins (P1-A, AUDIT-2026-08-B — the preflight used to
+//   always miss body-based resolution and silently fall back to the Isola-only
+//   legacy list). See lib/storefront-cors.js.
 // - import_amazon_reviews stays on the shared Amazon-domain env list — still a
 //   shared, less-critical list (Amazon's own domains, not per-store).
 //   Note: for the userscript's actual request, GM_xmlhttpRequest bypasses browser-side
@@ -165,8 +170,18 @@ async function applyCors(req, res, action) {
   const configured = CORS_ACTIONS[action] || [];
   const allowedOrigins = configured === 'per_store' ? await getPerStoreOrigins(req, action) : configured;
   const origin = req.headers.origin;
-  const allow = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  res.setHeader('Access-Control-Allow-Origin', allow);
+  // Never reflect an arbitrary Origin (P1-A, AUDIT-2026-08-B) — only echo it
+  // back when it matches a resolved allow-list (per-store DB match or the
+  // legacy env list), and only ever the request's own Origin, never a
+  // different entry from the list. Wildcard actions (health) stay '*'.
+  if (allowedOrigins.includes('*')) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  // else: unrecognized origin — fail closed, no ACAO header at all. A
+  // mismatched value would get blocked by the browser anyway; omitting it
+  // entirely is the more honest signal for anyone reading the response.
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');

@@ -23,6 +23,10 @@ const REVIEW_TO_STORE = {
   'review-a-1': 'store-a',
   'review-b-1': 'store-b',
 };
+// Sentinel shopify_product_id that simulates a genuine DB failure (network
+// blip, not "not found") during resolveStoreId's product lookup — exercises
+// getPerStoreOrigins' fail-open-to-legacy path (P1-A DB-error test below).
+const DB_ERROR_SHOPIFY_ID = 'shopify-dberror-1';
 
 vi.mock('@supabase/supabase-js', () => {
   function makeQuery(table) {
@@ -39,6 +43,7 @@ vi.mock('@supabase/supabase-js', () => {
         }
         if (table === 'products') {
           const shopifyId = val('shopify_id');
+          if (shopifyId === DB_ERROR_SHOPIFY_ID) throw new Error('simulated DB error');
           const storeId = PRODUCT_TO_STORE[shopifyId];
           return { data: storeId ? { store_id: storeId } : null, error: null };
         }
@@ -50,9 +55,25 @@ vi.mock('@supabase/supabase-js', () => {
         return { data: null, error: null };
       },
       // Generic fallbacks so any other module's module-level createClient()
-      // usage doesn't throw if a chain method beyond select/eq/single is hit.
+      // usage doesn't throw if a chain method beyond select/eq/single is hit
+      // (e.g. lib/rate-limit.js, transitively imported by the real POST
+      // action handlers the "POST unchanged behavior" test below dispatches
+      // into).
       is: () => builder, order: () => builder, limit: () => builder,
       in: () => builder, gte: () => builder, insert: () => builder, update: () => builder,
+      delete: () => builder,
+      // Thenable — reached when a query is awaited WITHOUT .single(), e.g.
+      // lib/storefront-cors.js's origin-index bulk fetch
+      // (`select('id, storefront_origins').from('stores')`, no .eq() filter —
+      // there's nothing to filter by, that's the whole point of the reverse
+      // index). Only the unfiltered `stores` case matters for these tests.
+      then: (resolve, reject) => {
+        if (table === 'stores' && conds.length === 0) {
+          const rows = Object.entries(STORE_ORIGINS).map(([id, storefront_origins]) => ({ id, storefront_origins }));
+          return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+        }
+        return Promise.resolve({ data: null, error: null }).then(resolve, reject);
+      },
     };
     return builder;
   }
@@ -81,7 +102,20 @@ vi.mock('../lib/doc-processor.js', () => ({
 }));
 
 function optionsReq(action, origin, extra = {}) {
-  const req = { method: 'OPTIONS', query: { action, ...extra.query }, body: extra.body || {}, headers: { origin } };
+  return mockReq('OPTIONS', action, origin, extra);
+}
+
+// Same shape as optionsReq but with a configurable method — used by the P1-A
+// "POST unchanged behavior" test to confirm the CORS header logic is
+// identical for the actual POST, not just its preflight.
+function mockReq(method, action, origin, extra = {}) {
+  const req = {
+    method,
+    query: { action, ...extra.query },
+    body: extra.body || {},
+    headers: { origin },
+    user: { role: 'admin', permissions: [], store_access: [] },
+  };
   const headers = {};
   const res = {
     setHeader: vi.fn((k, v) => { headers[k] = v; }),
@@ -148,5 +182,61 @@ describe('P1-10: per-store CORS for public review actions', () => {
     const { req, res, headers } = optionsReq('import_amazon_reviews', 'https://www.amazon.com');
     await handler(req, res);
     expect(headers['Access-Control-Allow-Origin']).toBe('https://www.amazon.com');
+  });
+});
+
+describe('P1-A (AUDIT-2026-08-B): CORS preflight resolves the store without a body', () => {
+  let handler;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.stubEnv('SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
+    vi.stubEnv('APP_SECRET', 'test-secret');
+    vi.stubEnv('STOREFRONT_URL', 'https://legacy-fallback.example.com');
+    vi.stubEnv('AMAZON_USERSCRIPT_ORIGINS', '');
+    const mod = await import('../api/system.js');
+    handler = mod.default;
+  });
+
+  it('a real preflight shape (no body, no query product/review id) resolves store B purely from the Origin header', async () => {
+    // This is the exact shape a browser sends before submit_review_public's actual POST:
+    // OPTIONS, no body, no store-identifying query param — only Origin. Before the fix this
+    // always fell through to the legacy Isola-only list regardless of storefront_origins.
+    const { req, res, headers } = optionsReq('submit_review_public', 'https://store-b.example.com');
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://store-b.example.com');
+  });
+
+  it('an Origin matching no store and not on the legacy list gets no Access-Control-Allow-Origin header (fail closed)', async () => {
+    const { req, res, headers } = optionsReq('submit_review_public', 'https://totally-unknown.example.com');
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBeUndefined();
+  });
+
+  it('?store_id= on the preflighted URL resolves directly, without needing shopify_product_id/review_id', async () => {
+    const { req, res, headers } = optionsReq('submit_review_public', 'https://store-b.example.com', {
+      query: { store_id: 'store-b' },
+    });
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://store-b.example.com');
+  });
+
+  it('a real POST (not just its preflight) still resolves per-store CORS the same way — unchanged behavior', async () => {
+    const { req, res, headers } = mockReq('POST', 'vote_review_helpful', 'https://store-b.example.com', {
+      body: { review_id: 'review-b-1' },
+    });
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://store-b.example.com');
+  });
+
+  it('a DB error during store resolution fails open to the legacy allow-list instead of throwing/500ing the preflight', async () => {
+    const { req, res, headers } = optionsReq('review_helpful_counts', 'https://legacy-fallback.example.com', {
+      query: { shopify_product_id: DB_ERROR_SHOPIFY_ID },
+    });
+    // getPerStoreOrigins must never throw — a rejected/thrown preflight would surface as an
+    // unhandled error here (vitest fails the test on an uncaught rejection).
+    await handler(req, res);
+    expect(headers['Access-Control-Allow-Origin']).toBe('https://legacy-fallback.example.com');
   });
 });

@@ -7,8 +7,10 @@ Source: `Docs/AUDIT-2026-08.md` P1-12 — "No new-store onboarding playbook / ru
 
 Related work not yet shipped that affects this flow, called out inline where relevant:
 - **P1-11** (Isola-specific hardcodes) — still open. See the gotcha in section 2 and section 11.
-- **P1-10** (`STOREFRONT_URL` is a single global env var, not per-store) — **fixed 2026-08-17.**
-  CORS for public review actions is now per-store (`stores.storefront_origins`). See section 4.
+- **P1-10** (`STOREFRONT_URL` is a single global env var, not per-store) — **fixed 2026-08-17,**
+  preflight gap closed 2026-08-19 (P1-A, AUDIT-2026-08-B). CORS for public review actions is per-store
+  (`stores.storefront_origins`), and the CORS *preflight* (which used to always miss per-store resolution
+  and fall back to the Isola-only legacy list) now resolves via the request's Origin header. See section 4.
 - **P1-13** (daily cron scans all stores sequentially in one 60s function) — still open. See section 10.
 
 ---
@@ -162,13 +164,12 @@ returns `!!(store.has_admin || store.admin_token)`. Without `admin_token`:
 
 ## 4. CORS — set `stores.storefront_origins` for the new store
 
-**Fixed 2026-08-17 (P1-10, AUDIT-2026-08).** CORS for the public review actions
-(`submit_review_public`, `vote_review_helpful`, `review_helpful_counts` — `api/system.js`) is now
-**per-store**, read from `stores.storefront_origins` (`TEXT[]`, migration
-`sql/add-store-storefront-origins.sql`). `applyCors` (`api/system.js`) resolves which store a request
-targets (via `shopify_product_id` for `submit_review_public`/`review_helpful_counts`, `review_id` for
-`vote_review_helpful`) and looks up that store's own origins in `lib/storefront-cors.js`'s
-`getPerStoreOrigins()`. Adding a new store's domain is now a plain `UPDATE`, not an env var edit +
+**Fixed 2026-08-17 (P1-10, AUDIT-2026-08); preflight gap closed 2026-08-19 (P1-A, AUDIT-2026-08-B).**
+CORS for the public review actions (`submit_review_public`, `vote_review_helpful`,
+`review_helpful_counts` — `api/system.js`) is **per-store**, read from `stores.storefront_origins`
+(`TEXT[]`, migration `sql/add-store-storefront-origins.sql`). `applyCors` (`api/system.js`) resolves
+which store a request targets and looks up that store's own origins in `lib/storefront-cors.js`'s
+`getPerStoreOrigins()`. Adding a new store's domain is a plain `UPDATE`, not an env var edit +
 redeploy — and it can't accidentally drop another store's origins, since each store owns its own row.
 
 ```sql
@@ -188,11 +189,30 @@ The request never even reaches the rate limiter or the DB, so `pipeline_log` sho
 like the widget is just "not working" with zero server-side signal — same failure mode as before, just a
 missing DB row instead of a missing env var entry now.
 
-**`STOREFRONT_URL` is deprecated, one-cycle fallback only** — see CLAUDE.md Env Vars. Don't add a new
-store's domain to it; that env var only exists today as a safety net for requests where the target store
-can't be resolved (e.g. a CORS preflight `OPTIONS` request, which never carries a body) or for a store row
-that hasn't been backfilled yet. It will be removed once logs confirm nothing is hitting the fallback for
-a full deploy cycle.
+**How the CORS preflight resolves the store (P1-A, AUDIT-2026-08-B).** `submit_review_public` and
+`vote_review_helpful` are POSTs, so the browser always sends an OPTIONS preflight first — and a preflight
+never carries a body. Before this fix, that meant the store could never be resolved on preflight (the
+resolution logic looks for `shopify_product_id`/`review_id` in the body), so preflight *always* fell
+through to the legacy Isola-only list regardless of `storefront_origins` — every non-Isola storefront was
+silently CORS-blocked end to end. Two mechanisms now fix this, and the `UPDATE` above is enough on its
+own to satisfy the primary one:
+1. **Origin-based resolution (primary, automatic)** — `getPerStoreOrigins()` matches the preflight
+   request's `Origin` header against every store's `storefront_origins`, cached 60s. Once you've run the
+   `UPDATE` above, preflight from this store's domain resolves correctly with **zero widget/theme
+   changes** — this is the fix for the common case.
+2. **`?store_id=` query param (belt, optional, widget-side)** — for extra robustness (or if a storefront
+   calls from an origin not yet in `storefront_origins`, e.g. mid-migration), have the widget append
+   `?store_id=<this store's TC UUID>` to its fetch URL, e.g.
+   `/api/system?action=submit_review_public&store_id=<uuid>`. A preflight carries the same query string
+   as the real request, so this resolves the store without any DB lookup at all — the cheapest path when
+   present. Not required (mechanism 1 already covers it), but cheap to add. See the comment above
+   `submit_review_public` in `lib/actions/reviews-public.js`.
+
+**`STOREFRONT_URL` is deprecated, burn-in fallback only** — see CLAUDE.md Env Vars. Don't add a new
+store's domain to it; that env var is now a genuine last resort, hit only when a request's Origin doesn't
+match ANY store's `storefront_origins` (new store not yet backfilled, typo'd domain, or a request with no
+Origin header at all). It will be removed once logs confirm nothing is hitting the fallback for a full
+deploy cycle — see the TODO in `lib/storefront-cors.js`.
 
 ---
 
