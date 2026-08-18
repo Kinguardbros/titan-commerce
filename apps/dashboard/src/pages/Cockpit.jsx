@@ -51,12 +51,12 @@ export default function Cockpit({ storeId, store, onNavigateToProduct, onNavigat
   const revenue = shopify?.kpi?.total_revenue || 0;
   const orders = shopify?.kpi?.total_orders || 0;
   const avgOrder = orders > 0 ? (revenue / orders).toFixed(2) : '0';
-  const profitVal = profit?.profit || 0;
-  const margin = profit?.revenue > 0 ? Math.round((profitVal / profit.revenue) * 100) : 0;
+  const profitVal = profit?.totals?.profit || 0;
+  const margin = profit?.totals?.revenue > 0 ? Math.round((profitVal / profit.totals.revenue) * 100) : 0;
   const currency = store?.currency === 'USD' ? '$' : '€';
 
   // Month progress (use 30d profit data as proxy)
-  const monthRevenue = profit?.revenue || 0;
+  const monthRevenue = profit?.totals?.revenue || 0;
   const monthPct = monthTarget > 0 ? Math.min(100, Math.round((monthRevenue / monthTarget) * 100)) : 0;
 
   // Pipeline

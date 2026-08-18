@@ -46,12 +46,13 @@ function isTokenValid() {
 
 function AppContent() {
   const { stores, activeStore, switchStore, refreshStores } = useActiveStore();
-  const { user } = useUser();
+  const { user, loading: userLoading } = useUser();
   const TABS = visibleTabs(user);
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tab') || 'Cockpit';
   });
+  const noAccess = !userLoading && TABS.length === 0;
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [studioProductId, setStudioProductId] = useState(null);
   const [clock, setClock] = useState('');
@@ -91,6 +92,16 @@ function AppContent() {
   }, []);
 
   useEffect(() => { setSelectedProduct(null); setStudioProductId(null); }, [storeId]);
+
+  // Fall back to the first permission-visible tab when the current one
+  // isn't visible (F4, AUDIT-2026-08-B) — covers the 'Cockpit' default for a
+  // non-finance user's first login and any ?tab= deep link the user can't
+  // see. Re-runs once `me` resolves, since `user` (and therefore TABS)
+  // starts null/empty on first render.
+  useEffect(() => {
+    if (userLoading || !user) return;
+    if (TABS.length > 0 && !TABS.includes(activeTab)) setActiveTab(TABS[0]);
+  }, [userLoading, user, activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Detect successful Shopify OAuth connection
   const toast = useToast();
@@ -222,16 +233,22 @@ function AppContent() {
 
       <div className="layout">
         <main className="main">
-          <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Loading...</div>}>
-            {activeTab === 'Cockpit' && <Cockpit storeId={storeId} store={activeStore} onNavigateToProduct={handleNavigateToProduct} onNavigateToStudio={handleNavigateToStudio} />}
-            {activeTab === 'Shopify' && <Shopify onNavigateToProduct={handleNavigateToProduct} storeId={storeId} store={activeStore} />}
-            {activeTab === 'Studio' && <Studio storeId={storeId} store={activeStore} initialProductId={studioProductId} onNavigateToProduct={handleNavigateToProduct} />}
-            {activeTab === 'Avatars' && <Avatars storeId={storeId} store={activeStore} />}
-            {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
-            {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
-            {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}
-            {activeTab === 'Settings' && <Settings />}
-          </Suspense>
+          {noAccess ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+              No access — this account has no permissions assigned. Contact an admin.
+            </div>
+          ) : (
+            <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>Loading...</div>}>
+              {activeTab === 'Cockpit' && <Cockpit storeId={storeId} store={activeStore} onNavigateToProduct={handleNavigateToProduct} onNavigateToStudio={handleNavigateToStudio} />}
+              {activeTab === 'Shopify' && <Shopify onNavigateToProduct={handleNavigateToProduct} storeId={storeId} store={activeStore} />}
+              {activeTab === 'Studio' && <Studio storeId={storeId} store={activeStore} initialProductId={studioProductId} onNavigateToProduct={handleNavigateToProduct} />}
+              {activeTab === 'Avatars' && <Avatars storeId={storeId} store={activeStore} />}
+              {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
+              {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
+              {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}
+              {activeTab === 'Settings' && <Settings />}
+            </Suspense>
+          )}
         </main>
       </div>
     </>
