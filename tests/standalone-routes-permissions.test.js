@@ -38,6 +38,7 @@ function makeBuilder(table) {
     range: vi.fn(() => builder),
     or: vi.fn(() => builder),
     not: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     delete: vi.fn(() => builder),
     update: vi.fn(() => builder),

@@ -35,7 +35,8 @@ async function handler(req, res) {
         product:products(id, title, image_url, handle)
       `)
       .order('created_at', { ascending: false })
-      .eq('store_id', storeId);
+      .eq('store_id', storeId)
+      .is('deleted_at', null);
 
     if (status) {
       query = query.eq('status', status);

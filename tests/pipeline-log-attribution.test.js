@@ -33,6 +33,7 @@ function makeBuilder(table) {
     lt: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     update: vi.fn(() => builder),
     insert: vi.fn((row) => {
       const c = cfg();

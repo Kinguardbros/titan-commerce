@@ -32,6 +32,7 @@ function makeBuilder(table) {
     neq: vi.fn(() => builder),
     lt: vi.fn(() => builder),
     not: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     order: vi.fn(() => builder),
     limit: vi.fn(() => builder),
     filter: vi.fn(() => builder),
