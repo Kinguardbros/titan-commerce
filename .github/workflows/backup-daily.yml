@@ -1,0 +1,66 @@
+# Automated version of the "Weekly — Postgres dump" step in
+# Docs/RUNBOOK-backup-restore.md section 3. That manual step required a
+# human to remember to run `npx supabase db dump` and move the file
+# off-machine by hand — in practice it rarely happened (P0-6,
+# Docs/AUDIT-2026-08.md). This runs daily, unattended. The companion
+# test-restore-weekly.yml workflow proves the resulting dump is actually
+# restorable, not just "a file got produced".
+#
+# GitHub Actions' `schedule` cron is best-effort, same caveat as
+# .github/workflows/uptime.yml — expect up to ~15 min drift past 03:15 UTC.
+#
+# Note: `scripts/backup-database.mjs` uses only Node core modules (no npm
+# dependencies), so there's no `npm install` step here.
+
+name: Daily database backup
+
+on:
+  schedule:
+    - cron: '15 3 * * *'  # 03:15 UTC daily
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: node scripts/backup-database.mjs
+
+      - name: Upload dump as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: titan-db-dump
+          path: backups/*.dump
+          retention-days: 30
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID repo secrets not set — skipping alert (fail-open, same contract as lib/notify.js)."
+            exit 0
+          fi
+          MSG="🔴 Titan daily DB backup FAILED
+          Run: ${{ github.run_id }}
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TG_CHAT" --arg text "$MSG" '{chat_id: $chat_id, text: $text}')"

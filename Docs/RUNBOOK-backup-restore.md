@@ -9,6 +9,58 @@ archiving), or an accidental service-role `DELETE` wipes data for **every store 
 Source: `Docs/AUDIT-2026-08.md` P0-6 — before this runbook, repo-wide grep for "backup" only found
 Shopify theme backups. Nothing existed for the DB or Storage.
 
+**The daily DB dump and the weekly test-restore described in section 5 are now automated** — see
+"0. Automated backup + test-restore" right below. Sections 3–5 are kept as the manual/emergency
+fallback procedure (still correct, still worth knowing), but the routine "did the backup actually
+happen, and does it actually restore" question is now answered by GitHub Actions every week without
+anyone remembering to do it.
+
+---
+
+## 0. Automated backup + test-restore (GitHub Actions)
+
+Two workflows, both zero-cost (same pattern as `Docs/RUNBOOK-monitoring.md`'s Telegram + GitHub
+Actions monitoring — no paid backup service):
+
+| Workflow | Schedule | What it does |
+|---|---|---|
+| `.github/workflows/backup-daily.yml` | `15 3 * * *` (03:15 UTC daily) | Runs `scripts/backup-database.mjs` — `pg_dump` of the `public` schema (custom format, single file), excludes `pipeline_log` data (see that script's header — this table grows unbounded and isn't needed for restore validation). Uploads the `.dump` as a GitHub Actions artifact named `titan-db-dump`, 30-day retention. |
+| `.github/workflows/test-restore-weekly.yml` | `0 4 * * 0` (Sunday 04:00 UTC) | Fetches the latest successful `backup-daily.yml` artifact, spins up an ephemeral `postgres:16` service container, `pg_restore`s the dump into it, then runs `scripts/restore-sanity.mjs` (5 row-count checks: `stores`, `users`, `products`, `product_reviews`, `schema_migrations`). |
+
+**Alerting:** both workflows post a Telegram alert only `if: failure()` — reuses the
+`TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` repo secrets already set up for `uptime.yml` (see
+`Docs/RUNBOOK-monitoring.md`). Success runs are silent by design — no daily "backup OK" spam.
+
+**Required secret (one-time setup, Dan):** `SUPABASE_DB_URL` — a **Session Pooler** connection string,
+not the same as the direct-connection `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` env vars the app
+uses. Get it from:
+
+> Supabase dashboard → Project Settings → Database → **Session Pooler** → URI
+
+Format: `postgres://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`.
+Add it under GitHub repo → Settings → Secrets and variables → Actions → New repository secret,
+name `SUPABASE_DB_URL`. **Never commit this value anywhere** — it's only ever read from
+`secrets.SUPABASE_DB_URL` inside the workflow, passed to `pg_dump` as a CLI arg, never logged (the
+script redacts anything URI-shaped before printing pg_dump's stderr, just in case).
+
+**Manual/ad-hoc trigger:** both workflows have `workflow_dispatch` — GitHub repo → Actions tab → pick
+the workflow → "Run workflow". Useful right after setting the secret for the first time, or to
+re-validate on demand without waiting for the next scheduled tick.
+
+**Where to see failed-run logs:** GitHub repo → Actions tab → the workflow name → the specific run →
+expand the failing step. The Telegram alert links directly to the run URL.
+
+**Known first-run gap:** `test-restore-weekly.yml` needs at least one successful `backup-daily.yml`
+run to exist before it has anything to restore — if it runs before that, the artifact-fetch step
+fails (correctly — that's a real "nothing to test yet" state, not a false positive) and alerts. This
+resolves itself once `backup-daily.yml` has run once, or trigger it manually via `workflow_dispatch`
+right after setting `SUPABASE_DB_URL`.
+
+**What's still manual:** the Storage bucket (`scripts/backup-storage-bucket.mjs`, section 3 below) —
+GitHub Actions artifacts aren't a sensible destination for hundreds of MB of product/review photos on
+the free tier, and the RUNBOOK's storage-restore path (section 4C) is already a manual
+re-upload-from-snapshot operation either way. Only the Postgres DB backup/restore loop is automated.
+
 ---
 
 ## 1. Current backup coverage
@@ -147,11 +199,13 @@ No PITR equivalent exists for Storage — restore is always "re-upload from the 
 
 ---
 
-## 5. Test-restore procedure — MUST do once before onboarding another user
+## 5. Test-restore procedure (manual/emergency version)
 
-This has **not been executed yet**. It's a required gate before a 2nd person gets access (per
-`Docs/AUDIT-2026-08.md` P0-6/Wave 2) — a restore procedure that's never been run is unverified, not a
-plan.
+**This is now automated weekly** — see section 0. The steps below are the manual equivalent, useful
+if GitHub Actions itself is unavailable, if you want to test-restore a specific non-latest dump, or
+for an actual emergency restore (section 4) rather than a validation run. This is no longer a
+required gate before onboarding another user — the automated weekly run covers that (P0-6,
+`Docs/AUDIT-2026-08.md`).
 
 Steps:
 1. Run a fresh `npx supabase db dump` against prod (or reuse the latest weekly dump).
@@ -164,11 +218,15 @@ Steps:
 6. Also run `node scripts/backup-storage-bucket.mjs` against prod once, and manually confirm a
    handful of the downloaded files open correctly (not zero-byte, not corrupted).
 7. **Record what you observed here** (append below, don't just mentally note it — the whole point is a
-   dated, checkable log of "this was actually tested and worked/didn't"):
+   dated, checkable log of "this was actually tested and worked/didn't"). This log is for *manual*
+   runs only — the automated weekly run's record of record is its GitHub Actions run history
+   (Actions tab → test-restore-weekly), not this file; don't add an entry here for every automated
+   Sunday run.
 
-> **Test-restore log**
-> _(empty — no test restore has been performed yet. Add an entry each time one is run: date, what was
-> restored, what was verified, anything that didn't work as expected.)_
+> **Manual test-restore log**
+> _(empty — no manual test-restore has been performed yet. The automated weekly workflow, section 0,
+> is the routine version of this and runs on its own schedule; add an entry here only for a manual
+> run — date, what was restored, what was verified, anything that didn't work as expected.)_
 
 8. Delete the scratch project once done (avoid an orphaned copy of prod data sitting on a forgotten
    Free-tier project).
@@ -214,9 +272,10 @@ routine-feeling actions, not obviously dangerous ones.
 
 | Situation | Action |
 |---|---|
+| Is the daily backup / weekly restore-test actually working | GitHub Actions → Actions tab → `Daily database backup` / `Weekly test-restore validation` run history (section 0) |
 | Need to check backup coverage | Section 1 links — verify tier, don't assume Pro |
 | About to run a migration | `pg_dump` first (section 3) |
 | About to run a bulk action or raw SQL Editor DELETE | Section 7 checklist |
 | DB got corrupted/wiped | Section 4 — PITR if available, else manual `pg_dump` restore |
 | Storage bucket got wiped | Section 4C — re-upload from last weekly `backup-storage-bucket.mjs` snapshot |
-| Never tested a restore | Section 5 — do it now, before adding another user |
+| Want to test-restore right now, ad hoc | Section 0 — trigger `test-restore-weekly.yml` via `workflow_dispatch`, or section 5 for the manual/scratch-project version |

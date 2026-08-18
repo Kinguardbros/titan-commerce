@@ -1,0 +1,125 @@
+# Automated version of Docs/RUNBOOK-backup-restore.md section 5,
+# "Test-restore procedure — MUST do once before onboarding another user".
+# That procedure had literally never been run (the RUNBOOK's own test-restore
+# log said so, in writing) — 30 min of manual work with no forcing function
+# to actually do it. This proves every week, unattended, that the previous
+# night's backup-daily.yml dump is not just "a file got produced" but is
+# genuinely restorable and structurally sane — the specific failure mode an
+# untested backup can't catch (P0-6, Docs/AUDIT-2026-08.md).
+#
+# Artifact source: fetches the latest successful run of backup-daily.yml via
+# `dawidd6/action-download-artifact` instead of `actions/download-artifact`,
+# because `actions/download-artifact@v4` can only pull artifacts produced
+# within the SAME workflow run (or an explicit run-id you already know) — it
+# has no "give me the latest artifact named X from workflow Y, whatever run
+# that was" lookup. The alternative was a `workflow_run` trigger chained off
+# backup-daily.yml, but that would make this workflow's own
+# `workflow_dispatch` (ad-hoc manual testing) behave differently from its
+# scheduled runs, and adds a layer of indirection for no real benefit at this
+# scale. Picked the simpler single-workflow-file option and documented the
+# choice here instead of half-explaining it in a comment nobody reads later.
+#
+# `permissions.actions: read` is required for the cross-workflow artifact
+# lookup above — the default GITHUB_TOKEN scope for a repo with restrictive
+# default workflow permissions may not include it otherwise.
+
+name: Weekly test-restore validation
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'  # Sunday 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: titan_restore_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache root node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node20-root-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node20-root-
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-16
+
+      - name: Fetch latest daily backup artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: backup-daily.yml
+          workflow_conclusion: success
+          name: titan-db-dump
+          path: backups
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prime ephemeral Postgres with Supabase-compatible role/auth stubs
+        env:
+          PGPASSWORD: testpassword
+        run: psql -h localhost -p 5432 -U postgres -d titan_restore_test -f scripts/ci-prime-restore-roles.sql
+
+      - name: Restore into ephemeral Postgres
+        env:
+          PGPASSWORD: testpassword
+        run: |
+          DUMP_FILE=$(ls backups/*.dump 2>/dev/null | head -n1)
+          if [ -z "$DUMP_FILE" ]; then
+            echo "No .dump file found in backups/ after artifact download" >&2
+            exit 1
+          fi
+          echo "Restoring $DUMP_FILE ..."
+          pg_restore -h localhost -p 5432 -U postgres -d titan_restore_test \
+            --no-owner --no-privileges "$DUMP_FILE"
+
+      - name: Sanity queries
+        env:
+          RESTORE_DB_URL: postgresql://postgres:testpassword@localhost:5432/titan_restore_test
+        run: node scripts/restore-sanity.mjs
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ] || [ -z "$TG_CHAT" ]; then
+            echo "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID repo secrets not set — skipping alert (fail-open, same contract as lib/notify.js)."
+            exit 0
+          fi
+          MSG="🔴 Titan weekly test-restore FAILED
+          Run: ${{ github.run_id }}
+          https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -n --arg chat_id "$TG_CHAT" --arg text "$MSG" '{chat_id: $chat_id, text: $text}')"
