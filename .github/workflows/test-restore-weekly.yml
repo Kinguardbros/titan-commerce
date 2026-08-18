@@ -76,6 +76,9 @@ jobs:
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
           sudo apt-get update -qq
           sudo apt-get install -y postgresql-client-17
+          # Ensure pg_restore 17 wins over default v16 on PATH
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
+          /usr/lib/postgresql/17/bin/pg_restore --version
 
       - name: Fetch latest daily backup artifact
         uses: dawidd6/action-download-artifact@v6
