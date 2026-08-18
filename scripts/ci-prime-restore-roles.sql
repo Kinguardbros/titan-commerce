@@ -30,6 +30,11 @@ BEGIN
   END IF;
 END $$;
 
+-- Drop default public schema so pg_restore can recreate it cleanly from the
+-- dump without a "schema public already exists" warning that would leak
+-- exit code 1 (pg_restore treats it as fatal even though it's harmless).
+DROP SCHEMA IF EXISTS public CASCADE;
+
 CREATE SCHEMA IF NOT EXISTS auth;
 
 CREATE OR REPLACE FUNCTION auth.role() RETURNS text
