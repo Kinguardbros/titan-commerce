@@ -45,6 +45,44 @@ A missing row for a file you'd expect to see = it was skipped. An
 replayed out of order — both are exactly the failure modes this table exists
 to surface.
 
+**A present row does NOT prove the migration ran.** The 2026-08-17 backfill
+registered every file without checking application, and `add-rate-limits.sql`
+sat "applied" for days while the table didn't exist and every rate limiter
+silently fail-opened in prod (C1, `Docs/AUDIT-2026-08-B.md`). That's what
+`verified_at` is for — see the next section.
+
+## After you apply — verify (MANDATORY)
+
+Run the ledger verification sweep **after every applied migration**:
+
+```bash
+SUPABASE_ACCESS_TOKEN=sbp_... node scripts/verify-migrations.mjs
+```
+
+It parses every registered file's primary objects (CREATE TABLE / INDEX /
+FUNCTION / POLICY, ALTER TABLE ADD COLUMN / ADD CONSTRAINT), checks each
+against the live catalogs, prints `filename → OK / GHOST / PARTIAL /
+DEPRECATED / NOOBJ`, stamps `schema_migrations.verified_at` on confirmed rows,
+and exits 1 on any drift. A `NULL verified_at` on a non-deprecated row means
+"never confirmed against live".
+
+This needs live DB access (Supabase Management API), so it is deliberately
+NOT a CI job — CI has no DB credentials. The human (or agent) applying the
+migration runs it as the last step of the apply.
+
+Conventions the sweep relies on:
+
+- A superseded file carries `-- DEPRECATED` as its **first line** (P1-18
+  style) — the sweep skips it. Prose mentions of the word elsewhere don't
+  count.
+- Objects a LATER migration intentionally removed are documented in the
+  `SUPERSEDED` map at the top of `scripts/verify-migrations.mjs`, each entry
+  citing the superseding file.
+
+`schema_migrations` itself has RLS enabled + anon/authenticated fully revoked
+(`sql/harden-schema-migrations.sql`, C3 — it was the only internet-writable
+table in public). Service role and the Management API are the only writers.
+
 **The 43 pre-P1-19 files were not retrofitted** with the `INSERT` line — too
 much churn for files that are already applied on every real environment. They
 were captured once via `node scripts/register-existing-migrations.mjs`
