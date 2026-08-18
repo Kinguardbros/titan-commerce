@@ -558,6 +558,12 @@ export function deleteReviewPhoto(photoUrl) {
   });
 }
 
+// Admin sweep: delete Storage photos for pending/rejected reviews older than 30 days
+// and clear their photo fields in the DB. Cross-store (no store_id) — admin:users gated.
+export function cleanupOrphanReviewPhotos() {
+  return fetchJSON('/api/system?action=cleanup_orphan_review_photos', { method: 'POST' });
+}
+
 // AI generation (Phase 4) — count 1–10, tone 'positive' | 'mix' → inserts pending reviews.
 export function generateReviewsAi(storeId, productId, count, tone) {
   return fetchJSON('/api/system?action=generate_reviews_ai', {

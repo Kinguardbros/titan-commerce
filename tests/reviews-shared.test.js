@@ -1,11 +1,22 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+// deleteReviewPhotosSettled calls the module's real `supabase` singleton (storage.
+// remove()) — mock the client so those tests don't hit the network. The other tests
+// below (validateImageBuffer/insertReviewsTolerant) don't touch `supabase` at all, so
+// this mock is a no-op for them.
+const removeMock = vi.fn();
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: () => ({
+    storage: { from: () => ({ remove: (...args) => removeMock(...args) }) },
+  }),
+}));
 
 // reviews-shared.js creates a Supabase client at import time → needs env present.
-let validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant;
+let validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant, deleteReviewPhotosSettled;
 beforeAll(async () => {
   vi.stubEnv('SUPABASE_URL', 'https://example.supabase.co');
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-key');
-  ({ validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant } = await import('../lib/actions/reviews-shared.js'));
+  ({ validateImageBuffer, decodeAndValidateImage, insertReviewsTolerant, deleteReviewPhotosSettled } = await import('../lib/actions/reviews-shared.js'));
 });
 
 // Minimal fake `db` — insertReviewsTolerant only calls `db.from('product_reviews').insert(row)`,
@@ -130,5 +141,82 @@ describe('decodeAndValidateImage — delegates to validateImageBuffer', () => {
     const junk = Buffer.from([0x00, 0x01, 0x02, 0x03]).toString('base64');
     const result = decodeAndValidateImage(junk, 1024 * 1024);
     expect(result.error).toBe('file is not a JPEG/PNG/WebP image');
+  });
+});
+
+// Photo cleanup (reviews Storage cleanup — set_review_status reject hook +
+// cleanup_orphan_review_photos admin sweep both call this for the actual Storage
+// removal work).
+describe('deleteReviewPhotosSettled — batch Storage removal, tolerates per-file failures', () => {
+  beforeEach(() => { removeMock.mockReset(); });
+
+  it('parses store-docs public URLs into their Storage object paths and removes each one', async () => {
+    removeMock.mockResolvedValue({ error: null });
+    const urls = [
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_1.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_2.jpg',
+    ];
+
+    const result = await deleteReviewPhotosSettled(urls);
+
+    expect(result).toEqual({ removed: 2, failed: 0, failures: [] });
+    expect(removeMock).toHaveBeenCalledWith(['isola/Reviews/p1/photo_1.jpg']);
+    expect(removeMock).toHaveBeenCalledWith(['isola/Reviews/p1/photo_2.jpg']);
+  });
+
+  it('tolerates one file failing (Promise.allSettled) — the rest still get removed, no throw', async () => {
+    removeMock.mockImplementation(async (paths) => {
+      if (paths[0].includes('photo_2')) return { error: { message: 'not found' } };
+      return { error: null };
+    });
+    const urls = [
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_1.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_2.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_3.jpg',
+    ];
+
+    const result = await deleteReviewPhotosSettled(urls);
+
+    expect(result.removed).toBe(2);
+    expect(result.failed).toBe(1);
+    expect(result.failures).toEqual([{ path: 'isola/Reviews/p1/photo_2.jpg', error: 'not found' }]);
+  });
+
+  it('tolerates a rejected promise (network error) the same way as a returned error', async () => {
+    removeMock.mockImplementation(async (paths) => {
+      if (paths[0].includes('photo_2')) throw new Error('network timeout');
+      return { error: null };
+    });
+    const urls = [
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_1.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_2.jpg',
+    ];
+
+    const result = await deleteReviewPhotosSettled(urls);
+
+    expect(result.removed).toBe(1);
+    expect(result.failed).toBe(1);
+    expect(result.failures[0]).toEqual({ path: 'isola/Reviews/p1/photo_2.jpg', error: 'network timeout' });
+  });
+
+  it('ignores URLs not from the store-docs bucket and dedups repeated URLs', async () => {
+    removeMock.mockResolvedValue({ error: null });
+    const urls = [
+      'https://cdn.other.com/not-ours.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_1.jpg',
+      'https://example.supabase.co/storage/v1/object/public/store-docs/isola/Reviews/p1/photo_1.jpg', // dup
+      null,
+    ];
+
+    const result = await deleteReviewPhotosSettled(urls);
+
+    expect(result.removed).toBe(1);
+    expect(removeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns zeros for empty/no-photo input without calling remove', async () => {
+    const result = await deleteReviewPhotosSettled([]);
+    expect(result).toEqual({ removed: 0, failed: 0, failures: [] });
+    expect(removeMock).not.toHaveBeenCalled();
   });
 });

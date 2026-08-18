@@ -24,6 +24,7 @@ import { product_reviews_list, add_review_manual, update_review, delete_review, 
 import { import_reviews_csv } from '../lib/actions/reviews-import.js';
 import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo, delete_review_photo } from '../lib/actions/reviews-photo.js';
+import { cleanup_orphan_review_photos } from '../lib/actions/reviews-cleanup.js';
 import { push_reviews_to_shopify, refresh_store_reviews_aggregate } from '../lib/actions/reviews-push.js';
 import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
 import { export_products_csv } from '../lib/actions/exports.js';
@@ -115,6 +116,7 @@ const POST_ACTIONS = {
   import_reviews_csv,
   upload_review_photo,
   delete_review_photo,
+  cleanup_orphan_review_photos,
   generate_reviews_ai,
   push_reviews_to_shopify,
   refresh_store_reviews_aggregate,

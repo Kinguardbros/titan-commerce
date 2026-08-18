@@ -17,3 +17,50 @@
   padding: 40px 0;
   text-align: center;
 }
+
+.settings-maintenance {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--edge);
+}
+
+.settings-maintenance h2 {
+  font-family: var(--display);
+  font-size: 14px;
+  color: var(--text2);
+  margin: 0 0 12px;
+}
+
+.settings-maintenance-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-maintenance-btn {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text3);
+  cursor: pointer;
+  transition: all .2s;
+}
+.settings-maintenance-btn:hover { border-color: var(--coral); color: var(--coral); }
+.settings-maintenance-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.settings-maintenance-hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text4);
+}
+
+.settings-maintenance-result {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--emerald);
+}
