@@ -1,0 +1,72 @@
+# One-off / emergency: restore the latest daily dump into a TARGET database.
+# Built for the 2026-08-25 Supabase free-tier egress restriction: the old
+# project (ercrkgfihqgrbkkqnoqy) hit exceed_cached_egress_quota and its data
+# plane is frozen until Sept 3, so production is migrating to a fresh project.
+# Generic by design — any future "stand up a copy from backup" reuses this.
+#
+# Target comes from the RESTORE_TARGET_DB_URL repo secret (Session Pooler URI).
+# Trigger manually (workflow_dispatch) only. Refuses to run if the secret is
+# unset. Restores into a REAL Supabase project (auth schema + roles exist),
+# so unlike test-restore-weekly.yml no role stubs are needed — but the target
+# must be EMPTY (fresh project): pg_restore runs without --clean and will
+# error on pre-existing objects rather than overwrite them.
+
+name: Restore dump to target DB
+
+on:
+  workflow_dispatch:
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard — require target secret
+        env:
+          TARGET: ${{ secrets.RESTORE_TARGET_DB_URL }}
+        run: |
+          if [ -z "$TARGET" ]; then
+            echo "RESTORE_TARGET_DB_URL secret is not set — refusing to run." >&2
+            exit 1
+          fi
+
+      - name: Install postgresql-client 17
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> $GITHUB_PATH
+
+      - name: Fetch latest daily backup artifact
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: backup-daily.yml
+          workflow_conclusion: success
+          name: titan-db-dump
+          path: backups
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Restore into target
+        env:
+          TARGET: ${{ secrets.RESTORE_TARGET_DB_URL }}
+        run: |
+          DUMP_FILE=$(ls backups/*.dump 2>/dev/null | head -n1)
+          if [ -z "$DUMP_FILE" ]; then
+            echo "No .dump file found after artifact download" >&2
+            exit 1
+          fi
+          echo "Restoring $DUMP_FILE into target ..."
+          pg_restore --no-owner --no-privileges -d "$TARGET" "$DUMP_FILE"
+
+      - name: Sanity queries
+        env:
+          TARGET: ${{ secrets.RESTORE_TARGET_DB_URL }}
+        run: |
+          psql "$TARGET" -tA -c "SELECT 'stores='||COUNT(*) FROM stores;"
+          psql "$TARGET" -tA -c "SELECT 'users='||COUNT(*) FROM users;"
+          psql "$TARGET" -tA -c "SELECT 'products='||COUNT(*) FROM products;"
+          psql "$TARGET" -tA -c "SELECT 'reviews='||COUNT(*) FROM product_reviews;"
+          psql "$TARGET" -tA -c "SELECT 'migrations='||COUNT(*) FROM schema_migrations;"
