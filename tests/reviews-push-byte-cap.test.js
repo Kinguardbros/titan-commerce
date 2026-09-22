@@ -36,6 +36,9 @@ function makeBuilder(table) {
 }
 
 vi.mock('../lib/actions/reviews-shared.js', () => ({
+  // Náhledy fotek testujeme zvlášť v reviews-photo-thumb.test.js; tady jen
+  // propustíme review beze změny, ať se měří byte-cap a ne délka URL.
+  withThumbnailPhotos: (r) => r,
   supabase: {
     from: (table) => {
       if (table === 'pipeline_log') {
