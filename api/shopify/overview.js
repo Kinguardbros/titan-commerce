@@ -29,7 +29,7 @@ async function handler(req, res) {
     if (!store || !store.admin_token) {
       return res.status(200).json({ connected: false });
     }
-    client = createShopifyClient(store.shopify_url, store.admin_token);
+    client = createShopifyClient(store.shopify_url, store.admin_token, { storeId: store.id });
   }
 
   if (!client && !isConnected()) {

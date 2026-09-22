@@ -41,7 +41,7 @@ async function processStore(store) {
     return { storeId: store.id, storeName: store.name, skipped: true, eventsCreated: 0, proposalsCreated: 0 };
   }
 
-  const client = createShopifyClient(store.shopify_url, store.admin_token);
+  const client = createShopifyClient(store.shopify_url, store.admin_token, { storeId: store.id });
   let topProducts;
   try {
     topProducts = await client.getTopProductsWithCreatives(7, 30);
