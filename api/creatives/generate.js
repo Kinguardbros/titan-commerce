@@ -267,7 +267,7 @@ async function handler(req, res) {
             const Anthropic = (await import('@anthropic-ai/sdk')).default;
             const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
             const skillRes = await anthropic.messages.create({
-              model: 'claude-sonnet-4-20250514', max_tokens: 2000,
+              model: 'claude-sonnet-5', max_tokens: 2000,
               messages: [{ role: 'user', content: [
                 { type: 'image', source: { type: 'base64', media_type: ext, data: base64 } },
                 { type: 'text', text: `Analyze this product photo and extract detailed product knowledge.\n\nProduct: ${skillTitle}\nPrice: ${skillPrice || 'N/A'}\n\nReturn:\n## PRODUCT IDENTITY\n- Exact colors, patterns, textures\n- Cut/style details\n- Key design elements (ties, straps, panels)\n- Material appearance\n\n## UNIQUE FEATURES\n- What makes this product visually distinct\n- Special construction details\n\n## VISUAL REPRODUCTION RULES\n- Exact description to recreate this product in AI generation\n- "The product MUST have [detail]"\n\n## DO NOT\n- What would make the generated product look WRONG\n- Common AI mistakes for this product type\n\nBe extremely specific — this ensures AI-generated photos show THIS EXACT product.` },
@@ -276,7 +276,7 @@ async function handler(req, res) {
 
             await supabase.from('store_skills').insert({
               store_id: skillStoreId, skill_type: `product-${productSlug}`, product_name: skillTitle,
-              title: skillTitle, content: skillRes.content[0].text, source_count: 1,
+              title: skillTitle, content: (skillRes.content.find((b) => b.type === 'text')?.text ?? ''), source_count: 1,
             });
             console.log(`[generate] Product skill created for ${productSlug}`);
           } catch (skillErr) {

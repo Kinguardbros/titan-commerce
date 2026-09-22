@@ -59,7 +59,7 @@ Skills in `.claude/skills/` are product-knowledge mentors — they advise, you d
 
 ## Project Overview
 
-**Titan Commerce Limited** — multi-store SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives (image + video), optimizes product listings with AI, tracks Shopify analytics and profit, manages branded content + persona avatars, and integrates with Meta Ads. Supports **3 stores** (Elegance House, Isola, Eleganz Haus) with full store isolation via `store_id` FK on all data tables.
+**Titan Commerce Limited** — multi-store SaaS dashboard for e-commerce ad creative management. Generates AI ad creatives (image + video), optimizes product listings with AI, tracks Shopify analytics and profit, manages branded content + persona avatars, and integrates with Meta Ads. Supports **3 stores** (Clara Atelier, Isola, Eleganz Haus) with full store isolation via `store_id` FK on all data tables.
 
 ---
 
@@ -70,7 +70,7 @@ Skills in `.claude/skills/` are product-knowledge mentors — they advise, you d
 - **Database:** Supabase (Postgres + Auth + Storage + Realtime)
 - **AI — Images/Video (primary):** fal.ai — Nano Banana 2 / Nano Banana Pro for images (`/edit` variants, fire-and-forget polling), plus FLUX.2 edit, FLUX Kontext, Ideogram v3. **`resolution: "2K"` is the fallback for Nano Banana** when `resolution` is unset or invalid (fal.ai's own default is 1K — too soft for product photos); an explicit `"1K"` or other valid value passes through unchanged.
 - **AI — Images/Video (fallback / legacy):** Higgsfield — Soul / Soul Reference (`/v1/text2image/soul`) for text-to-image, Flux Kontext Max, DOP Turbo (`dop-turbo`) for video. Used when fal.ai isn't a fit (e.g. no reference image → HF Flux Kontext Max).
-- **AI — Text:** Anthropic Claude API (`claude-sonnet-4-20250514`) for product optimization, product-skill auto-generation, Claude Vision (size chart parsing, style analysis)
+- **AI — Text:** Anthropic Claude API — `claude-opus-5` for product optimization (`lib/claude.js`), `claude-sonnet-5` everywhere else (skills, doc processing, review generation, garment-length + size-chart + style Claude Vision). **`claude-sonnet-4-20250514` was retired by Anthropic and returns `404 not_found_error`** — every Claude-backed feature was silently dead until the 2026-09-14 swap. Check `GET https://api.anthropic.com/v1/models` before pinning a model id.
 - **E-commerce:** Shopify Admin API (REST v2024-01 + some GraphQL Admin v2024-01) — MUST use `{handle}.myshopify.com` URLs (not custom domains)
 - **Ads:** Meta Marketing API (v21.0) — read-only, awaiting credentials
 - **Amazon reviews scraping:** TC scraper VPS (Hetzner `37.27.189.60`, ex-Yomi box repurposed 2026-07-29) — standalone Docker/Express/Puppeteer service, NOT in this repo (`/root/titan-scraper/`), bearer-token auth. Titan calls it from `lib/actions/reviews-amazon.js`. **Alethe VPS `147.93.56.72` is a different box — never touch it for Titan work.**
@@ -82,7 +82,7 @@ Skills in `.claude/skills/` are product-knowledge mentors — they advise, you d
 ## Multi-Store Architecture
 
 3 stores in `stores` table, each with own Shopify credentials:
-- **Elegance House** (women's fashion, EU, EUR)
+- **Clara Atelier** (German womenswear, `i641tw-zf`, clara-atelier.de, EUR) — the store row formerly called Elegance House, repointed and renamed 2026-09-14; the old catalog and history were purged (backup `backups/elegance-house-retire-20260914/`). Its Shopify app issues 24h `client_credentials` tokens, so `stores.admin_token` needs refreshing from `client_id`/`client_secret` until a permanent `shpat_` token is stored.
 - **Isola** (tummy-control swimwear, US, USD)
 - **Eleganz Haus** (fashion, DE, EUR)
 
@@ -112,7 +112,7 @@ Key patterns:
 - Supabase server-side: `createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)`
 - Frontend API: all calls through `apps/dashboard/src/lib/api.js` (`fetchJSON` wrapper with auth token)
 - `npm install` always with `--legacy-peer-deps` (Higgsfield peer dep conflict)
-- Currency: per-store (`stores.currency`) — EUR for Elegance House / Eleganz Haus, USD for Isola
+- Currency: per-store (`stores.currency`) — EUR for Clara Atelier / Eleganz Haus, USD for Isola
 
 ### Frontend (React 19)
 - Functional components only, hooks order: `useState → useRef → useEffect → custom → callbacks → render`
@@ -127,7 +127,7 @@ Key patterns:
 ### Backend
 - Error handling: `try/catch` everywhere, structured logging: `console.error('[Module] Description:', { context })`
 - `catch (e) {}` is **FORBIDDEN** — always log or re-throw
-- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `AUTH_ADMIN`, `MASTER`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `AMAZON_SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals). All 20 values enforced by `pipeline_log_agent_check` (fixed 2026-08-17 via `sql/fix-pipeline-log-agent-check.sql` — P0-7 from AUDIT-2026-08).
+- Pipeline activity → `pipeline_log` table (agent, message, level, metadata). **`level` CHECK allows only `info` / `warn` / `error`** (`sql/schema.sql`) — 7 call sites wrote `'success'` and every one of those inserts failed silently (the inserts don't check `error`), so those events never reached the terminal log; all switched to `'info'` 2026-09-14. Agent names in use: `OPTIMIZER`, `IMPORTER`, `PRICING`, `CLEANUP`, `AUTH`, `AUTH_ADMIN`, `MASTER`, `SKILL_GEN`, `STYLE_GEN`, `SCRAPER`, `AMAZON_SCRAPER`, `FORGE`, `PUBLISHER`, `LOOPER`, `AVATAR`, `EDITOR`, `SIZE_CHART`, `DOC_PROCESSOR`, `REVIEWS`, `AGENT` (proposals). All 20 values enforced by `pipeline_log_agent_check` (fixed 2026-08-17 via `sql/fix-pipeline-log-agent-check.sql` — P0-7 from AUDIT-2026-08).
 - **Audit trail (P1-16, AUDIT-2026-08, fixed 2026-08-17):** every `pipeline_log` insert also records `initiator` (`'user'` / `'system'` / `'webhook'` / `'cron'`, CHECK-constrained) and `user_id` (UUID FK to `users.id`, nullable). `initiator: 'user'` covers every dashboard-triggered action (`lib/actions/*.js` dispatched via `api/system.js`, plus the standalone routes `api/creatives/*.js` / `api/ads/action.js` / `api/auth/login.js` / `api/auth/shopify.js`) — `user_id` is `req.user?.user_id || null` (`null` for the master-password fallback token, which has no backing `users` row, and for the unauthenticated `submit_review_public`/OAuth-connect flows, which have no session to attribute to). `initiator: 'cron'` is `api/cron/detect-events.js`'s single aggregated scan-summary log (`user_id: null` — cron auth is `CRON_SECRET`, not a session). `initiator: 'webhook'` is `api/webhooks/shopify.js`'s per-webhook log (`user_id: null` — Shopify calls this, not a person). No central `logPipeline()` helper exists — each of the ~73 call sites does its own `supabase.from('pipeline_log').insert({...})`, so attribution was added additively at every site rather than via one signature change. Pre-migration rows keep `user_id`/`initiator` `NULL` (history not reconstructed). Check when auditing who did what. Migration: `sql/add-pipeline-log-user-attribution.sql`. Test: `tests/pipeline-log-attribution.test.js` (one case per initiator category, driven through the real handler).
 - Shopify writes: always log to pipeline_log before and after
 - Rate limiting via `lib/rate-limit.js` (Supabase-backed, async): generate 20/hr, video 10/hr, optimize 30/hr, import_reviews_csv 20/hr, generate_reviews 20/hr, public `review_submit:{ip}` 5/hr + `review_submit_global` 200/hr, `helpful_vote:{ip}` 30/hr + `helpful_vote_global` 500/hr + `helpful_one:{ip}:{review_id}` 1/24h (per-review dedup)
@@ -502,7 +502,7 @@ Cron (daily 08:00 UTC) → `detect-events.js` → per store in parallel (`Promis
 
 ### Product Sync (`lib/actions/sync.js`)
 1. Fetch custom + smart collections (Admin REST), then for each: fetch member products via **GraphQL** `collection.products` (paginated). Build `handle → [collection titles]` map.
-2. Fetch all products (Admin REST, `since_id` pagination).
+2. Fetch all products (Admin REST, **Link-header cursor pagination** via `fetchAllAdminPages`). The old `since_id` loop both repeated and skipped rows — the product list is not ordered by id, so on Clara Atelier it returned 438 rows for a 285-product catalog, 281 of them unique (fixed 2026-09-14).
 3. Upsert each via `upsertProductFromShopify()`, then set `tags` = collection titles — **only if the product is in ≥1 collection** (preserves existing tags otherwise; downside: a product that left all collections keeps stale tags).
 4. Archive products no longer in Shopify (`status='archived'`).
 - Webhooks (`api/webhooks/shopify.js`) call the same upsert helper but **never touch `tags`** (webhook payload has no collection memberships) — only full sync populates collections.

@@ -167,7 +167,7 @@ export default async function handler(req, res) {
         store_id: storeId,
         agent: 'AUTH',
         message: `Shopify Admin connected for ${shop}`,
-        level: 'success',
+        level: 'info',
         metadata: { shop, scopes: SCOPES },
         user_id: null, initiator: 'user',
       });

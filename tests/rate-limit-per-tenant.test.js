@@ -123,7 +123,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
     return {
       messages: {
         create: vi.fn().mockResolvedValue({
-          content: [{ text: '[{"author":"Jane","rating":5,"title":"Great","body":"Loved it"}]' }],
+          content: [{ type: 'text', text: '[{"author":"Jane","rating":5,"title":"Great","body":"Loved it"}]' }],
         }),
       },
     };

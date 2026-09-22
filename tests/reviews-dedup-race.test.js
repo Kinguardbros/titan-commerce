@@ -57,6 +57,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
       messages: {
         create: vi.fn().mockResolvedValue({
           content: [{
+            type: 'text',
             text: JSON.stringify([
               { author: 'Maria', rating: 5, title: 'Great', body: 'Loved it' },
               { author: 'Jennifer', rating: 4, title: 'Good', body: 'Pretty good fit' },

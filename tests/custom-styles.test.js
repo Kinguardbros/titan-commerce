@@ -48,7 +48,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
     return {
       messages: {
         create: vi.fn().mockResolvedValue({
-          content: [{ text: '{"style_name_suggestion":"Poolside","color_palette":["#fff"],"lighting":"soft","composition":"wide","setting":"pool","mood":"calm","camera_angle":"eye-level","color_grading":"warm","distinguishing_features":"tile","prompt_template":"a poolside scene"}' }],
+          content: [{ type: 'text', text: '{"style_name_suggestion":"Poolside","color_palette":["#fff"],"lighting":"soft","composition":"wide","setting":"pool","mood":"calm","camera_angle":"eye-level","color_grading":"warm","distinguishing_features":"tile","prompt_template":"a poolside scene"}' }],
         }),
       },
     };

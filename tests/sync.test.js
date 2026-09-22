@@ -55,11 +55,15 @@ function mockReqRes(body) {
 }
 
 function stubShopifyFetch() {
+  // Products are paged via the Link header (sync.js::fetchAllAdminPages), so every
+  // stubbed response carries one — an empty header means "this was the last page".
+  const noNextPage = { get: () => null };
   const fetchMock = vi.fn(async (url) => {
-    if (url.includes('custom_collections.json')) return { json: async () => ({ custom_collections: [] }) };
-    if (url.includes('smart_collections.json')) return { json: async () => ({ smart_collections: [] }) };
+    if (url.includes('custom_collections.json')) return { headers: noNextPage, json: async () => ({ custom_collections: [] }) };
+    if (url.includes('smart_collections.json')) return { headers: noNextPage, json: async () => ({ smart_collections: [] }) };
     if (url.includes('products.json')) {
       return {
+        headers: noNextPage,
         json: async () => ({
           products: [
             {
@@ -70,7 +74,7 @@ function stubShopifyFetch() {
         }),
       };
     }
-    return { json: async () => ({}) };
+    return { headers: noNextPage, json: async () => ({}) };
   });
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
