@@ -28,8 +28,12 @@ export default function MetafieldEditor({ metafields, editing, onChange }) {
     setNewVal('');
   };
 
-  // Filter out size_chart_text (handled by SizeChartEditor)
-  const visible = metafields.filter((m) => !(m.namespace === 'custom' && m.key === 'size_chart_text'));
+  // Filter out the two size-chart metafields: size_chart_text is the retired plain-text
+  // mechanism (2026-09-22, see lib/actions/size-chart.js), left in Shopify untouched but not
+  // presented as truth anywhere; size_chart (metaobject_reference) is the live mechanism,
+  // managed by the dedicated Size Chart widget (SizeChartAssignment.jsx) and the Size Charts
+  // tab — editing its raw gid string here would bypass that UI's validation.
+  const visible = metafields.filter((m) => !(m.namespace === 'custom' && (m.key === 'size_chart_text' || m.key === 'size_chart')));
 
   if (!editing && visible.length === 0) {
     return <div className="mfe-empty">No metafields</div>;

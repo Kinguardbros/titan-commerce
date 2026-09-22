@@ -1,0 +1,27 @@
+.apc-modal__backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.apc-modal {
+  background: var(--surface-1, #111114); border: 1px solid var(--border, #2a2a30);
+  border-radius: 10px; width: min(480px, 92vw); max-height: 80vh;
+  display: flex; flex-direction: column; padding: 20px; color: var(--text-primary, #eee);
+}
+.apc-modal__title { font-weight: 600; font-size: 1.05rem; margin-bottom: 10px; }
+.apc-modal__search {
+  padding: 7px 9px; border-radius: 6px; border: 1px solid var(--border, #2a2a30);
+  background: var(--surface-2, #1a1a1f); color: var(--text-primary, #eee); font: inherit; margin-bottom: 10px;
+}
+.apc-modal__loading { color: var(--text-secondary, #a8a8b0); font-size: 0.9rem; }
+.apc-modal__list { list-style: none; margin: 0; padding: 0; overflow-y: auto; max-height: 40vh; }
+.apc-modal__list li { padding: 4px 0; font-size: 0.88rem; }
+.apc-modal__list label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.apc-modal__empty { color: var(--text-secondary, #a8a8b0); }
+.apc-modal__error { color: #ff6b6b; font-size: 0.85rem; margin-top: 6px; }
+.apc-modal__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.apc-modal__actions button {
+  padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border, #2a2a30);
+  background: transparent; color: var(--text-primary, #eee); cursor: pointer; font: inherit;
+}
+.apc-modal__actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.apc-modal__confirm { background: var(--accent, #6c5ce7) !important; border-color: var(--accent, #6c5ce7) !important; color: #fff !important; }

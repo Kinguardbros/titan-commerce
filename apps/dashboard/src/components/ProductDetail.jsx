@@ -4,7 +4,7 @@ import TagInput from './TagInput';
 import VariantEditor from './VariantEditor';
 import ImageManager from './ImageManager';
 import MetafieldEditor from './MetafieldEditor';
-import SizeChartEditor from './SizeChartEditor';
+import SizeChartAssignment from './SizeChartAssignment';
 import { useToast } from '../hooks/useToast.jsx';
 import { useUser } from '../hooks/useUser.jsx';
 import './ProductDetail.css';
@@ -231,7 +231,7 @@ export default function ProductDetail({ product, storeId, store }) {
       </div>
 
       {/* Size Chart */}
-      <SizeChartEditor product={product} storeId={storeId} />
+      <SizeChartAssignment product={product} storeId={storeId} />
 
       {/* Metafields */}
       <div className="pd-card">

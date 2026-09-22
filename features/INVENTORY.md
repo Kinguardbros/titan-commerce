@@ -8,6 +8,7 @@ Capability map for Titan Commerce. IDs are monotonic; slugs never reuse.
 | feature-02 | users-and-permissions | shipped | medium (4d) | dan | feature.users_and_permissions.enabled | 2026-07-24 | 2026-07-27 |
 | feature-03 | amazon-reviews-scraper | shipped-with-limitation | medium (4-5d) | dan | feature.amazon_reviews_scraper.enabled (OFF) | 2026-07-28 | 2026-07-29 |
 | feature-04 | amazon-userscript | active | small-medium (2-3d) | dan | feature.amazon_userscript.enabled (OFF) | 2026-07-29 | — |
+| feature-05 | size-charts-management | shipped | medium (~4d) | dan | feature.size_charts_management.enabled (OFF) | 2026-09-22 | 2026-09-22 |
 
 ## Build waves
 
@@ -15,6 +16,7 @@ Capability map for Titan Commerce. IDs are monotonic; slugs never reuse.
 - **Wave 2 (depends on feature-01):** feature-02
 - **Wave 3 (depends on feature-02):** feature-03
 - **Wave 4 (depends on feature-02 + feature-03):** feature-04
+- **Wave 5 (no deps):** feature-05
 
 ## Notes
 

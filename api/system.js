@@ -11,7 +11,11 @@ import { profit_summary } from '../lib/actions/profit.js';
 import { proposals_list, approve_proposal, reject_proposal, approve_all_proposals, scan_events } from '../lib/actions/proposals.js';
 import { pending_optimizations, optimize_product, approve_optimization, reject_optimization, save_optimization } from '../lib/actions/optimizations.js';
 import { get_skills, generate_skills, regenerate_skill, save_skill } from '../lib/actions/skills.js';
-import { read_size_chart, refresh_size_charts, save_size_chart, parse_size_chart_image } from '../lib/actions/size-chart.js';
+import {
+  size_charts_list, size_chart_detail, validate_size_chart, create_size_chart, update_size_chart,
+  duplicate_size_chart, assign_size_chart_products, unassign_size_chart_products,
+  refresh_has_size_chart, parse_size_chart_image,
+} from '../lib/actions/size-chart.js';
 import { product_detail, scrape_product, import_confirm, update_product_full, bulk_price } from '../lib/actions/products.js';
 import { store_docs, store_docs_download, upload_store_doc, process_single_file, process_inbox } from '../lib/actions/docs.js';
 import { custom_styles, analyze_style, create_custom_style, delete_custom_style, describe_style, scrape_style } from '../lib/actions/custom-styles.js';
@@ -48,13 +52,13 @@ const GET_ACTIONS = {
   pending_optimizations,
   insights,
   proposals_list,
-  read_size_chart,
+  size_charts_list,
+  size_chart_detail,
   product_detail,
   store_docs,
   store_docs_download,
   get_skills,
   meta_overview,
-  refresh_size_charts,
   custom_styles,
   persona_avatars,
   poll_avatar_generations,
@@ -88,7 +92,13 @@ const POST_ACTIONS = {
   process_single_file,
   process_inbox,
   push_creative_to_shopify,
-  save_size_chart,
+  validate_size_chart,
+  create_size_chart,
+  update_size_chart,
+  duplicate_size_chart,
+  assign_size_chart_products,
+  unassign_size_chart_products,
+  refresh_has_size_chart,
   parse_size_chart_image,
   update_product_full,
   scrape_product,

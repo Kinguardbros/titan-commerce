@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import { getProducts, getAllProducts, syncProducts, refreshSizeCharts, bulkMakeUnlisted, bulkMakeListed, exportProductsCsv } from '../lib/api';
+import { getProducts, getAllProducts, syncProducts, refreshHasSizeChart, bulkMakeUnlisted, bulkMakeListed, exportProductsCsv } from '../lib/api';
 import { SkeletonGrid } from '../components/Skeleton';
 import { useToast } from '../hooks/useToast.jsx';
 import StatusFilter from '../components/products/StatusFilter';
 import SelectionToolbar from '../components/products/SelectionToolbar';
 import BulkConfirmModal from '../components/products/BulkConfirmModal';
+import AssignSizeChartModal from '../components/AssignSizeChartModal';
 import PermissionGate from '../components/PermissionGate';
 import './Products.css';
 
@@ -65,6 +66,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
   const [statusFilter, setStatusFilter] = useState('all');
   const [bulkModal, setBulkModal] = useState(null); // null | { mode: 'unlist'|'list', items }
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [showAssignChart, setShowAssignChart] = useState(false);
 
   const fetchProducts = useCallback(async (page = 1, append = false) => {
     // Guard: never fetch without storeId — backend would return ALL stores' products (cross-store leak).
@@ -221,7 +223,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
     setRefreshingSC(true);
     toast.info('Checking size charts...');
     try {
-      const result = await refreshSizeCharts(storeId);
+      const result = await refreshHasSizeChart(storeId);
       await fetchProducts();
       toast.success(`${result.with_size_chart} of ${result.total} products have size charts`);
     } catch (err) {
@@ -231,6 +233,11 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       setRefreshingSC(false);
     }
   };
+
+  const selectedProductIds = useMemo(
+    () => allProducts.filter((p) => selectedIds.has(p.shopify_id)).map((p) => p.id),
+    [allProducts, selectedIds],
+  );
 
   const toggleSelect = useCallback((shopifyId) => {
     setSelectedIds((prev) => {
@@ -406,6 +413,31 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
           onClear={clearSelection}
         />
       </PermissionGate>
+      {/* Separate from the publications-gated toolbar above: assigning a size chart is a
+          products:edit action (writes custom.size_chart), not a publications one, so a user
+          with edit-but-not-publications access still gets bulk assignment. */}
+      <PermissionGate perm="products:edit">
+        {selectedIds.size > 0 && (
+          <div className="products-sizechart-bar">
+            <span>{selectedIds.size} selected</span>
+            <button className="products-sync-btn" onClick={() => setShowAssignChart(true)}>Assign size chart…</button>
+          </div>
+        )}
+      </PermissionGate>
+      {showAssignChart && (
+        <AssignSizeChartModal
+          storeId={storeId}
+          productIds={selectedProductIds}
+          onClose={() => setShowAssignChart(false)}
+          onDone={(result) => {
+            setShowAssignChart(false);
+            const verb = result.action === 'assign' ? `assigned "${result.chartName || 'chart'}" to` : 'removed the chart from';
+            toast.success(`${verb} ${result.updated} product${result.updated !== 1 ? 's' : ''}`);
+            clearSelection();
+            fetchProducts(1, false);
+          }}
+        />
+      )}
       <BulkConfirmModal
         open={!!bulkModal}
         title={bulkModal?.mode === 'unlist' ? 'Make Unlisted' : 'Make Listed'}
@@ -451,7 +483,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                     <div className="product-card-title">{p.title}</div>
                     <div className="product-card-meta">
                       {p.price && <span className="product-card-price">${p.price}</span>}
-                      {!p.has_size_chart && <span style={{ color: 'var(--accent-secondary)', fontSize: 10, marginLeft: 6 }} title="Missing size chart">⚠ Size</span>}
+                      {p.has_size_chart ? <span style={{ color: 'var(--accent-success)', fontSize: 10, marginLeft: 6 }} title={p.size_chart_name ? `Size chart: ${p.size_chart_name}` : 'Size chart assigned'}>✓ Size</span> : <span style={{ color: 'var(--accent-secondary)', fontSize: 10, marginLeft: 6 }} title="No size chart assigned">⚠ Size</span>}
                     </div>
                   </div>
                 </div>
@@ -480,7 +512,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                       <td className="products-table-name">{p.title}{isNew(p) && <span className="pill" style={{ marginLeft: 6, background: 'var(--accent-primary-soft)', color: 'var(--accent-primary)', fontSize: 9, padding: '2px 6px' }}>New</span>}</td>
                       <td>${p.price || '—'}</td>
                       <td>{p.creative_count > 0 ? <span style={{ color: 'var(--accent-success)' }}>{p.creative_count}</span> : <span style={{ color: 'var(--accent-danger)' }}>0 ⚠</span>}</td>
-                      <td>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠</span>}</td>
+                      <td title={p.size_chart_name || undefined}>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓ {p.size_chart_name}</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠</span>}</td>
                       <td>{p.cogs ? `$${p.cogs}` : '—'}</td>
                       <td><button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button></td>
                     </tr>
@@ -511,7 +543,7 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
                   </div>
                   <div className="products-card-stats">
                     <span>{p.creative_count || 0} 🎨</span>
-                    <span>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓ Size</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠ Size</span>}</span>
+                    <span title={p.size_chart_name || undefined}>{p.has_size_chart ? <span style={{ color: 'var(--accent-success)' }}>✓ Size</span> : <span style={{ color: 'var(--accent-secondary)' }}>⚠ Size</span>}</span>
                   </div>
                   <div className="products-card-actions">
                     <button className="products-studio-link" aria-label={`Open ${p.title} in Studio`} onClick={(e) => { e.stopPropagation(); onNavigateToStudio(p.id); }}>Studio →</button>

@@ -1,0 +1,45 @@
+.asc-modal__backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+
+.asc-modal {
+  background: var(--surface-1, #111114);
+  border: 1px solid var(--border, #2a2a30);
+  border-radius: 10px;
+  width: min(420px, 92vw);
+  padding: 20px;
+  color: var(--text-primary, #eee);
+}
+
+.asc-modal__title { font-weight: 600; font-size: 1.05rem; margin-bottom: 6px; }
+.asc-modal__count { color: var(--text-secondary, #a8a8b0); font-size: 0.9rem; margin-bottom: 14px; }
+.asc-modal__loading { color: var(--text-secondary, #a8a8b0); font-size: 0.9rem; padding: 10px 0; }
+
+.asc-modal__select {
+  width: 100%; padding: 8px 10px; border-radius: 6px;
+  border: 1px solid var(--border, #2a2a30);
+  background: var(--surface-2, #1a1a1f); color: var(--text-primary, #eee);
+  font: inherit; margin-bottom: 8px;
+}
+
+.asc-modal__error {
+  color: #ff6b6b; font-size: 0.85rem; margin-top: 6px; margin-bottom: 6px;
+}
+
+.asc-modal__actions {
+  display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;
+}
+.asc-modal__actions button {
+  padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border, #2a2a30);
+  background: transparent; color: var(--text-primary, #eee); cursor: pointer; font: inherit;
+}
+.asc-modal__actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.asc-modal__confirm {
+  background: var(--accent, #6c5ce7) !important; border-color: var(--accent, #6c5ce7) !important; color: #fff !important;
+}
+.asc-modal__remove {
+  border-color: #ff6b6b !important; color: #ff6b6b !important;
+}

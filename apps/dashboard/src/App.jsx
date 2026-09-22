@@ -14,9 +14,10 @@ const ProductWorkspace = lazy(() => import('./pages/ProductWorkspace'));
 const Studio = lazy(() => import('./pages/Studio'));
 const Profit = lazy(() => import('./pages/Profit'));
 const Avatars = lazy(() => import('./pages/Avatars'));
+const SizeCharts = lazy(() => import('./pages/SizeCharts'));
 const Settings = lazy(() => import('./pages/Settings'));
 
-const ALL_TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Profit'];
+const ALL_TABS = ['Cockpit', 'Shopify', 'Studio', 'Avatars', 'Products', 'Size Charts', 'Profit'];
 
 function visibleTabs(user) {
   if (!user) return [];
@@ -26,7 +27,8 @@ function visibleTabs(user) {
   if (user.role === 'admin') return [...ALL_TABS, 'Settings'];
   const perms = user.permissions || [];
   const tabs = [];
-  if (perms.includes('products:read')) tabs.push('Products');
+  // Same gate as Products — Size Charts is a products:read/edit surface, not finance/creative.
+  if (perms.includes('products:read')) tabs.push('Products', 'Size Charts');
   // Cockpit/Shopify/Profit surface revenue, margin and ad-spend data — gated on
   // finance:read (P0-5, Docs/AUDIT-2026-08.md), separate from products:read so a
   // VA/contractor scoped for product image work doesn't automatically see P&L.
@@ -245,6 +247,7 @@ function AppContent() {
               {activeTab === 'Avatars' && <Avatars storeId={storeId} store={activeStore} />}
               {activeTab === 'Products' && !selectedProduct && <Products onSelectProduct={handleSelectProduct} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} />}
               {activeTab === 'Products' && selectedProduct && <ProductWorkspace product={selectedProduct} onBack={handleBackToProducts} onNavigateToStudio={handleNavigateToStudio} storeId={storeId} store={activeStore} />}
+              {activeTab === 'Size Charts' && <SizeCharts storeId={storeId} />}
               {activeTab === 'Profit' && <Profit storeId={storeId} store={activeStore} />}
               {activeTab === 'Settings' && <Settings />}
             </Suspense>

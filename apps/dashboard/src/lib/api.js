@@ -29,7 +29,12 @@ async function fetchJSON(url, options = {}) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.hint || body.details || body.error || `Request failed (${res.status})`);
+    const err = new Error(body.hint || body.details || body.error || `Request failed (${res.status})`);
+    // Structured detail (e.g. size-chart validation's { errors: [...], warnings: [...] }) —
+    // attached, not folded into .message, so existing callers that only read .message are
+    // unaffected and a caller that wants the list can read err.body.
+    err.body = body;
+    throw err;
   }
 
   return res.json();
@@ -303,15 +308,64 @@ export function confirmImport(data) {
   });
 }
 
-// Size Chart
-export function readSizeChart(storeId, productId) {
-  return fetchJSON(`/api/system?action=read_size_chart&store_id=${storeId}&product_id=${productId}`);
+// Size Charts — the `size_chart` Shopify metaobject mechanism (see
+// SIZE-CHART-DATA-CONTRACT.md in the clara-atelier repo). Retired 2026-09-22:
+// readSizeChart/saveSizeChart/refreshSizeCharts, which read/wrote the plain-text
+// custom.size_chart_text metafield the storefront theme never renders.
+export function getSizeCharts(storeId) {
+  return fetchJSON(`/api/system?action=size_charts_list&store_id=${storeId}`);
 }
 
-export function saveSizeChart(storeId, productId, sizeChartText) {
-  return fetchJSON('/api/system?action=save_size_chart', {
+export function getSizeChartDetail(storeId, chartId) {
+  return fetchJSON(`/api/system?action=size_chart_detail&store_id=${storeId}&chart_id=${encodeURIComponent(chartId)}`);
+}
+
+export function validateSizeChart(storeId, { chartId, columns, rows, unit } = {}) {
+  return fetchJSON('/api/system?action=validate_size_chart', {
     method: 'POST',
-    body: JSON.stringify({ store_id: storeId, product_id: productId, size_chart_text: sizeChartText }),
+    body: JSON.stringify({ store_id: storeId, chart_id: chartId, columns, rows, unit }),
+  });
+}
+
+export function createSizeChart(storeId, { name, columns, rows, note, unit }) {
+  return fetchJSON('/api/system?action=create_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, name, columns, rows, note, unit }),
+  });
+}
+
+export function updateSizeChart(storeId, chartId, { name, columns, rows, note, unit }) {
+  return fetchJSON('/api/system?action=update_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, chart_id: chartId, name, columns, rows, note, unit }),
+  });
+}
+
+export function duplicateSizeChart(storeId, chartId) {
+  return fetchJSON('/api/system?action=duplicate_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, chart_id: chartId }),
+  });
+}
+
+export function assignSizeChartProducts(storeId, chartId, productIds) {
+  return fetchJSON('/api/system?action=assign_size_chart_products', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, chart_id: chartId, product_ids: productIds }),
+  });
+}
+
+export function unassignSizeChartProducts(storeId, productIds) {
+  return fetchJSON('/api/system?action=unassign_size_chart_products', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_ids: productIds }),
+  });
+}
+
+export function refreshHasSizeChart(storeId) {
+  return fetchJSON('/api/system?action=refresh_has_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId }),
   });
 }
 
@@ -434,10 +488,6 @@ export function scrapeStyle(url, storeId) {
     method: 'POST',
     body: JSON.stringify({ url, store_id: storeId }),
   });
-}
-
-export function refreshSizeCharts(storeId) {
-  return fetchJSON(`/api/system?action=refresh_size_charts&store_id=${storeId}`);
 }
 
 // Avatars

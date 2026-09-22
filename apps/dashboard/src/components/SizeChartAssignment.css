@@ -1,0 +1,9 @@
+.sca-current { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.sca-name { font-size: 13px; font-weight: 600; color: var(--text-primary, #eee); }
+.sca-empty { font-size: 13px; color: var(--text-secondary, #a8a8b0); }
+.sca-btn {
+  border: 1px solid var(--border, #2a2a30); background: transparent; color: var(--text-secondary, #a8a8b0);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer;
+}
+.sca-btn:hover { color: var(--text-primary, #eee); }
+.sca-hint { font-size: 10px; color: var(--text-secondary, #a8a8b0); margin-top: 8px; }
