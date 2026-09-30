@@ -3,6 +3,7 @@ import { getProductReviews, addReviewManual, updateReview, deleteReview, setRevi
 import { useToast } from '../hooks/useToast.jsx';
 import ReviewDetail from './ReviewDetail';
 import './ReviewsPanel.css';
+import { approveAllPending } from '../lib/review-bulk';
 
 // Lazy — pulls in the xlsx parser only when the import modal is actually opened.
 const ImportReviews = lazy(() => import('./ImportReviews'));
@@ -37,6 +38,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const [importing, setImporting] = useState(false); // import sub-modal open
   const [generating, setGenerating] = useState(false); // AI generate dialog open
   const [pushing, setPushing] = useState(false);   // push-to-Shopify in flight
+  const [approving, setApproving] = useState(false); // approve-all-pending in flight
   const [seedOpen, setSeedOpen] = useState(false);
   const [seedRange, setSeedRange] = useState({ min: 5, max: 50 });
 
@@ -97,6 +99,24 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
     } catch (err) {
       console.error('[ReviewsPanel] delete failed:', err);
       toast.error(`Delete failed: ${err.message}`);
+    }
+  };
+
+  const pendingCount = reviews.filter((r) => r.status === 'pending').length;
+
+  const handleApproveAll = async () => {
+    if (!window.confirm(`Approve all ${pendingCount} pending review${pendingCount === 1 ? '' : 's'}? They go live with the next Push to Shopify.`)) return;
+    setApproving(true);
+    try {
+      const updated = await approveAllPending(reviews, storeId, setReviewStatus);
+      toast.success(`Approved ${updated} review${updated === 1 ? '' : 's'}`);
+      await fetchReviews();
+    } catch (err) {
+      console.error('[ReviewsPanel] approve all failed:', err);
+      toast.error(`Approve all failed: ${err.message}`);
+      await fetchReviews(); // earlier chunks may have gone through
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -196,6 +216,11 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
             <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
+            {pendingCount > 0 && (
+              <button className="rv-import-btn" onClick={handleApproveAll} disabled={approving}>
+                {approving ? 'Approving…' : `Approve all pending (${pendingCount})`}
+              </button>
+            )}
             <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
             {canPush && (
               <button className="rv-push-btn" onClick={handlePush} disabled={pushing}>
