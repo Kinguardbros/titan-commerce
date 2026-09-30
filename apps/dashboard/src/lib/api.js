@@ -126,6 +126,17 @@ export async function getAllProducts(storeId, show_archived) {
   return result.products || [];
 }
 
+// Every active product, walking all pages — getAllProducts stops at the first 200.
+export async function getAllProductsPaged(storeId) {
+  const first = await getProducts(storeId, { page: 1, limit: 200 });
+  const all = [...(first.products || [])];
+  for (let page = 2; page <= (first.pages || 1); page++) {
+    const next = await getProducts(storeId, { page, limit: 200 });
+    all.push(...(next.products || []));
+  }
+  return all;
+}
+
 export function syncProducts(storeId) {
   return fetchJSON('/api/system?action=sync_products', {
     method: 'POST',

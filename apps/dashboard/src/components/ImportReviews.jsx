@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { importReviewsCsv } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import AmazonImport from './AmazonImport';
+import ReviewTargetPicker from './ReviewTargetPicker';
 
 const CSV_EXAMPLE = `author,rating,title,body,date,photo_url,verified
 Maria,5,"Perfect fit","True to size, super comfortable",2024-06-10,,1
@@ -63,9 +64,14 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
   const [sheetUrl, setSheetUrl] = useState('');
   const [fileName, setFileName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [target, setTarget] = useState('product'); // 'product' | 'collection'
+  const [targetIds, setTargetIds] = useState([productId]); // collection mode selection
   const fileRef = useRef(null);
 
   const rowCount = csv.trim() ? Math.max(0, csv.trim().split(/\r?\n/).length - 1) : 0;
+  // Other products that get a copy (collection mode only); the current one is always included.
+  const extraIds = target === 'collection' ? targetIds.filter((id) => id !== productId) : [];
+  const productCount = extraIds.length + 1;
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
@@ -83,12 +89,14 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
 
   const handleImport = async () => {
     const payload = sheetUrl.trim() ? { sheet_url: sheetUrl.trim() } : { csv };
+    if (extraIds.length) payload.product_ids = extraIds;
     if (!sheetUrl.trim() && !csv.trim()) { toast.error('Paste CSV, upload a file, or add a Sheets URL'); return; }
     setBusy(true);
     try {
-      const { inserted, skipped, duplicates } = await importReviewsCsv(storeId, productId, payload);
+      const { inserted, skipped, duplicates, products } = await importReviewsCsv(storeId, productId, payload);
       const extra = [skipped ? `${skipped} skipped` : '', duplicates ? `${duplicates} duplicate` : ''].filter(Boolean).join(' · ');
-      toast.success(`Imported ${inserted} review${inserted === 1 ? '' : 's'}${extra ? ` · ${extra}` : ''}`);
+      const into = products > 1 ? ` into ${products} products` : '';
+      toast.success(`Imported ${inserted} review${inserted === 1 ? '' : 's'}${into}${extra ? ` · ${extra}` : ''}`);
       onImported();
       onClose();
     } catch (err) {
@@ -118,10 +126,24 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
         </div>
 
         {tab !== 'amazon' && (
-          <div className="rv-import-template">
-            <span>New here? Grab the format:</span>
-            <button type="button" className="rv-template-btn" onClick={downloadTemplate}>↓ Download CSV template</button>
-          </div>
+          <>
+            <div className="rv-import-template">
+              <span>New here? Grab the format:</span>
+              <button type="button" className="rv-template-btn" onClick={downloadTemplate}>↓ Download CSV template</button>
+            </div>
+
+            <div className="rv-target-switch" role="radiogroup" aria-label="Import into">
+              <button type="button" role="radio" aria-checked={target === 'product'}
+                className={target === 'product' ? 'rv-target-opt rv-target-opt--active' : 'rv-target-opt'}
+                onClick={() => setTarget('product')}>This product</button>
+              <button type="button" role="radio" aria-checked={target === 'collection'}
+                className={target === 'collection' ? 'rv-target-opt rv-target-opt--active' : 'rv-target-opt'}
+                onClick={() => setTarget('collection')}>Products in a collection</button>
+            </div>
+            {target === 'collection' && (
+              <ReviewTargetPicker storeId={storeId} productId={productId} selected={targetIds} onChange={setTargetIds} />
+            )}
+          </>
         )}
 
         {tab === 'csv' && (
@@ -133,7 +155,7 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
               placeholder={CSV_EXAMPLE} />
             <div className="rv-import-meta">
               <span>Columns: author, rating, title, body, date, photo_url, verified</span>
-              {rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}</span>}
+              {rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}{productCount > 1 ? ` × ${productCount} products` : ''}</span>}
             </div>
             <div className="rv-detail-actions rv-import-actions">
               <button className="rv-btn rv-btn--save" disabled={busy} onClick={handleImport}>
@@ -149,7 +171,7 @@ export default function ImportReviews({ storeId, productId, onClose, onImported 
               Upload .csv / .xlsx
             </button>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" hidden onChange={handleFile} />
-            {fileName && <div className="rv-import-meta"><span>📄 {fileName}</span>{rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}</span>}</div>}
+            {fileName && <div className="rv-import-meta"><span>📄 {fileName}</span>{rowCount > 0 && <span className="rv-import-count">{rowCount} row{rowCount === 1 ? '' : 's'}{productCount > 1 ? ` × ${productCount} products` : ''}</span>}</div>}
             <div className="rv-detail-actions rv-import-actions">
               <button className="rv-btn rv-btn--save" disabled={busy || !csv.trim()} onClick={handleImport}>
                 {busy ? 'Importing…' : 'Import'}

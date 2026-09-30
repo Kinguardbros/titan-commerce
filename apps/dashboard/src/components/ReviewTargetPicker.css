@@ -1,0 +1,38 @@
+/* Reviews import: "This product / Products in a collection" switch + collection picker. */
+.rv-target-switch {
+  display: inline-flex; gap: 2px; padding: 2px; margin-bottom: 14px;
+  background: var(--deep); border: 1px solid var(--edge); border-radius: 8px;
+}
+.rv-target-opt {
+  background: none; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer;
+  color: var(--text3); font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .3px;
+}
+.rv-target-opt:hover { color: var(--text); }
+.rv-target-opt--active { background: var(--surface); color: var(--gold); }
+
+.rv-target { margin-bottom: 16px; }
+.rv-target-note {
+  margin-bottom: 16px; font-family: var(--mono); font-size: 10px; color: var(--text4);
+}
+.rv-target-bulk { display: inline-flex; gap: 8px; }
+.rv-target-bulk button {
+  background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--gold); font-family: var(--mono); font-size: 9px; text-decoration: underline;
+}
+
+.rv-target-list {
+  list-style: none; margin: 8px 0 0; padding: 4px 0; max-height: 200px; overflow-y: auto;
+  border: 1px solid var(--edge); border-radius: 8px; background: var(--deep);
+}
+.rv-target-list label {
+  display: flex; align-items: center; gap: 8px; padding: 5px 10px; cursor: pointer;
+  font-family: var(--sans); font-size: 12px; color: var(--text);
+}
+.rv-target-list label:hover { background: var(--surface); }
+.rv-target-list input { accent-color: var(--gold); margin: 0; flex-shrink: 0; }
+.rv-target-list span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-target-list em {
+  margin-left: auto; flex-shrink: 0; font-style: normal;
+  font-family: var(--mono); font-size: 9px; color: var(--text4);
+}
+.rv-target-current { cursor: default; }
