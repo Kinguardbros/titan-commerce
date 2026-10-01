@@ -210,6 +210,61 @@ describe('lib/actions/reviews-amazon.js', () => {
       expect(supabaseState.inserted[0].source).toBe('temu');
     });
 
+    it('accepts source="stamped" with origin_site, stores the origin and never marks it verified', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'stamped', origin_site: 'shapermint.com' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(supabaseState.inserted[0]).toMatchObject({ source: 'stamped', origin_site: 'shapermint.com', verified: false });
+    });
+
+    it('normalizes origin_site to a bare lowercase hostname', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'stamped', origin_site: 'WWW.Shapermint.com' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(supabaseState.inserted[0].origin_site).toBe('shapermint.com');
+    });
+
+    it('400s for source="stamped" without origin_site (would reach the storefront unattributed)', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'stamped' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(supabaseState.inserted).toHaveLength(0);
+    });
+
+    it('400s for an origin_site that is not a bare hostname', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'stamped', origin_site: 'https://shapermint.com/x' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(supabaseState.inserted).toHaveLength(0);
+    });
+
+    it('leaves origin_site off the row when none is given (older sources unchanged)', async () => {
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW], source: 'temu' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(supabaseState.inserted[0]).not.toHaveProperty('origin_site');
+      expect(supabaseState.inserted[0].verified).toBe(true);
+    });
+
+    it('keeps an ISO review_date (Stamped, Judge.me) instead of falling back to today', async () => {
+      const iso = { ...SAMPLE_REVIEW, review_date: '2025-03-14' };
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [iso], source: 'stamped', origin_site: 'shapermint.com' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(supabaseState.inserted[0].review_date).toBe('2025-03-14');
+    });
+
+    it('allows the Stamped photo CDN host', async () => {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        arrayBuffer: async () => new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0]).buffer,
+      });
+      const photo = { ...SAMPLE_REVIEW, photo_urls: ['https://cdn1.stamped.io/uploads/photos/52233_abc.jpg'] };
+      const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [photo], source: 'stamped', origin_site: 'shapermint.com' }, MEMBER_WITH_EDIT);
+      await import_amazon_reviews(req, res);
+      expect(fetchMock).toHaveBeenCalledWith('https://cdn1.stamped.io/uploads/photos/52233_abc.jpg', expect.any(Object));
+      expect(supabaseState.inserted[0].photo_url).toBe('https://storage.test/photo.jpg');
+    });
+
     it('defaults source to "amazon" when omitted (backward compat with F04 userscript)', async () => {
       const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1', reviews: [SAMPLE_REVIEW] }, MEMBER_WITH_EDIT);
       await import_amazon_reviews(req, res);

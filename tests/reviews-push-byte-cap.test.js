@@ -24,6 +24,7 @@ function makeBuilder(table) {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     order: vi.fn(() => builder),
     update: vi.fn(() => builder),
     single: vi.fn(async () => ({ data: supabaseState.product, error: null })),

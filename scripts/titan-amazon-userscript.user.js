@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Titan Commerce — Reviews Importer
 // @namespace    https://titan-commerce.vercel.app/
-// @version      2.5.0
-// @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me stores) and import into Titan Commerce as pending reviews.
+// @version      2.6.0
+// @description  Scrape product reviews (Amazon, Temu, Cupshe, Judge.me and Stamped stores) and import into Titan Commerce as pending reviews.
 // @author       Dan
 // @match        https://www.amazon.com/*
 // @match        https://smile.amazon.com/*
@@ -23,6 +23,8 @@
 // @match        https://cupshe.com/*
 // @match        https://www.swanswaywear.com/*
 // @match        https://swanswaywear.com/*
+// @match        https://shapermint.com/*
+// @match        https://www.shapermint.com/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_xmlhttpRequest
@@ -30,6 +32,7 @@
 // @connect      titan-commerce.vercel.app
 // @connect      review.cupshe.com
 // @connect      judge.me
+// @connect      stamped.io
 // @updateURL    https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @downloadURL  https://raw.githubusercontent.com/Kinguardbros/titan-commerce/main/scripts/titan-amazon-userscript.user.js
 // @run-at       document-idle
@@ -284,14 +287,21 @@
     return collected;
   }
 
+  // products/list caps one page at 200 and a store can hold more (Isola: 249), so walk the
+  // pages — otherwise products past the first 200 never show up in the picker.
   async function fetchProducts(titanUrl, token, storeId) {
-    const resp = await gmFetch(`${titanUrl}/api/products/list?store_id=${encodeURIComponent(storeId)}&limit=200`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-    if (resp.status >= 400) throw new Error(`Failed to load products (HTTP ${resp.status})`);
-    const body = JSON.parse(resp.responseText);
-    return body.products || [];
+    const all = [];
+    for (let page = 1; page <= 20; page += 1) {
+      const resp = await gmFetch(`${titanUrl}/api/products/list?store_id=${encodeURIComponent(storeId)}&limit=200&page=${page}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (resp.status >= 400) throw new Error(`Failed to load products (HTTP ${resp.status})`);
+      const body = JSON.parse(resp.responseText);
+      all.push(...(body.products || []));
+      if (!body.pages || page >= body.pages) break;
+    }
+    return all;
   }
 
   async function fetchStores(titanUrl, token) {
@@ -315,17 +325,19 @@
   const MAX_REVIEWS_PER_RUN = 500;
   const IMPORT_CHUNK_SIZE = 100;
 
-  function submitImport(titanUrl, token, storeId, productId, reviews, source) {
+  // originSite: the shop the reviews were written on, for sources that come from another shop
+  // (scraper.sendsOrigin). The storefront prints it next to each review.
+  function submitImport(titanUrl, token, storeId, productId, reviews, source, originSite) {
     return gmFetch(`${titanUrl}/api/system?action=import_amazon_reviews`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ store_id: storeId, product_id: productId, reviews, source }),
+      body: JSON.stringify({ store_id: storeId, product_id: productId, reviews, source, ...(originSite ? { origin_site: originSite } : {}) }),
     });
   }
 
   // Returns {inserted, duplicates, skipped, failedChunks, httpError}. Never throws —
   // a failed chunk is counted and the remaining chunks still run.
-  async function submitImportChunked(titanUrl, token, storeId, productId, reviews, source, onProgress) {
+  async function submitImportChunked(titanUrl, token, storeId, productId, reviews, source, originSite, onProgress) {
     const totals = { inserted: 0, duplicates: 0, skipped: 0, failedChunks: 0, httpError: null };
     for (let i = 0; i < reviews.length; i += IMPORT_CHUNK_SIZE) {
       const chunk = reviews.slice(i, i + IMPORT_CHUNK_SIZE);
@@ -333,7 +345,7 @@
       const of = Math.ceil(reviews.length / IMPORT_CHUNK_SIZE);
       if (onProgress) onProgress(nth, of, totals.inserted);
       try {
-        const resp = await submitImport(titanUrl, token, storeId, productId, chunk, source);
+        const resp = await submitImport(titanUrl, token, storeId, productId, chunk, source, originSite);
         if (resp.status === 401 || resp.status === 429) {
           totals.httpError = resp.status;
           break; // auth / rate limit won't fix itself on the next chunk
@@ -625,6 +637,81 @@
     return out.slice(0, harvestLimit);
   }
 
+  // ---------- STAMPED SCRAPER (Stamped.io widget API) ----------
+  // Shapermint is a headless Next.js storefront over Shopify, so there is no /products/{handle}.js:
+  // the Stamped public key, the shop domain and the product id all sit in the page's
+  // __NEXT_DATA__. The page is re-fetched rather than read from the live <script>, because after
+  // client-side navigation __NEXT_DATA__ still describes the product the tab was opened on.
+  // Reviews come newest first, 100 per page, and are kept in that order — this source does not
+  // oversample (see oversample:false), so an import is the newest N, not a pick of the best.
+  const STAMPED_ENDPOINT = 'https://stamped.io/api/widget/reviews';
+  const STAMPED_PAGE_SIZE = 100;
+  const STAMPED_PHOTO_BASE = 'https://cdn1.stamped.io/uploads/photos/';
+
+  // Strips tags and decodes entities without running anything (DOMParser documents are inert).
+  function htmlToText(html) {
+    const text = new DOMParser().parseFromString(String(html || ''), 'text/html').documentElement.textContent || '';
+    return text.replace(/\s+/g, ' ').trim();
+  }
+
+  async function readStampedConfig() {
+    const html = await fetch(window.location.pathname, { credentials: 'same-origin' }).then((r) => r.text());
+    const raw = new DOMParser().parseFromString(html, 'text/html').getElementById('__NEXT_DATA__')?.textContent;
+    if (!raw) throw new Error('No __NEXT_DATA__ on this page');
+    const data = JSON.parse(raw);
+    const cfg = data.runtimeConfig || {};
+    const apiKey = cfg.STAMPED?.API_KEY || cfg.STAMPED_API_KEY;
+    const storeUrl = cfg.STAMPED?.STORE || cfg.STORE_PLATFORM_DOMAIN;
+    const productId = data.props?.pageProps?.product?.vendor_product?.product_id;
+    if (!apiKey || !storeUrl || !productId) throw new Error('Stamped key, shop or product id not found on this page');
+    return { apiKey, storeUrl, productId };
+  }
+
+  // Stamped stores photos as a comma-separated list of file names (some with a ?v= suffix).
+  function stampedPhotoUrls(fileNames) {
+    return String(fileNames || '').split(',')
+      .map((f) => f.trim().split('?')[0])
+      .filter(Boolean)
+      .map((f) => STAMPED_PHOTO_BASE + encodeURIComponent(f))
+      .slice(0, 10);
+  }
+
+  async function scrapeStampedReviews(harvestLimit) {
+    const { apiKey, storeUrl, productId } = await readStampedConfig();
+    const base = `${STAMPED_ENDPOINT}?productId=${encodeURIComponent(productId)}&apiKey=${encodeURIComponent(apiKey)}`
+      + `&storeUrl=${encodeURIComponent(storeUrl)}&take=${STAMPED_PAGE_SIZE}`;
+    const out = [];
+    const seen = new Set();
+    for (let page = 1; out.length < harvestLimit && page <= 50; page += 1) {
+      const resp = await gmFetch(`${base}&page=${page}`, { method: 'GET' });
+      if (resp.status !== 200) throw new Error(`Stamped API HTTP ${resp.status}`);
+      const data = JSON.parse(resp.responseText);
+      const list = Array.isArray(data.data) ? data.data : [];
+      if (!list.length) break;
+      for (const r of list) {
+        if (out.length >= harvestLimit) break;
+        if (seen.has(r.id)) continue;
+        seen.add(r.id);
+        const rating = parseInt(r.reviewRating, 10);
+        const body = clip(htmlToText(r.reviewMessage), 2000);
+        if (!(rating >= 1 && rating <= 5) || !body) continue;
+        out.push({
+          author: anonymizeAuthor(r.author),
+          rating,
+          title: clip(htmlToText(r.reviewTitle), 200),
+          body,
+          verified: false, // bought on another shop; the backend enforces this as well
+          photo_urls: stampedPhotoUrls(r.reviewUserPhotos),
+          helpful_count: Number.isFinite(r.reviewVotesUp) ? r.reviewVotesUp : 0,
+          review_date: String(r.dateCreated || '').slice(0, 10),
+        });
+      }
+      if (page * STAMPED_PAGE_SIZE >= (data.total || 0)) break;
+      await new Promise((res) => setTimeout(res, 800));
+    }
+    return out;
+  }
+
   const SCRAPERS = [
     {
       source: 'amazon',
@@ -653,6 +740,18 @@
       extractId: extractShopifyHandle,
       scrape: (id, max) => scrapeJudgemeReviews(id, max),
       label: 'Judge.me (Swansway)',
+    },
+    {
+      source: 'stamped',
+      hostMatch: /(?:^|\.)shapermint\.com$/i,
+      extractId: extractShopifyHandle,
+      scrape: (id, max) => scrapeStampedReviews(max),
+      label: 'Stamped (Shapermint)',
+      // Reviews written on another shop: the import carries this host so the storefront can
+      // show where each review comes from. The backend rejects a stamped import without it.
+      sendsOrigin: true,
+      // Take the newest N as they come instead of the best-rated N out of 2× N.
+      oversample: false,
     },
   ];
 
@@ -731,12 +830,17 @@
     }
     const product = filtered[productIdx];
 
-    const maxInput = window.prompt('How many reviews to import? (max 500)', '500');
+    const maxInput = window.prompt(
+      scraper.oversample === false ? 'How many of the newest reviews to import? (max 500)' : 'How many reviews to import? (max 500)',
+      '500'
+    );
     const maxReviews = Math.min(MAX_REVIEWS_PER_RUN, Math.max(1, parseInt(maxInput, 10) || MAX_REVIEWS_PER_RUN));
 
     // F11: oversample by 2× so DB-dedup pre-check has room to drop duplicates and still
-    // hit maxReviews unique. Hard-capped to bound scrape wall time.
-    const harvestLimit = Math.min(maxReviews * 2, 1000);
+    // hit maxReviews unique. Hard-capped to bound scrape wall time. Sources with
+    // oversample:false take exactly maxReviews, so the trim below never drops by rating.
+    const harvestLimit = scraper.oversample === false ? maxReviews : Math.min(maxReviews * 2, 1000);
+    const originSite = scraper.sendsOrigin ? window.location.hostname : null;
     showToast(`Scraping up to ${harvestLimit} candidates from ${scraper.label}…`, false);
     let harvested;
     try {
@@ -772,7 +876,7 @@
 
     try {
       const t = await submitImportChunked(
-        titanUrl, token, store.id, product.id, reviews, scraper.source,
+        titanUrl, token, store.id, product.id, reviews, scraper.source, originSite,
         function (nth, of, soFar) {
           if (of > 1) showToast(`Importing batch ${nth}/${of}… (${soFar} in so far)`, false);
         }

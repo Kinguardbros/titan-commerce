@@ -22,6 +22,7 @@ function makeBuilder(table) {
     select: vi.fn(() => builder),
     eq: vi.fn((k, v) => { filters[k] = v; return builder; }),
     in: vi.fn((k, v) => { filters[k] = v; return builder; }),
+    is: vi.fn((k, v) => { filters[`is:${k}`] = v; return builder; }),
     order: vi.fn(() => builder),
     insert: vi.fn((rows) => {
       (calls.inserts[table] ||= []).push(rows);
@@ -56,6 +57,7 @@ const SOURCE = [
   { author: 'Mia K.', rating: 4, title: null, body: 'Runs small', review_date: '2026-05-02', status: 'approved', source: 'csv', verified: false, helpful_count: 3, photo_url: null, photo_urls: null },
   { author: 'Pending P.', rating: 5, title: null, body: 'Not live yet', review_date: '2026-05-03', status: 'pending', source: 'web', verified: false, helpful_count: 0, photo_url: null, photo_urls: null },
   { author: 'Rejected R.', rating: 1, title: null, body: 'Spam', review_date: '2026-05-04', status: 'rejected', source: 'web', verified: false, helpful_count: 0, photo_url: null, photo_urls: null },
+  { author: 'Johnnie H.', rating: 5, title: 'Love it!', body: 'Bought on shapermint', review_date: '2026-09-29', status: 'published', source: 'stamped', origin_site: 'shapermint.com', verified: false, helpful_count: 0, photo_url: null, photo_urls: null },
 ];
 
 function setup({ owned = ['src', 'tgt'], targetHas = [] } = {}) {
@@ -66,7 +68,9 @@ function setup({ owned = ['src', 'tgt'], targetHas = [] } = {}) {
     },
     product_reviews: {
       list: (f) => {
-        if (f.product_id === 'src') return { data: SOURCE.filter((r) => (f.status || []).includes(r.status)), error: null };
+        if (f.product_id === 'src') {
+          return { data: SOURCE.filter((r) => (f.status || []).includes(r.status) && (!('is:origin_site' in f) || !r.origin_site)), error: null };
+        }
         if (f.product_id === 'tgt') return { data: targetHas, error: null };
         return { data: [], error: null };
       },
@@ -104,6 +108,14 @@ describe('copy_reviews_to_products', () => {
       expect(r).toMatchObject({ store_id: 's1', product_id: 'tgt', status: 'pending', verified: false, helpful_count: 0 });
     }
     expect(inserted().map((r) => r.source)).toEqual(['amazon', 'csv']);
+  });
+
+  it('never copies a syndicated review (origin_site): it belongs only to the identical product it was imported for', async () => {
+    setup();
+    const { status } = await run({});
+
+    expect(status).toBe(200);
+    expect(inserted().map((r) => r.author)).not.toContain('Johnnie H.');
   });
 
   it('skips reviews the target product already has', async () => {

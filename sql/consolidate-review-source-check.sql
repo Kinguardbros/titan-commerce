@@ -27,6 +27,9 @@
 -- generated, lib/actions/reviews-ai.js) and 'web' (storefront public submit, lib/actions/
 -- reviews-public.js) have zero rows yet but are live, reachable code paths — kept in the CHECK.
 --
+-- 2026-10-01: + 'stamped' (Stamped.io widget API, first used for shapermint.com reviews on an
+-- identical Isola product; always imported with origin_site, see add-review-origin-site.sql).
+--
 -- Idempotent: safe to re-run on prod. NOT VALID + separate VALIDATE avoids a long-held lock while
 -- scanning the full table — VALIDATE CONSTRAINT only takes SHARE UPDATE EXCLUSIVE (doesn't block
 -- reads/writes), unlike a plain ADD CONSTRAINT which validates inline.
@@ -38,7 +41,7 @@ UPDATE product_reviews SET source = lower(trim(source)) WHERE source <> lower(tr
 -- 2) Replace the constraint with the current full canonical set, NOT VALID (skips the scan).
 ALTER TABLE product_reviews DROP CONSTRAINT IF EXISTS chk_product_reviews_source;
 ALTER TABLE product_reviews ADD CONSTRAINT chk_product_reviews_source
-  CHECK (source IN ('manual', 'csv', 'ai', 'web', 'amazon', 'temu', 'cupshe', 'judgeme'))
+  CHECK (source IN ('manual', 'csv', 'ai', 'web', 'amazon', 'temu', 'cupshe', 'judgeme', 'stamped'))
   NOT VALID;
 
 -- 3) Validate separately (read lock only, non-blocking for concurrent reads/writes).
