@@ -7,6 +7,7 @@ import { approveAllPending } from '../lib/review-bulk';
 
 // Lazy — pulls in the xlsx parser only when the import modal is actually opened.
 const ImportReviews = lazy(() => import('./ImportReviews'));
+const CopyReviewsModal = lazy(() => import('./CopyReviewsModal'));
 const GenerateReviews = lazy(() => import('./GenerateReviews'));
 
 const STATUS_BADGE = {
@@ -39,6 +40,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const [generating, setGenerating] = useState(false); // AI generate dialog open
   const [pushing, setPushing] = useState(false);   // push-to-Shopify in flight
   const [approving, setApproving] = useState(false); // approve-all-pending in flight
+  const [copyOpen, setCopyOpen] = useState(false);   // copy-to-collection modal open
   const [seedOpen, setSeedOpen] = useState(false);
   const [seedRange, setSeedRange] = useState({ min: 5, max: 50 });
 
@@ -103,6 +105,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
   };
 
   const pendingCount = reviews.filter((r) => r.status === 'pending').length;
+  const liveCount = reviews.filter((r) => r.status === 'approved' || r.status === 'published').length;
 
   const handleApproveAll = async () => {
     if (!window.confirm(`Approve all ${pendingCount} pending review${pendingCount === 1 ? '' : 's'}? They go live with the next Push to Shopify.`)) return;
@@ -216,6 +219,7 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
             <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
             <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
             {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
+            {liveCount > 0 && <button className="rv-import-btn" onClick={() => setCopyOpen(true)}>Copy to collection…</button>}
             {pendingCount > 0 && (
               <button className="rv-import-btn" onClick={handleApproveAll} disabled={approving}>
                 {approving ? 'Approving…' : `Approve all pending (${pendingCount})`}
@@ -309,6 +313,11 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
           )}
         </div>
 
+        {copyOpen && (
+          <Suspense fallback={null}>
+            <CopyReviewsModal storeId={storeId} product={product} liveCount={liveCount} onClose={() => setCopyOpen(false)} />
+          </Suspense>
+        )}
         {importing && (
           <Suspense fallback={null}>
             <ImportReviews

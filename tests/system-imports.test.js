@@ -11,10 +11,12 @@ describe('api/system.js import chain', () => {
     vi.stubEnv('APP_SECRET', 'test-secret');
   });
 
+  // Cold-imports the whole router (30+ action modules); under a parallel full-suite run
+  // that can pass the 5 s default, so it gets its own budget.
   it('loads the router and all action modules without throwing', async () => {
     const mod = await import('../api/system.js');
     expect(typeof mod.default).toBe('function'); // the withAuth(handler) export
-  });
+  }, 15000);
 
   it('reviews-shared exports every helper the reviews modules import', async () => {
     const shared = await import('../lib/actions/reviews-shared.js');

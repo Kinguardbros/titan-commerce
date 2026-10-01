@@ -12,3 +12,24 @@ export async function approveAllPending(reviews, storeId, setStatus) {
   }
   return updated;
 }
+
+// "Copy to collection…": one copy_reviews_to_products call per target product, one
+// after another, so each request stays small. A failed product is reported and the
+// rest still run. onProgress(done, total) drives the modal's counter.
+export async function copyToProducts(targetIds, copyOne, onProgress) {
+  const result = { copied: 0, duplicates: 0, failed: [] };
+  onProgress(0, targetIds.length);
+  for (let i = 0; i < targetIds.length; i++) {
+    const id = targetIds[i];
+    try {
+      const res = await copyOne(id);
+      result.copied += res?.copied || 0;
+      result.duplicates += res?.duplicates || 0;
+    } catch (err) {
+      console.error('[review-bulk] copy to product failed:', { id, message: err.message });
+      result.failed.push({ id, error: err.message });
+    }
+    onProgress(i + 1, targetIds.length);
+  }
+  return result;
+}

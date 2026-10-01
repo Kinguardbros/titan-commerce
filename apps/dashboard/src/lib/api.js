@@ -583,6 +583,14 @@ export function deleteReview(id, storeId) {
   return fetchJSON('/api/system?action=delete_review', { method: 'POST', body: JSON.stringify({ id, store_id: storeId }) });
 }
 
+// Copy a product's live reviews onto one other product (Reviews → Copy to collection…).
+export function copyReviewsToProduct(storeId, sourceProductId, targetProductId) {
+  return fetchJSON('/api/system?action=copy_reviews_to_products', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, source_product_id: sourceProductId, target_product_id: targetProductId }),
+  });
+}
+
 export function setReviewStatus(ids, status, storeId) {
   return fetchJSON('/api/system?action=set_review_status', { method: 'POST', body: JSON.stringify({ ids, status, store_id: storeId }) });
 }
