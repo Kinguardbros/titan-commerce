@@ -1,3 +1,48 @@
+# BUG — Kolekce v Products ukazuje jen produkty z první stránky (Isola: 17 z 20 podprsenek)
+
+*Nahlásil Dan, 2026-10-02.*
+
+**Příčina:** `apps/dashboard/src/lib/api.js::getAllProducts` přes svůj název načte jen první stránku
+(`getProducts(storeId, { limit: 200 })`). Isola má 228 produktů, takže 28 z nich v „celém katalogu“ chybí.
+Kolekce Bras má 20 produktů, ale 3 jsou na 2. stránce (Underwire Support Seamless Unlined Balconette Bra,
+Wireless Leopard V-Neck Contour Bra, Wireless Support & Lift V-Neck Mesh Bra) → filtr kolekce ukáže 17.
+
+**Kde se to projevuje:**
+- `pages/Products.jsx` ~ř. 112: filtr kolekce / ceny / statusu a hledání (načtení celého katalogu).
+- `App.jsx` ~ř. 73 a ~ř. 139: otevření produktu z URL `?product=` a `handleNavigateToProduct` (produkt z 2. stránky se nenajde).
+- `AssignProductsToChartModal.jsx` ř. 18: přiřazení size chartu (chybí produkty z 2. stránky).
+
+**Oprava:** `getAllProducts(storeId, show_archived)` ať stránkuje přes všechny stránky (stejně jako už existující
+`getAllProductsPaged`, ale s podporou `show_archived`), případně obě funkce sloučit do jedné.
+
+**Acceptance criteria:**
+- Products → filtr kolekce „Bras“ u Isoly ukáže 20 produktů (ověřit proti isolaworld.com/collections/bras).
+- Otevření produktu z 2. stránky přes `?product=<id>` funguje.
+- Size chart modal nabízí všech 228 produktů Isoly.
+
+## Pro developera — copy-paste prompt (bug)
+
+Oprav bug popsaný v DEVELOPER-BRIEF.md (sekce „BUG — Kolekce v Products ukazuje jen produkty z první stránky“).
+
+Klíčové soubory:
+- apps/dashboard/src/lib/api.js (getAllProducts, getAllProductsPaged)
+- apps/dashboard/src/pages/Products.jsx, apps/dashboard/src/App.jsx, apps/dashboard/src/components/AssignProductsToChartModal.jsx
+
+Acceptance criteria:
+- Filtr kolekce „Bras“ u Isoly ukáže 20 produktů, ne 17
+- Produkt z 2. stránky jde otevřít přes ?product=<id>
+- Size chart modal nabízí všechny produkty store
+
+Postup:
+1. Načti DEVELOPER-BRIEF.md a uvedené soubory
+2. getAllProducts ať stránkuje přes všechny stránky (zachovat show_archived)
+3. Ověř v dashboardu na Isole (228 produktů)
+4. Vytvoř PR s názvem "fix(products): load every page of the catalog, not just the first 200"
+
+Pokud něco není jasné, zeptej se před začátkem implementace.
+
+---
+
 # DEVELOPER-BRIEF — Přepínač „zobrazit původ“ u recenzí + hromadná úprava (Reviews panel)
 
 *Zadal Dan, 2026-10-02.*
