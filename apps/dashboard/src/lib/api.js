@@ -120,21 +120,22 @@ export async function getProducts(storeId, { page, limit, show_archived } = {}) 
   return result;
 }
 
-// Convenience: fetch all products (used by Shopify pricing which needs full list)
+// The whole catalog, walking every page (the API caps a page at 200; Isola has more).
+// Deduplicated by id so a product that moves between pages mid-walk is not listed twice.
 export async function getAllProducts(storeId, show_archived) {
-  const result = await getProducts(storeId, { limit: 200, show_archived });
-  return result.products || [];
-}
-
-// Every active product, walking all pages — getAllProducts stops at the first 200.
-export async function getAllProductsPaged(storeId) {
-  const first = await getProducts(storeId, { page: 1, limit: 200 });
+  const first = await getProducts(storeId, { page: 1, limit: 200, show_archived });
   const all = [...(first.products || [])];
   for (let page = 2; page <= (first.pages || 1); page++) {
-    const next = await getProducts(storeId, { page, limit: 200 });
+    const next = await getProducts(storeId, { page, limit: 200, show_archived });
     all.push(...(next.products || []));
   }
-  return all;
+  const seen = new Set();
+  return all.filter((p) => !seen.has(p.id) && seen.add(p.id));
+}
+
+// Kept for existing callers (ReviewTargetPicker); same as getAllProducts.
+export function getAllProductsPaged(storeId) {
+  return getAllProducts(storeId);
 }
 
 export function syncProducts(storeId) {

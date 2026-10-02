@@ -79,7 +79,13 @@ export default function Products({ onSelectProduct, onNavigateToStudio, storeId 
       const showArchived = statusFilter !== 'all' && statusFilter !== 'active';
       const result = await getProducts(storeId, { page, limit: PAGE_SIZE, show_archived: showArchived });
       if (result) {
-        setAllProducts((prev) => append ? [...prev, ...result.products] : result.products);
+        // Append only products not already loaded: after the full-catalog load (search/filter)
+        // a "Load more" page would otherwise add duplicates of what is already there.
+        setAllProducts((prev) => {
+          if (!append) return result.products;
+          const have = new Set(prev.map((p) => p.id));
+          return [...prev, ...result.products.filter((p) => !have.has(p.id))];
+        });
         setTotalProducts(result.total);
         setCurrentPage(result.page);
         setHasMore(result.page < result.pages);
