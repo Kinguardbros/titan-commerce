@@ -162,6 +162,31 @@ describe('refreshReviewGroupAggregates', () => {
   });
 });
 
+describe('all-products group', () => {
+  const ALL = { ...STORE, brand_config: { review_group_aggregates: [{ key: 'reviews_total', all: true }] } };
+
+  it('is a valid group without collections', async () => {
+    const { reviewGroups } = await import('../lib/actions/reviews-group-aggregate.js');
+    expect(reviewGroups(ALL)).toEqual([{ key: 'reviews_total', all: true }]);
+    expect(reviewGroups({ brand_config: { review_group_aggregates: [{ key: 'reviews_total', all: 'yes' }] } })).toEqual([]);
+  });
+
+  it('counts every non-archived product, whatever its collections', async () => {
+    const { refreshReviewGroupAggregates } = await import('../lib/actions/reviews-group-aggregate.js');
+    const [out] = await refreshReviewGroupAggregates(ALL, 's1');
+    expect(out).toMatchObject({ key: 'reviews_total', products: 4 });
+    expect(state.countQueries[0].in).toEqual(['cami1', 'bra1', 'bundle', 'bikini']);
+    expect(JSON.parse(metafieldWrites()[0].value)).toMatchObject({ count: 2384, collections: 'all' });
+    expect(state.logged[0].message).toContain('(all products, 4 products)');
+  });
+
+  it('is refreshed by a push of any product', async () => {
+    const { refreshReviewGroupAggregates } = await import('../lib/actions/reviews-group-aggregate.js');
+    expect(await refreshReviewGroupAggregates(ALL, 's1', { collections: ['Bikinis'] })).toHaveLength(1);
+    expect(await refreshReviewGroupAggregates(ALL, 's1', { collections: [] })).toHaveLength(1);
+  });
+});
+
 describe('refresh_review_group_aggregates action', () => {
   const ADMIN = { role: 'admin', user_id: 'u1', permissions: [], store_access: [] };
   const call = async (body, user = ADMIN) => {
