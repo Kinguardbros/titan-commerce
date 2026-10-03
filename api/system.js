@@ -31,6 +31,7 @@ import { generate_reviews_ai } from '../lib/actions/reviews-ai.js';
 import { upload_review_photo, delete_review_photo } from '../lib/actions/reviews-photo.js';
 import { cleanup_orphan_review_photos } from '../lib/actions/reviews-cleanup.js';
 import { push_reviews_to_shopify, refresh_store_reviews_aggregate } from '../lib/actions/reviews-push.js';
+import { refresh_review_group_aggregates } from '../lib/actions/reviews-group-aggregate.js';
 import { submit_review_public, vote_review_helpful, review_helpful_counts } from '../lib/actions/reviews-public.js';
 import { export_products_csv } from '../lib/actions/exports.js';
 import { bulk_make_unlisted, bulk_make_listed } from '../lib/actions/publications.js';
@@ -132,6 +133,7 @@ const POST_ACTIONS = {
   generate_reviews_ai,
   push_reviews_to_shopify,
   refresh_store_reviews_aggregate,
+  refresh_review_group_aggregates,
   scrape_amazon_preview,
   import_amazon_reviews,
   check_review_duplicates,
