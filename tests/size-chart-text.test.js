@@ -63,3 +63,17 @@ describe('size chart text', () => {
     expect(res.status).toHaveBeenCalledWith(404);
   });
 });
+
+// The editor reads with GET (fetchJSON without a body) and saves with POST; api/system.js keeps
+// separate GET/POST maps, so a read registered under POST answers "Unknown GET action" (f19dcb1).
+import { readFileSync } from 'node:fs';
+describe('size chart text routing', () => {
+  const src = readFileSync(new URL('../api/system.js', import.meta.url), 'utf8');
+  const block = (name) => src.slice(src.indexOf(`const ${name} = {`), src.indexOf('};', src.indexOf(`const ${name} = {`)));
+  it('read_size_chart is a GET action, save_size_chart a POST action', () => {
+    expect(block('GET_ACTIONS')).toMatch(/\bread_size_chart\b/);
+    expect(block('POST_ACTIONS')).not.toMatch(/\bread_size_chart\b/);
+    expect(block('POST_ACTIONS')).toMatch(/\bsave_size_chart\b/);
+    expect(block('GET_ACTIONS')).not.toMatch(/\bsave_size_chart\b/);
+  });
+});
