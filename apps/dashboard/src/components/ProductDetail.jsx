@@ -232,8 +232,8 @@ export default function ProductDetail({ product, storeId, store }) {
       </div>
 
       {/* Size Chart — a per-product text chart (custom.size_chart_text) for stores whose theme reads it
-          (brand_config.features.size_chart_text, Isola), otherwise the shared size_chart metaobject. */}
-      {store?.brand_config?.features?.size_chart_text
+          (stores_list → features.size_chart_text, Isola), otherwise the shared size_chart metaobject. */}
+      {store?.features?.size_chart_text
         ? <SizeChartEditor product={product} storeId={storeId} />
         : <SizeChartAssignment product={product} storeId={storeId} />}
 

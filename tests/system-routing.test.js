@@ -38,7 +38,7 @@ vi.mock('../lib/rate-limit.js', () => ({
 }));
 vi.mock('../lib/store-context.js', () => ({
   getAllStores: vi.fn().mockResolvedValue([
-    { id: '1', name: 'Test Store', slug: 'test', currency: 'EUR', is_active: true, admin_token: 'secret-123', client_id: 'cid' },
+    { id: '1', name: 'Test Store', slug: 'test', currency: 'EUR', is_active: true, admin_token: 'secret-123', client_id: 'cid', brand_config: { brand_voice: 'secret voice', features: { size_chart_text: true } } },
   ]),
   getStore: vi.fn(),
 }));
@@ -105,6 +105,14 @@ describe('system.js routing', () => {
       expect(store).not.toHaveProperty('admin_token');
       expect(store).toHaveProperty('has_admin');
     }
+  });
+
+  it('stores_list exposes only the feature switches of brand_config', async () => {
+    const { req, res } = mockReqRes('GET', 'stores_list');
+    await handler(req, res);
+    const store = res.json.mock.calls[0][0][0];
+    expect(store).not.toHaveProperty('brand_config');
+    expect(store.features).toEqual({ size_chart_text: true });
   });
 
   it('stores_list returns has_admin boolean', async () => {
