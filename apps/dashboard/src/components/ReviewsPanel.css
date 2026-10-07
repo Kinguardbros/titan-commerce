@@ -25,12 +25,20 @@
 
 /* Header */
 .rv-header {
-  display: flex; align-items: flex-start; justify-content: space-between;
-  gap: 16px; padding-right: 36px; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding-right: 36px; margin-bottom: 14px;
 }
+.rv-header > :first-child { min-width: 0; }
 .rv-title { font-family: var(--display); font-size: 18px; font-weight: 500; color: var(--text); }
 .rv-product { font-family: var(--mono); font-size: 10px; color: var(--gold); margin-top: 3px; }
-.rv-header-right { display: flex; align-items: center; gap: 16px; }
+.rv-header-right { display: flex; align-items: stretch; gap: 10px; flex-shrink: 0; }
+/* Action row under the summaries: secondary buttons left, Add + Push right, wraps on narrow modals */
+.rv-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding-top: 14px; margin-bottom: 16px; border-top: 1px solid var(--edge);
+}
+.rv-actions button { white-space: nowrap; }
+.rv-actions .rv-add-btn { margin-left: auto; }
 .rv-summary {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 6px 12px; border-radius: 8px;
@@ -307,6 +315,8 @@
   .rv-content { flex-direction: column; }
   .rv-table-wrap--narrow { flex: none; max-height: 30vh; }
   .rv-import-row { flex-wrap: wrap; }
+  .rv-header { flex-wrap: wrap; }
+  .rv-header-right { flex-wrap: wrap; }
 }
 
 /* Helpful count — detail panel + table + seed dialog */
@@ -334,8 +344,14 @@
 .rv-import-tab--active { color: var(--gold); border-bottom-color: var(--gold); }
 
 /* Storefront review count (hand-set override; empty = real count) */
-.rv-summary--count { min-width: 92px; }
-.rv-count-input { width: 80px; background: transparent; border: 1px solid var(--edge); border-radius: 6px; color: var(--text); font-family: var(--display); font-size: 15px; padding: 3px 6px; }
+.rv-summary--count { min-width: 104px; }
+.rv-count-input {
+  width: 88px; background: transparent; border: 1px solid var(--edge); border-radius: 6px;
+  color: var(--gold); font-family: var(--mono); font-size: 15px; font-weight: 600; text-align: center;
+  padding: 3px 4px; margin: 2px 0; font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+.rv-count-input::-webkit-outer-spin-button, .rv-count-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.rv-count-input:focus { outline: none; border-color: var(--gold); }
 .rv-count-input::placeholder { color: var(--text4); }
-.rv-count-save { margin-top: 4px; font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--gold); background: transparent; color: var(--gold); cursor: pointer; }
+.rv-count-save { margin-top: 2px; font-family: var(--mono); font-size: 10px; padding: 1px 10px; border-radius: 6px; border: 1px solid var(--gold); background: transparent; color: var(--gold); cursor: pointer; }
 .rv-count-save:disabled { opacity: .6; cursor: default; }

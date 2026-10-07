@@ -238,10 +238,12 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                       onChange={(e) => setCountDraft(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCount(); }}
                       aria-label="Review count shown on the storefront" />
-                    {(countDraft !== (countOverride == null ? '' : String(countOverride))) && (
+                    {countDraft !== (countOverride == null ? '' : String(countOverride)) ? (
                       <button className="rv-count-save" onClick={handleSaveCount} disabled={savingCount}>
                         {savingCount ? 'Saving…' : 'Save'}
                       </button>
+                    ) : (
+                      <span className="rv-summary-count">{countOverride == null ? 'real count' : `real ${published.length}`}</span>
                     )}
                   </div>
                   <div className="rv-summary rv-summary--dist" title="Rating distribution across all non-rejected reviews">
@@ -261,23 +263,27 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                 </>
               );
             })()}
-            <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
-            <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
-            {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
-            {liveCount > 0 && <button className="rv-import-btn" onClick={() => setCopyOpen(true)}>Copy to collection…</button>}
-            {pendingCount > 0 && (
-              <button className="rv-import-btn" onClick={handleApproveAll} disabled={approving}>
-                {approving ? 'Approving…' : `Approve all pending (${pendingCount})`}
-              </button>
-            )}
-            <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
-            {canPush && (
-              <button className="rv-push-btn" onClick={handlePush} disabled={pushing}>
-                {pushing ? 'Pushing…' : 'Push to Shopify'}
-                {!pushing && pendingPush > 0 && <span className="rv-push-badge">{pendingPush}</span>}
-              </button>
-            )}
           </div>
+        </div>
+
+        {/* Actions — own row, wraps instead of overflowing the modal */}
+        <div className="rv-actions">
+          <button className="rv-import-btn" onClick={() => setGenerating(true)}>Generate (AI)</button>
+          <button className="rv-import-btn" onClick={() => setImporting(true)}>Import</button>
+          {reviews.length > 0 && <button className="rv-import-btn" onClick={() => setSeedOpen(true)}>Seed helpful</button>}
+          {liveCount > 0 && <button className="rv-import-btn" onClick={() => setCopyOpen(true)}>Copy to collection…</button>}
+          {pendingCount > 0 && (
+            <button className="rv-import-btn" onClick={handleApproveAll} disabled={approving}>
+              {approving ? 'Approving…' : `Approve all pending (${pendingCount})`}
+            </button>
+          )}
+          <button className="rv-add-btn" onClick={() => { setSelected(null); setAdding(true); }}>+ Add</button>
+          {canPush && (
+            <button className="rv-push-btn" onClick={handlePush} disabled={pushing}>
+              {pushing ? 'Pushing…' : 'Push to Shopify'}
+              {!pushing && pendingPush > 0 && <span className="rv-push-badge">{pendingPush}</span>}
+            </button>
+          )}
         </div>
 
         <div className="rv-content">
