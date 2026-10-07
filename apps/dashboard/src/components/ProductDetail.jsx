@@ -5,6 +5,7 @@ import VariantEditor from './VariantEditor';
 import ImageManager from './ImageManager';
 import MetafieldEditor from './MetafieldEditor';
 import SizeChartAssignment from './SizeChartAssignment';
+import SizeChartEditor from './SizeChartEditor';
 import { useToast } from '../hooks/useToast.jsx';
 import { useUser } from '../hooks/useUser.jsx';
 import './ProductDetail.css';
@@ -230,8 +231,11 @@ export default function ProductDetail({ product, storeId, store }) {
           onChange={(v) => { setVariants(v); markDirty(); }} />
       </div>
 
-      {/* Size Chart */}
-      <SizeChartAssignment product={product} storeId={storeId} />
+      {/* Size Chart — a per-product text chart (custom.size_chart_text) for stores whose theme reads it
+          (brand_config.features.size_chart_text, Isola), otherwise the shared size_chart metaobject. */}
+      {store?.brand_config?.features?.size_chart_text
+        ? <SizeChartEditor product={product} storeId={storeId} />
+        : <SizeChartAssignment product={product} storeId={storeId} />}
 
       {/* Metafields */}
       <div className="pd-card">

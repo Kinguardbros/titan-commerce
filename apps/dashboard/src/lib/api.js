@@ -381,6 +381,18 @@ export function refreshHasSizeChart(storeId) {
   });
 }
 
+// Plain-text size chart (custom.size_chart_text) — stores whose theme reads it (Isola).
+export function readSizeChart(storeId, productId) {
+  return fetchJSON(`/api/system?action=read_size_chart&store_id=${storeId}&product_id=${productId}`);
+}
+
+export function saveSizeChart(storeId, productId, sizeChartText) {
+  return fetchJSON('/api/system?action=save_size_chart', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, size_chart_text: sizeChartText }),
+  });
+}
+
 export function parseSizeChartImage(imageUrl) {
   return fetchJSON('/api/system?action=parse_size_chart_image', {
     method: 'POST',

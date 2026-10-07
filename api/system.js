@@ -16,6 +16,7 @@ import {
   duplicate_size_chart, assign_size_chart_products, unassign_size_chart_products,
   refresh_has_size_chart, parse_size_chart_image,
 } from '../lib/actions/size-chart.js';
+import { read_size_chart, save_size_chart } from '../lib/actions/size-chart-text.js';
 import { product_detail, scrape_product, import_confirm, update_product_full, bulk_price } from '../lib/actions/products.js';
 import { store_docs, store_docs_download, upload_store_doc, process_single_file, process_inbox } from '../lib/actions/docs.js';
 import { custom_styles, analyze_style, create_custom_style, delete_custom_style, describe_style, scrape_style } from '../lib/actions/custom-styles.js';
@@ -102,6 +103,8 @@ const POST_ACTIONS = {
   unassign_size_chart_products,
   refresh_has_size_chart,
   parse_size_chart_image,
+  read_size_chart,
+  save_size_chart,
   update_product_full,
   scrape_product,
   import_confirm,
