@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { createSizeChart, updateSizeChart, parseSizeChartImage } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
+import { parseCsvTable } from '../lib/size-chart-csv';
 import './SizeChartTableEditor.css';
 
 // Mirrors the storefront's own conversion exactly (clara-size-chart.liquid): every number
@@ -13,16 +14,6 @@ function cmToInch(text) {
     const v = parseFloat(n.replace(',', '.')) / 2.54;
     return (Math.round(v * 10) / 10).toFixed(1).replace('.', ',');
   });
-}
-
-function parseCsvTable(csv) {
-  const lines = csv.split('\n').map((l) => l.trim()).filter(Boolean);
-  if (lines.length < 2) return null;
-  const split = (line) => line.split(',').map((c) => c.trim());
-  const columns = split(lines[0]);
-  const rows = lines.slice(1).map(split).filter((r) => r.length === columns.length);
-  if (!columns.length || !rows.length) return null;
-  return { columns, rows };
 }
 
 export default function SizeChartTableEditor({ storeId, chart, initialValidation, onSaved, onCancel }) {
