@@ -650,6 +650,14 @@ export function pushReviewsToShopify(storeId, productId) {
   });
 }
 
+// Hand-set review count shown on the storefront (null = the real count). Takes effect on the next push.
+export function setReviewCountOverride(storeId, productId, count) {
+  return fetchJSON('/api/system?action=set_review_count_override', {
+    method: 'POST',
+    body: JSON.stringify({ store_id: storeId, product_id: productId, count }),
+  });
+}
+
 // Amazon review import — scrape a product page for a preview list (not saved yet).
 export function scrapeAmazonPreview(storeId, productId, amazonUrl, maxReviews) {
   return fetchJSON('/api/system?action=scrape_amazon_preview', {

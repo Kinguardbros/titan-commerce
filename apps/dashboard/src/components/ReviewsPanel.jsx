@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus, pushReviewsToShopify, seedReviewsHelpful } from '../lib/api';
+import { getProductReviews, addReviewManual, updateReview, deleteReview, setReviewStatus, pushReviewsToShopify, seedReviewsHelpful, setReviewCountOverride } from '../lib/api';
 import { useToast } from '../hooks/useToast.jsx';
 import ReviewDetail from './ReviewDetail';
 import './ReviewsPanel.css';
@@ -43,11 +43,16 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
   const [copyOpen, setCopyOpen] = useState(false);   // copy-to-collection modal open
   const [seedOpen, setSeedOpen] = useState(false);
   const [seedRange, setSeedRange] = useState({ min: 5, max: 50 });
+  const [countOverride, setCountOverride] = useState(null); // saved hand-set storefront count (null = real)
+  const [countDraft, setCountDraft] = useState('');         // input value
+  const [savingCount, setSavingCount] = useState(false);
 
   const fetchReviews = useCallback(async () => {
     try {
       const data = await getProductReviews(product.id, storeId);
       setReviews(data?.reviews || []);
+      setCountOverride(data?.review_count_override ?? null);
+      setCountDraft(data?.review_count_override == null ? '' : String(data.review_count_override));
     } catch (err) {
       console.error('[ReviewsPanel] fetch failed:', err);
       toast.error(`Failed to load reviews: ${err.message}`);
@@ -141,6 +146,32 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
     }
   };
 
+  // Save the storefront review count (empty = real count) and push so the site picks it up.
+  const handleSaveCount = async () => {
+    const value = countDraft.trim() === '' ? null : Number(countDraft);
+    if (value !== null && (!Number.isInteger(value) || value < 0)) {
+      toast.error('Enter a whole number, or leave empty for the real count');
+      return;
+    }
+    setSavingCount(true);
+    try {
+      await setReviewCountOverride(storeId, product.id, value);
+      setCountOverride(value);
+      if (canPush) {
+        const { count } = await pushReviewsToShopify(storeId, product.id);
+        toast.success(`Storefront count is now ${count}`);
+      } else {
+        toast.success('Saved. It shows on the storefront after the next push.');
+      }
+      await fetchReviews();
+    } catch (err) {
+      console.error('[ReviewsPanel] count override failed:', err);
+      toast.error(`Saving the count failed: ${err.message}`);
+    } finally {
+      setSavingCount(false);
+    }
+  };
+
   const handleSeed = async () => {
     try {
       const { updated } = await seedReviewsHelpful(storeId, product.id, seedRange.min, seedRange.max);
@@ -198,6 +229,20 @@ export default function ReviewsPanel({ product, storeId, store, onClose }) {
                     <span className="rv-summary-label">Published</span>
                     <span className="rv-summary-avg">★ {pubAvg || '—'}</span>
                     <span className="rv-summary-count">{published.length}</span>
+                  </div>
+                  <div className="rv-summary rv-summary--count"
+                    title="Review count shown on the storefront. Empty = the real number of published reviews.">
+                    <span className="rv-summary-label">On site</span>
+                    <input className="rv-count-input" type="number" min="0" step="1" inputMode="numeric"
+                      placeholder={String(published.length)} value={countDraft}
+                      onChange={(e) => setCountDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveCount(); }}
+                      aria-label="Review count shown on the storefront" />
+                    {(countDraft !== (countOverride == null ? '' : String(countOverride))) && (
+                      <button className="rv-count-save" onClick={handleSaveCount} disabled={savingCount}>
+                        {savingCount ? 'Saving…' : 'Save'}
+                      </button>
+                    )}
                   </div>
                   <div className="rv-summary rv-summary--dist" title="Rating distribution across all non-rejected reviews">
                     <span className="rv-summary-label">Ratings</span>

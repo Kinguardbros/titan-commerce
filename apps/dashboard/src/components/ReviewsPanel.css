@@ -332,3 +332,10 @@
 }
 .rv-import-tab:hover { color: var(--text); }
 .rv-import-tab--active { color: var(--gold); border-bottom-color: var(--gold); }
+
+/* Storefront review count (hand-set override; empty = real count) */
+.rv-summary--count { min-width: 92px; }
+.rv-count-input { width: 80px; background: transparent; border: 1px solid var(--edge); border-radius: 6px; color: var(--text); font-family: var(--display); font-size: 15px; padding: 3px 6px; }
+.rv-count-input::placeholder { color: var(--text4); }
+.rv-count-save { margin-top: 4px; font-size: 11px; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--gold); background: transparent; color: var(--gold); cursor: pointer; }
+.rv-count-save:disabled { opacity: .6; cursor: default; }

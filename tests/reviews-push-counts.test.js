@@ -106,6 +106,32 @@ describe('push_reviews_to_shopify — real storefront count', () => {
   });
 });
 
+describe('push_reviews_to_shopify — hand-set count (review_count_override)', () => {
+  it('shows the override as the storefront count and keeps the real count beside it', async () => {
+    supabaseState.product = { ...supabaseState.product, review_count_override: 320 };
+    const { push_reviews_to_shopify } = await import('../lib/actions/reviews-push.js');
+    const { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1' });
+    await push_reviews_to_shopify(req, res);
+    expect(pushedSummary()).toMatchObject({ count: 320, real: 47, shown: 47 });
+  });
+
+  it('an override of 0 is respected, null falls back to the real count', async () => {
+    supabaseState.product = { ...supabaseState.product, review_count_override: 0 };
+    let mod = await import('../lib/actions/reviews-push.js');
+    let { req, res } = mockReqRes({ store_id: 's1', product_id: 'p1' });
+    await mod.push_reviews_to_shopify(req, res);
+    expect(pushedSummary().count).toBe(0);
+
+    updateMetafieldMock.mockClear();
+    supabaseState.product = { ...supabaseState.product, review_count_override: null };
+    vi.resetModules();
+    mod = await import('../lib/actions/reviews-push.js');
+    ({ req, res } = mockReqRes({ store_id: 's1', product_id: 'p1' }));
+    await mod.push_reviews_to_shopify(req, res);
+    expect(pushedSummary().count).toBe(47);
+  });
+});
+
 describe('refreshStoreReviewsAggregate — no 1000-row cap', () => {
   it('sums exact per-star counts of published reviews and writes custom.reviews_aggregate', async () => {
     supabaseState.headCounts = { 5: 3900, 4: 450, 3: 100, 2: 40, 1: 38 };
