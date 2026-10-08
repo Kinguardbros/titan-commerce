@@ -77,7 +77,9 @@ describe('lib/shopify-webhook-handlers.js', () => {
     it('returns action:"created" + resolves the DB product_id for the notification link', async () => {
       selectSingleMock.mockResolvedValue({ data: { id: 'db-p1' }, error: null });
       const result = await handleProductCreate({ id: 's1', shopify_url: 'x.myshopify.com' }, { id: 555, title: 'New Product' });
-      expect(result).toEqual({ action: 'created', shopify_id: 555, title: 'New Product', product_id: 'db-p1' });
+      // compare_at: the struck-price fallback (tests/compare-at-fallback.test.js); a store without
+      // brand_config.features.compare_at_fallback_metafield reports 'off' and calls nothing.
+      expect(result).toEqual({ action: 'created', shopify_id: 555, title: 'New Product', product_id: 'db-p1', compare_at: { action: 'off' } });
     });
 
     it('falls back to product_id: null (no crash) when the post-upsert id lookup finds no row', async () => {
@@ -98,7 +100,7 @@ describe('lib/shopify-webhook-handlers.js', () => {
     it('returns action:"updated" + resolves the DB product_id', async () => {
       selectSingleMock.mockResolvedValue({ data: { id: 'db-p2' }, error: null });
       const result = await handleProductUpdate({ id: 's1', shopify_url: 'x.myshopify.com' }, { id: 556, title: 'Updated Product' });
-      expect(result).toEqual({ action: 'updated', shopify_id: 556, title: 'Updated Product', product_id: 'db-p2' });
+      expect(result).toEqual({ action: 'updated', shopify_id: 556, title: 'Updated Product', product_id: 'db-p2', compare_at: { action: 'off' } });
     });
   });
 

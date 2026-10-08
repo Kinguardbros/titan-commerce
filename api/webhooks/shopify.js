@@ -55,7 +55,7 @@ export default async function handler(req, res) {
 
   const { data: store } = await supabase
     .from('stores')
-    .select('id, shopify_url, admin_token, client_secret')
+    .select('id, shopify_url, admin_token, client_secret, brand_config')
     .eq('shopify_url', shop)
     .single();
 
